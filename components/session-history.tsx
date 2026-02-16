@@ -130,7 +130,7 @@ export function SessionHistory({
                   <User className="h-3 w-3" />
                   {session.role}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                   <Target className="h-3 w-3" />
                   {session.activity}
                 </span>

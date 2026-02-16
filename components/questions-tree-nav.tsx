@@ -71,7 +71,7 @@ export function QuestionsTreeNav({
   onToggleQuestion,
 }: QuestionsTreeNavProps) {
   return (
-    <aside className="flex w-full flex-col border-r border-border bg-card lg:w-72 lg:flex-shrink-0">
+    <aside className="flex w-full flex-col border border-border bg-card lg:w-72 lg:flex-shrink-0">
       <div className="p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Question Library

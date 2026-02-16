@@ -208,7 +208,7 @@ export function QuestionsView({
           expandedQuestions={expandedQuestions}
           onToggleQuestion={toggleQuestion}
         />
-        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-card lg:min-w-0">
+        <div className="min-h-0 flex-1 overflow-hidden border border-border bg-card lg:min-w-0">
           <QuestionDetailPanel
             selectedNode={selectedNode}
             perspectives={perspectives}
