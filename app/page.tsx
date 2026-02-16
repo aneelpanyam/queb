@@ -793,65 +793,7 @@ export default function QuestionBookPage() {
 
         {/* ===== VIEW SAVED SESSION ===== (same layout as step 5 Question Book) */}
         {view === 'view-session' && viewingSession && (
-          <div className="flex flex-1 flex-col overflow-auto">
-            <div className="flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-              <div className="flex w-full flex-col">
-                <div className="mb-6 text-center">
-                  <h2 className="font-display text-2xl font-bold text-balance text-foreground sm:text-3xl">
-                    Your Question Book
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                    Viewing a previously saved session
-                  </p>
-                </div>
-
-                {/* Context summary – same as step 5 */}
-                <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-sm">
-                  <span className="rounded-md bg-muted px-2.5 py-1 text-muted-foreground">
-                    {viewingSession.industry}
-                  </span>
-                  <span className="text-muted-foreground">/</span>
-                  <span className="rounded-md bg-muted px-2.5 py-1 text-muted-foreground">
-                    {viewingSession.service}
-                  </span>
-                  <span className="text-muted-foreground">/</span>
-                  <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                    {viewingSession.role}
-                  </span>
-                  <span className="text-muted-foreground">/</span>
-                  <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                    {viewingSession.activity}
-                  </span>
-                </div>
-
-                {/* Situation – same card as step 5 */}
-                <div className="mb-6 rounded-lg border border-border bg-card p-4">
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Situation
-                  </p>
-                  <p className="text-sm leading-relaxed text-foreground">
-                    {viewingSession.situation}
-                  </p>
-                  {viewingSession.additionalContext?.length > 0 && (
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      {viewingSession.additionalContext.map((ctx, i) => (
-                        <div
-                          key={i}
-                          className="rounded-md border border-border/60 bg-muted/30 p-3"
-                        >
-                          <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                            {ctx.label}
-                          </p>
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            {ctx.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-h-[480px] flex-1">
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <QuestionsView
               perspectives={viewingSession.perspectives}
               isLoading={false}
@@ -862,6 +804,7 @@ export default function QuestionBookPage() {
                 industry: viewingSession.industry,
                 service: viewingSession.service,
               }}
+              additionalContext={viewingSession.additionalContext}
               initialDissections={viewingSession.dissections}
               initialDeeperQuestions={viewingSession.deeperQuestions}
               onDissectionUpdate={handleDissectionUpdate}
@@ -869,31 +812,6 @@ export default function QuestionBookPage() {
               onExportSite={handleExportSite}
               exportLoading={exportLoading}
             />
-                </div>
-
-                <div className="mt-8 flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setView('history')
-                      setViewingSession(null)
-                    }}
-                    className="gap-2"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to History
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleStartOver}
-                    className="gap-2"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    New Session
-                  </Button>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -912,9 +830,9 @@ export default function QuestionBookPage() {
 
             {/* Main content */}
             <div className="flex flex-1 flex-col overflow-auto">
-              <div className="flex-1 px-4 py-8 pb-20 sm:px-6 sm:py-10 sm:pb-24 lg:px-8">
-                {step <= 4 ? (
-                  /* Steps 1–4: full-width card in main pane */
+              {step <= 4 ? (
+                <div className="flex-1 px-4 py-8 pb-20 sm:px-6 sm:py-10 sm:pb-24 lg:px-8">
+                  {/* Steps 1–4: full-width card in main pane */}
                   <div className="w-full max-w-full rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
                     {/* Step Title */}
                     <div className="mb-5">
@@ -1057,63 +975,10 @@ export default function QuestionBookPage() {
               </>
             )}
                   </div>
-                ) : (
-                  /* Step 5: full-width Question Book with tree + detail */
-                  <div className="flex w-full flex-col">
-                    <div className="mb-6 text-center">
-                      <h2 className="font-display text-2xl font-bold text-balance text-foreground sm:text-3xl">
-                        Your Question Book
-                      </h2>
-                      <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                        Questions from multiple perspectives to deepen your thinking
-                      </p>
-                    </div>
-
-                    {/* Context summary */}
-                    <div className="mb-4 flex flex-wrap items-center justify-center gap-2 text-sm">
-                      <span className="rounded-md bg-muted px-2.5 py-1 text-muted-foreground">
-                        {industry}
-                      </span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="rounded-md bg-muted px-2.5 py-1 text-muted-foreground">
-                        {service}
-                      </span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                        {selectedRole}
-                      </span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                        {selectedActivity}
-                      </span>
-                    </div>
-
-                    {/* Situation display */}
-                    <div className="mb-6 rounded-lg border border-border bg-card p-4">
-                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Situation
-                      </p>
-                      <p className="text-sm leading-relaxed text-foreground">{situation}</p>
-                      {filledContext.length > 0 && (
-                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                          {filledContext.map((ctx, i) => (
-                            <div
-                              key={i}
-                              className="rounded-md border border-border/60 bg-muted/30 p-3"
-                            >
-                              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                                {ctx.label}
-                              </p>
-                              <p className="text-xs leading-relaxed text-muted-foreground">
-                                {ctx.value}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-h-[480px] flex-1">
+                </div>
+              ) : (
+                /* Step 5: full-width Question Book with tree + detail */
+                <div className="flex h-full min-h-0 w-full flex-1 flex-col">
                 <QuestionsView
                   perspectives={questionsData?.perspectives || []}
                   isLoading={questionsLoading}
@@ -1124,76 +989,75 @@ export default function QuestionBookPage() {
                     industry: industry,
                     service: service,
                   }}
+                  additionalContext={filledContext}
                   onDissectionUpdate={handleDissectionUpdate}
                   onDeeperUpdate={handleDeeperUpdate}
                   onExportSite={handleExportSite}
                   exportLoading={exportLoading}
                 />
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              {/* Navigation */}
-              <div className="mt-8 mb-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-              {step > 1 ? (
-                <Button variant="ghost" onClick={handleBack} className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
+            {/* Navigation */}
+            <div className="mt-8 mb-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+            {step > 1 ? (
+              <Button variant="ghost" onClick={handleBack} className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              {/* Save Button on step 5 */}
+              {step === 5 && questionsData?.perspectives && questionsData.perspectives.length > 0 && (
+                <Button
+                  variant={saveStatus === 'saved' ? 'secondary' : 'outline'}
+                  onClick={handleSaveSession}
+                  disabled={saveStatus === 'saved'}
+                  className="gap-2"
+                >
+                  {saveStatus === 'saved' ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-accent" />
+                      Saved
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Session
+                    </>
+                  )}
                 </Button>
-              ) : (
-                <div />
               )}
 
-              <div className="flex items-center gap-2">
-                {/* Save Button on step 5 */}
-                {step === 5 && questionsData?.perspectives && questionsData.perspectives.length > 0 && (
+              {step === 5 && (
+                <>
+                  {questionsData?.perspectives?.length && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleGenerateQuestions()}
+                      disabled={questionsLoading}
+                      className="gap-1.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Regenerate
+                    </Button>
+                  )}
                   <Button
-                    variant={saveStatus === 'saved' ? 'secondary' : 'outline'}
-                    onClick={handleSaveSession}
-                    disabled={saveStatus === 'saved'}
+                    variant="outline"
+                    onClick={handleStartOver}
                     className="gap-2"
                   >
-                    {saveStatus === 'saved' ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-accent" />
-                        Saved
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Save Session
-                      </>
-                    )}
+                    <RotateCcw className="h-4 w-4" />
+                    Start Over
                   </Button>
-                )}
-
-                {step === 5 && (
-                  <>
-                    {questionsData?.perspectives?.length && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleGenerateQuestions()}
-                        disabled={questionsLoading}
-                        className="gap-1.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Regenerate
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      onClick={handleStartOver}
-                      className="gap-2"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Start Over
-                    </Button>
-                  </>
-                )}
-              </div>
-              </div>
+                </>
+              )}
+            </div>
             </div>
           </>
         )}

@@ -47,6 +47,7 @@ interface QuestionsViewProps {
     industry: string
     service: string
   }
+  additionalContext?: Array<{ label: string; value: string }>
   initialDissections?: Record<string, DissectionData>
   initialDeeperQuestions?: Record<string, DeeperData>
   onDissectionUpdate?: (
@@ -67,6 +68,7 @@ export function QuestionsView({
   perspectives,
   isLoading,
   context,
+  additionalContext,
   initialDissections,
   initialDeeperQuestions,
   onDissectionUpdate,
@@ -165,6 +167,7 @@ export function QuestionsView({
   }
 
   if (isLoading && perspectives.length === 0) {
+    
     return (
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -191,7 +194,7 @@ export function QuestionsView({
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       {/* Export Bar */}
       {perspectives.length > 0 && onExportSite && (
         <div className="flex shrink-0 items-center justify-between rounded-lg border border-border bg-card p-4">
@@ -230,17 +233,49 @@ export function QuestionsView({
           onTogglePerspective={togglePerspective}
           expandedQuestions={expandedQuestions}
           onToggleQuestion={toggleQuestion}
+          context={context}
+          additionalContext={additionalContext}
         />
-        <div className="min-h-0 flex-1 overflow-hidden border border-border bg-card lg:min-w-0">
-          <QuestionDetailPanel
-            selectedNode={selectedNode}
-            perspectives={perspectives}
-            context={context}
-            dissectionMap={dissectionMap}
-            deeperMap={deeperMap}
-            onDissectionUpdate={handleDissectionUpdate}
-            onDeeperUpdate={handleDeeperUpdate}
-          />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-w-0">
+          {/* Top bar with metadata */}
+          <div className="flex shrink-0 flex-wrap items-center gap-6 border-b border-border bg-card/95 px-8 py-3.5 text-xs text-muted-foreground backdrop-blur-sm">
+            <span>
+              <strong className="font-semibold text-foreground">Industry:</strong> {context.industry}
+            </span>
+            <span>
+              <strong className="font-semibold text-foreground">Service:</strong> {context.service}
+            </span>
+            <span>
+              <strong className="font-semibold text-foreground">Role:</strong> {context.role}
+            </span>
+            <span>
+              <strong className="font-semibold text-foreground">Activity:</strong> {context.activity}
+            </span>
+            <span>
+              <strong className="font-semibold text-foreground">Situation:</strong> {context.situation}
+            </span>
+            {/* Counter */}
+            {false && <div className="shrink-0 bg-primary/10 rounded-md text-accent px-1 py-1 text-center text-xs font-medium text-muted-foreground">
+              {perspectives.reduce(
+                (sum, p) => sum + (p.questions?.length ?? 0),
+                0
+              )} questions
+            </div>
+            }
+          </div>
+          
+          {/* Question detail panel */}
+          <div className="min-h-0 flex-1 overflow-hidden bg-background">
+            <QuestionDetailPanel
+              selectedNode={selectedNode}
+              perspectives={perspectives}
+              context={context}
+              dissectionMap={dissectionMap}
+              deeperMap={deeperMap}
+              onDissectionUpdate={handleDissectionUpdate}
+              onDeeperUpdate={handleDeeperUpdate}
+            />
+          </div>
         </div>
       </div>
 

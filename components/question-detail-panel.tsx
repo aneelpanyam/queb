@@ -5,17 +5,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import {
-  Lightbulb,
-  Search,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Loader2,
-  Microscope,
-  Info,
-  AlertTriangle,
-} from 'lucide-react'
+import { Layers, Loader2, Microscope } from 'lucide-react'
 import { QuestionDissection } from '@/components/question-dissection'
 import type { SelectedNode } from '@/components/questions-tree-nav'
 
@@ -46,43 +36,6 @@ interface Perspective {
   perspectiveName: string
   perspectiveDescription: string
   questions: Question[]
-}
-
-/** Decision Explorer-style card: icon + title + content */
-function DeepDiveCard({
-  icon: Icon,
-  iconClassName,
-  title,
-  children,
-  className,
-}: {
-  icon: typeof Info
-  iconClassName?: string
-  title: string
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-xl border border-border bg-card p-4 shadow-sm',
-        className
-      )}
-    >
-      <div className="mb-3 flex items-center gap-2">
-        <div
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-            iconClassName ?? 'bg-primary/10 text-primary'
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      </div>
-      <div className="text-sm text-foreground/90">{children}</div>
-    </div>
-  )
 }
 
 function dissectionKey(node: SelectedNode): string {
@@ -123,7 +76,6 @@ export function QuestionDetailPanel({
 }: QuestionDetailPanelProps) {
   const [dissectionLoading, setDissectionLoading] = useState(false)
   const [deeperLoading, setDeeperLoading] = useState(false)
-  const [showInfoPrompt, setShowInfoPrompt] = useState(false)
 
   if (!selectedNode || !perspectives.length) {
     return (
@@ -245,65 +197,63 @@ export function QuestionDetailPanel({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <div className="space-y-6 p-4">
-        {/* Question / title */}
-        <div>
-          <p className="text-base font-semibold leading-relaxed text-foreground">
-            {displayQuestion}
-          </p>
-          {selectedNode.type === 'question' && question?.relevance && (
-            <div className="mt-2 flex items-start gap-2 rounded-lg bg-muted/50 p-3">
-              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {question.relevance}
-              </p>
+    <div className="flex h-full max-h-[640px] flex-col overflow-y-auto bg-background">
+      <div className="mx-auto w-full space-y-5 px-6 py-4 pb-6">
+        {/* Perspective badge & description */}
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2.5 inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+              {perspective.perspectiveName}
             </div>
-          )}
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {perspective.perspectiveDescription}
+            </p>
+          </div>
+
+          {/* Question / title */}
+          <h2 className="text-[16px] font-bold leading-tight tracking-tight text-foreground">
+            {displayQuestion}
+          </h2>
         </div>
 
-        {/* Why this question / Context (for 2nd/3rd or main question info prompt) */}
-        {(displayReasoning || (selectedNode.type === 'question' && question?.infoPrompt)) && (
-          <DeepDiveCard
-            icon={Info}
-            iconClassName="bg-blue-500/10 text-blue-600"
-            title={
-              selectedNode.type === 'question'
-                ? 'Why this question matters'
-                : 'Context & reasoning'
-            }
-          >
-            {displayReasoning ? (
-              <p className="leading-relaxed">{displayReasoning}</p>
-            ) : (
-              <>
-                {question?.infoPrompt && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowInfoPrompt(!showInfoPrompt)}
-                      className="flex w-full items-center gap-1.5 text-left text-xs font-medium text-primary"
-                    >
-                      <Search className="h-3 w-3" />
-                      How to find the answer
-                      {showInfoPrompt ? (
-                        <ChevronUp className="ml-auto h-3 w-3" />
-                      ) : (
-                        <ChevronDown className="ml-auto h-3 w-3" />
-                      )}
-                    </button>
-                    {showInfoPrompt && (
-                      <p className="mt-2 leading-relaxed">{question.infoPrompt}</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </DeepDiveCard>
+        {/* Why This Matters card */}
+        {selectedNode.type === 'question' && question?.relevance && (
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+              Why This Matters
+            </div>
+            <p className="text-[14.5px] leading-relaxed text-foreground">
+              {question.relevance}
+            </p>
+          </div>
+        )}
+
+        {/* How to Find the Answer card */}
+        {selectedNode.type === 'question' && question?.infoPrompt && (
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+              How to Find the Answer
+            </div>
+            <p className="text-[14.5px] leading-relaxed text-foreground">
+              {question.infoPrompt}
+            </p>
+          </div>
+        )}
+
+        {/* Context & reasoning for 2nd/3rd order */}
+        {displayReasoning && (
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+              Context & Reasoning
+            </div>
+            <p className="text-[14.5px] leading-relaxed text-foreground">
+              {displayReasoning}
+            </p>
+          </div>
         )}
 
         {/* Actions: Dissect (all types), Go deeper (main only) */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           <Button
             variant="outline"
             size="sm"
@@ -316,14 +266,14 @@ export function QuestionDetailPanel({
             }}
             disabled={dissectionLoading}
             className={cn(
-              'gap-1.5',
+              'gap-2',
               dissection && 'border-primary/50 bg-primary/5 text-primary'
             )}
           >
             {dissectionLoading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Microscope className="h-3.5 w-3.5" />
+              <Microscope className="h-4 w-4" />
             )}
             {dissectionLoading
               ? 'Generating...'
@@ -338,14 +288,14 @@ export function QuestionDetailPanel({
               onClick={handleGoDeeper}
               disabled={deeperLoading}
               className={cn(
-                'gap-1.5',
+                'gap-2',
                 deeper && 'border-primary/50 bg-primary/5 text-primary'
               )}
             >
               {deeperLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Layers className="h-3.5 w-3.5" />
+                <Layers className="h-4 w-4" />
               )}
               {deeperLoading
                 ? 'Thinking deeper...'
@@ -356,64 +306,63 @@ export function QuestionDetailPanel({
           )}
         </div>
 
-        {/* Deep dive content - Decision Explorer style */}
+        {/* Deep dive content */}
         {(dissectionLoading || dissection) && (
-          <DeepDiveCard
-            icon={AlertTriangle}
-            iconClassName="bg-amber-500/10 text-amber-600"
-            title="Deep dive"
-          >
+          <div className="mt-10 space-y-8">
             {dissectionLoading && !dissection && (
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
+              <div className="space-y-4">
+                <Skeleton className="h-5 w-56" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
               </div>
             )}
             {dissection && <QuestionDissection data={dissection} />}
-          </DeepDiveCard>
+          </div>
         )}
 
         {/* Deeper questions summary (when main question has deeper loaded) */}
         {selectedNode.type === 'question' && deeper && (
-          <DeepDiveCard
-            icon={Layers}
-            iconClassName="bg-primary/10 text-primary"
-            title="Deeper questions"
-          >
-            <p className="mb-3 text-xs text-muted-foreground">
-              Second and third order questions are listed in the left sidebar.
-              Select any to view its context and run a deep dive.
-            </p>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-primary">
-                2nd-order ({deeper.secondOrder.length})
-              </p>
-              <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
-                {deeper.secondOrder.slice(0, 3).map((dq, i) => (
-                  <li key={i} className="line-clamp-1">
-                    {dq.question}
-                  </li>
-                ))}
-                {deeper.secondOrder.length > 3 && (
-                  <li>+{deeper.secondOrder.length - 3} more in sidebar</li>
-                )}
-              </ul>
-              <p className="mt-2 text-xs font-semibold text-primary">
-                3rd-order ({deeper.thirdOrder.length})
-              </p>
-              <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
-                {deeper.thirdOrder.slice(0, 3).map((tq, i) => (
-                  <li key={i} className="line-clamp-1">
-                    {tq.question}
-                  </li>
-                ))}
-                {deeper.thirdOrder.length > 3 && (
-                  <li>+{deeper.thirdOrder.length - 3} more in sidebar</li>
-                )}
-              </ul>
+          <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Deeper Questions</h3>
             </div>
-          </DeepDiveCard>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Second and third order questions were generated. Select any from the left sidebar to view its context and run a deep dive.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-primary">
+                  2nd-order ({deeper.secondOrder.length})
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
+                  {deeper.secondOrder.slice(0, 3).map((dq, i) => (
+                    <li key={i} className="line-clamp-1">
+                      {dq.question}
+                    </li>
+                  ))}
+                  {deeper.secondOrder.length > 3 && (
+                    <li>+{deeper.secondOrder.length - 3} more in sidebar</li>
+                  )}
+                </ul>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-primary">
+                  3rd-order ({deeper.thirdOrder.length})
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
+                  {deeper.thirdOrder.slice(0, 3).map((tq, i) => (
+                    <li key={i} className="line-clamp-1">
+                      {tq.question}
+                    </li>
+                  ))}
+                  {deeper.thirdOrder.length > 3 && (
+                    <li>+{deeper.thirdOrder.length - 3} more in sidebar</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
