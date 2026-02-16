@@ -303,7 +303,11 @@ export default function QuestionBookPage() {
       setSaveStatus('idle')
       toast.info('Generating roles for your organization...')
       try {
-        await triggerRoles({ industry: industry.trim(), service: service.trim() })
+        const result = await triggerRoles({ industry: industry.trim(), service: service.trim() })
+        // Expand all departments when roles are first loaded
+        if (result?.departments) {
+          setExpandedRoleDepartments(new Set(result.departments.map(d => d.departmentName)))
+        }
         toast.success('Roles generated successfully')
       } catch (err) {
         toast.error('Failed to generate roles', {
@@ -324,11 +328,15 @@ export default function QuestionBookPage() {
       setStep(3)
       toast.info(`Loading activities for ${role}...`)
       try {
-        await triggerActivities({
+        const result = await triggerActivities({
           role,
           industry: industry.trim(),
           service: service.trim(),
         })
+        // Expand all categories when activities are first loaded
+        if (result?.categories) {
+          setExpandedActivityCategories(new Set(result.categories.map(c => c.category)))
+        }
         toast.success('Activities loaded')
       } catch (err) {
         toast.error('Failed to load activities', {
@@ -599,7 +607,11 @@ export default function QuestionBookPage() {
     if (!industry.trim() || !service.trim()) return
     toast.info('Regenerating roles...')
     try {
-      await triggerRoles({ industry: industry.trim(), service: service.trim() })
+      const result = await triggerRoles({ industry: industry.trim(), service: service.trim() })
+      // Expand all departments when roles are regenerated
+      if (result?.departments) {
+        setExpandedRoleDepartments(new Set(result.departments.map(d => d.departmentName)))
+      }
       toast.success('Roles regenerated')
     } catch (err) {
       toast.error('Failed to regenerate roles', {
@@ -612,11 +624,15 @@ export default function QuestionBookPage() {
     if (!selectedRole || !industry.trim() || !service.trim()) return
     toast.info('Regenerating activities...')
     try {
-      await triggerActivities({
+      const result = await triggerActivities({
         role: selectedRole,
         industry: industry.trim(),
         service: service.trim(),
       })
+      // Expand all categories when activities are regenerated
+      if (result?.categories) {
+        setExpandedActivityCategories(new Set(result.categories.map(c => c.category)))
+      }
       toast.success('Activities regenerated')
     } catch (err) {
       toast.error('Failed to regenerate activities', {
@@ -927,10 +943,10 @@ export default function QuestionBookPage() {
                             </div>
                             {rolesData?.departments?.length && !rolesLoading && (
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={handleRegenerateRoles}
-                                className="shrink-0 gap-1.5"
+                                className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
                               >
                                 <RefreshCw className="h-3.5 w-3.5" />
                                 Regenerate
@@ -953,10 +969,10 @@ export default function QuestionBookPage() {
                             </div>
                             {activitiesData?.categories?.length && !activitiesLoading && (
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={handleRegenerateActivities}
-                                className="shrink-0 gap-1.5"
+                                className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
                               >
                                 <RefreshCw className="h-3.5 w-3.5" />
                                 Regenerate
@@ -1156,11 +1172,11 @@ export default function QuestionBookPage() {
                   <>
                     {questionsData?.perspectives?.length && (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => handleGenerateQuestions()}
                         disabled={questionsLoading}
-                        className="gap-1.5"
+                        className="gap-1.5 text-muted-foreground hover:text-foreground"
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
                         Regenerate

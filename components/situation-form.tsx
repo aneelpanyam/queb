@@ -72,7 +72,7 @@ export function SituationForm({
           <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
             {role}
           </span>
-          <span className="rounded-md bg-accent/10 px-2.5 py-1 font-medium text-accent">
+          <span className="rounded-md bg-primary/10 px-2.5 py-1 font-medium text-primary">
             {activity}
           </span>
         </div>

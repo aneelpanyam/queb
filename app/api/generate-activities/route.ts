@@ -4,50 +4,91 @@ import { ACTIVITY_CATEGORIES } from '@/lib/activity-categories'
 
 export const maxDuration = 120
 
-export const activitiesSchema = z.object({
-  categories: z.array(
+// Schema for a single category's activities
+const singleCategorySchema = z.object({
+  category: z.string().describe('The activity category name, matching the framework'),
+  activities: z.array(
     z.object({
-      category: z.string().describe('The activity category name, matching the framework'),
-      activities: z.array(
-        z.object({
-          name: z.string().describe('Specific activity name for this role'),
-          description: z.string().describe('A one-line description of how this role performs this activity'),
-        })
-      ),
+      name: z.string().describe('Specific activity name for this role'),
+      description: z.string().describe('A one-line description of how this role performs this activity'),
     })
   ),
 })
 
-export async function POST(req: Request) {
-  try {
-  const { role, industry, service } = await req.json()
-  console.log(`[generate-activities] Role: ${role}, Industry: ${industry}, Service: ${service}`)
+export const activitiesSchema = z.object({
+  categories: z.array(singleCategorySchema),
+})
 
-  const frameworkText = ACTIVITY_CATEGORIES.map(
-    (cat) =>
-      `- ${cat.category}: ${cat.description} (e.g. ${cat.exampleActivities.slice(0, 3).join(', ')})`
-  ).join('\n')
+// Helper function to generate activities for a single category
+async function generateActivitiesForCategory(
+  category: { category: string; description: string; exampleActivities: readonly string[] },
+  context: {
+    role: string
+    industry: string
+    service: string
+  }
+) {
+  const { role, industry, service } = context
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
     prompt: `You are an organizational design expert.
 
-For the role of "${role}" working in the "${industry}" industry providing "${service}" services, generate a comprehensive list of activities organized by the following activity framework categories.
+For the role of "${role}" working in the "${industry}" industry providing "${service}" services, generate 2-4 specific activities for the following category:
 
-ACTIVITY FRAMEWORK:
-${frameworkText}
+CATEGORY:
+${category.category}: ${category.description}
+
+EXAMPLES (for reference, not to copy):
+${category.exampleActivities.slice(0, 3).join(', ')}
 
 RULES:
-- For EACH category, generate 2-4 specific activities that a "${role}" would actually perform.
+- Generate 2-4 specific activities that a "${role}" would actually perform in this category.
 - Activities must be specific to the role, not generic. Tailor them to the industry and service context.
-- If a category is not relevant to this role, still include it with at least 1 activity, even if it's a minor part of their work.
+- If this category is not very relevant to this role, still include at least 1 activity, even if it's a minor part of their work.
 - The activity name should be action-oriented (start with a verb or gerund).
 - The description should explain what this specifically looks like for a "${role}".`,
-    output: Output.object({ schema: activitiesSchema }),
+    output: Output.object({ schema: singleCategorySchema }),
   })
 
-  console.log(`[generate-activities] Success: ${result.output?.categories?.length || 0} categories`)
-  return Response.json(result.output)
+  return result.output
+}
+
+export async function POST(req: Request) {
+  try {
+    const { role, industry, service } = await req.json()
+    console.log(`[generate-activities] Role: ${role}, Industry: ${industry}, Service: ${service}`)
+    console.log(`[generate-activities] Starting parallel generation for ${ACTIVITY_CATEGORIES.length} categories`)
+
+    const startTime = Date.now()
+
+    // Generate activities for all categories in parallel
+    const categoryPromises = ACTIVITY_CATEGORIES.map((category) =>
+      generateActivitiesForCategory(category, {
+        role,
+        industry,
+        service,
+      }).catch((error) => {
+        console.error(`[generate-activities] Error for category ${category.category}:`, error)
+        // Return a fallback category with empty activities on error
+        return {
+          category: category.category,
+          activities: [],
+        }
+      })
+    )
+
+    const allCategories = await Promise.all(categoryPromises)
+
+    // Filter out categories with no activities (errors)
+    const validCategories = allCategories.filter((c) => c.activities.length > 0)
+
+    const duration = Date.now() - startTime
+    console.log(
+      `[generate-activities] Success: ${validCategories.length}/${ACTIVITY_CATEGORIES.length} categories in ${duration}ms`
+    )
+
+    return Response.json({ categories: validCategories })
   } catch (error) {
     console.error('[generate-activities] Error:', error)
     return Response.json(

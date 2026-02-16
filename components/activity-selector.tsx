@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowRight, ChevronDown } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 interface Activity {
   name: string
@@ -48,14 +48,6 @@ export function ActivitySelector({
     }
     setExpandedCategories(next)
   }
-  
-  // Initialize external state if provided and empty
-  useEffect(() => {
-    if (externalExpandedCategories !== undefined && externalExpandedCategories.size === 0 && categories.length > 0) {
-      const initial = new Set(categories.map((c) => c.category))
-      onExpandedCategoriesChange?.(initial)
-    }
-  }, [categories.length, externalExpandedCategories, onExpandedCategoriesChange])
 
   if (isLoading) {
     return (
