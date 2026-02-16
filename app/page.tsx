@@ -168,10 +168,18 @@ export default function QuestionBookPage() {
   // Step 5 - Enrichment tracking for export
   const [exportLoading, setExportLoading] = useState(false)
   const dissectionsRef = useRef<
-    Record<string, { thinkingFramework: unknown[]; checklist: unknown[]; resources: unknown[]; keyInsight: string }>
+    Record<string, {
+      thinkingFramework: { step: number; title: string; description: string }[]
+      checklist: { item: string; description: string; isRequired: boolean }[]
+      resources: { title: string; type: string; url: string; description: string }[]
+      keyInsight: string
+    }>
   >({})
   const deeperRef = useRef<
-    Record<string, { secondOrder: unknown[]; thirdOrder: unknown[] }>
+    Record<string, {
+      secondOrder: { question: string; reasoning: string }[]
+      thirdOrder: { question: string; reasoning: string }[]
+    }>
   >({})
 
   // Session history
@@ -345,6 +353,14 @@ export default function QuestionBookPage() {
               situation: situation.trim(),
               additionalContext: additionalContext.filter((c) => c.label.trim() && c.value.trim()),
               perspectives: result.perspectives,
+              dissections:
+                Object.keys(dissectionsRef.current).length > 0
+                  ? (dissectionsRef.current as SavedSession['dissections'])
+                  : undefined,
+              deeperQuestions:
+                Object.keys(deeperRef.current).length > 0
+                  ? (deeperRef.current as SavedSession['deeperQuestions'])
+                  : undefined,
             })
             setSavedSessions(store.getAll())
             setSaveStatus('saved')
@@ -364,17 +380,78 @@ export default function QuestionBookPage() {
   }, [selectedRole, selectedActivity, situation, additionalContext, industry, service, triggerQuestions])
 
   const handleDissectionUpdate = useCallback(
-    (perspectiveIndex: number, questionIndex: number, data: Record<string, unknown>) => {
-      dissectionsRef.current[`${perspectiveIndex}-${questionIndex}`] = data as typeof dissectionsRef.current[string]
+    (
+      perspectiveIndex: number,
+      questionIndex: number,
+      data: {
+        thinkingFramework: { step: number; title: string; description: string }[]
+        checklist: { item: string; description: string; isRequired: boolean }[]
+        resources: { title: string; type: string; url: string; description: string }[]
+        keyInsight: string
+      } | null
+    ) => {
+      const key = `${perspectiveIndex}-${questionIndex}`
+      if (data) {
+        dissectionsRef.current[key] = data
+      } else {
+        delete dissectionsRef.current[key]
+      }
+      
+      // Auto-save if viewing a session
+      if (view === 'view-session' && viewingSession) {
+        try {
+          const updated = store.update(viewingSession.id, {
+            dissections: Object.keys(dissectionsRef.current).length > 0 
+              ? (dissectionsRef.current as SavedSession['dissections'])
+              : undefined,
+            deeperQuestions: Object.keys(deeperRef.current).length > 0
+              ? (deeperRef.current as SavedSession['deeperQuestions'])
+              : undefined,
+          })
+          if (updated) {
+            setViewingSession(updated)
+            setSavedSessions(store.getAll())
+          }
+        } catch {
+          // Silently fail for auto-save
+        }
+      }
     },
-    []
+    [view, viewingSession]
   )
 
   const handleDeeperUpdate = useCallback(
-    (perspectiveIndex: number, questionIndex: number, data: Record<string, unknown>) => {
-      deeperRef.current[`${perspectiveIndex}-${questionIndex}`] = data as typeof deeperRef.current[string]
+    (
+      perspectiveIndex: number,
+      questionIndex: number,
+      data: {
+        secondOrder: { question: string; reasoning: string }[]
+        thirdOrder: { question: string; reasoning: string }[]
+      }
+    ) => {
+      deeperRef.current[`${perspectiveIndex}-${questionIndex}`] = data
+      
+      // Auto-save if viewing a session
+      if (view === 'view-session' && viewingSession) {
+        try {
+          const updated = store.update(viewingSession.id, {
+            dissections: Object.keys(dissectionsRef.current).length > 0 
+              ? (dissectionsRef.current as SavedSession['dissections'])
+              : undefined,
+            deeperQuestions: Object.keys(deeperRef.current).length > 0
+              ? (deeperRef.current as SavedSession['deeperQuestions'])
+              : undefined,
+          })
+          if (updated) {
+            setViewingSession(updated)
+            setSavedSessions(store.getAll())
+          }
+        } catch {
+          // Silently fail for auto-save
+        }
+      }
     },
-    []
+    [view, viewingSession]
   )
 
   const handleSaveSession = useCallback(() => {
@@ -388,6 +465,8 @@ export default function QuestionBookPage() {
         situation: situation.trim(),
         additionalContext: additionalContext.filter((c) => c.label.trim() && c.value.trim()),
         perspectives: questionsData.perspectives,
+        dissections: Object.keys(dissectionsRef.current).length > 0 ? dissectionsRef.current : undefined,
+        deeperQuestions: Object.keys(deeperRef.current).length > 0 ? deeperRef.current : undefined,
       })
       setSavedSessions(store.getAll())
       setSaveStatus('saved')
@@ -402,6 +481,17 @@ export default function QuestionBookPage() {
   }, [questionsData, industry, service, selectedRole, selectedActivity, situation, additionalContext])
 
   const handleLoadSession = useCallback((session: SavedSession) => {
+    // Restore dissections and deeper questions from saved session
+    if (session.dissections) {
+      dissectionsRef.current = session.dissections as typeof dissectionsRef.current
+    } else {
+      dissectionsRef.current = {}
+    }
+    if (session.deeperQuestions) {
+      deeperRef.current = session.deeperQuestions as typeof deeperRef.current
+    } else {
+      deeperRef.current = {}
+    }
     setViewingSession(session)
     setView('view-session')
   }, [])
@@ -735,6 +825,8 @@ export default function QuestionBookPage() {
                 industry: viewingSession.industry,
                 service: viewingSession.service,
               }}
+              initialDissections={viewingSession.dissections}
+              initialDeeperQuestions={viewingSession.deeperQuestions}
               onDissectionUpdate={handleDissectionUpdate}
               onDeeperUpdate={handleDeeperUpdate}
               onExportSite={handleExportSite}

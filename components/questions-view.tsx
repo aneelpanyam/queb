@@ -47,10 +47,12 @@ interface QuestionsViewProps {
     industry: string
     service: string
   }
+  initialDissections?: Record<string, DissectionData>
+  initialDeeperQuestions?: Record<string, DeeperData>
   onDissectionUpdate?: (
     perspectiveIndex: number,
     questionIndex: number,
-    data: DissectionData
+    data: DissectionData | null
   ) => void
   onDeeperUpdate?: (
     perspectiveIndex: number,
@@ -65,6 +67,8 @@ export function QuestionsView({
   perspectives,
   isLoading,
   context,
+  initialDissections,
+  initialDeeperQuestions,
   onDissectionUpdate,
   onDeeperUpdate,
   onExportSite,
@@ -73,8 +77,10 @@ export function QuestionsView({
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [dissectionMap, setDissectionMap] = useState<
     Record<string, DissectionData>
-  >({})
-  const [deeperMap, setDeeperMap] = useState<Record<string, DeeperData>>({})
+  >(initialDissections || {})
+  const [deeperMap, setDeeperMap] = useState<Record<string, DeeperData>>(
+    initialDeeperQuestions || {}
+  )
   const [expandedPerspectives, setExpandedPerspectives] = useState<Set<number>>(
     () => new Set()
   )
@@ -82,11 +88,25 @@ export function QuestionsView({
     () => new Set()
   )
 
+  // Update maps when initial values change (e.g., when loading a session)
+  useEffect(() => {
+    if (initialDissections) {
+      setDissectionMap(initialDissections)
+    }
+  }, [initialDissections])
+
+  useEffect(() => {
+    if (initialDeeperQuestions) {
+      setDeeperMap(initialDeeperQuestions)
+    }
+  }, [initialDeeperQuestions])
+
   useEffect(() => {
     if (perspectives.length > 0 && expandedPerspectives.size === 0) {
-      setExpandedPerspectives(
+      setExpandedPerspectives(new Set([0]))
+      /*setExpandedPerspectives(
         new Set(perspectives.map((_, i) => i))
-      )
+      )*/
     }
   }, [perspectives, expandedPerspectives.size])
 
@@ -115,6 +135,11 @@ export function QuestionsView({
         delete next[key]
         return next
       })
+      // Notify parent when removing (for persistence)
+      const match = key.match(/^(\d+)-(\d+)$/)
+      if (match && onDissectionUpdate) {
+        onDissectionUpdate(Number(match[1]), Number(match[2]), null)
+      }
     }
   }
 

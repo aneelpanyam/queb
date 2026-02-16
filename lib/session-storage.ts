@@ -16,6 +16,16 @@ export interface SavedSession {
       infoPrompt: string
     }[]
   }[]
+  dissections?: Record<string, {
+    thinkingFramework: { step: number; title: string; description: string }[]
+    checklist: { item: string; description: string; isRequired: boolean }[]
+    resources: { title: string; type: string; url: string; description: string }[]
+    keyInsight: string
+  }>
+  deeperQuestions?: Record<string, {
+    secondOrder: { question: string; reasoning: string }[]
+    thirdOrder: { question: string; reasoning: string }[]
+  }>
 }
 
 const STORAGE_KEY = 'question-book-sessions'
@@ -53,4 +63,17 @@ function getById(id: string): SavedSession | undefined {
   return getAll().find((s) => s.id === id)
 }
 
-export const sessionStorage = { getAll, save, remove, getById }
+function update(id: string, updates: Partial<Omit<SavedSession, 'id' | 'createdAt'>>): SavedSession | undefined {
+  const sessions = getAll()
+  const index = sessions.findIndex((s) => s.id === id)
+  if (index === -1) return undefined
+  const updated: SavedSession = {
+    ...sessions[index],
+    ...updates,
+  }
+  sessions[index] = updated
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+  return updated
+}
+
+export const sessionStorage = { getAll, save, remove, getById, update }
