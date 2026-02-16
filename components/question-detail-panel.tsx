@@ -245,7 +245,7 @@ export function QuestionDetailPanel({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-auto">
+    <div className="flex h-full flex-col overflow-y-auto">
       <div className="space-y-6 p-4">
         {/* Question / title */}
         <div>

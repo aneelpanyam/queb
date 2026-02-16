@@ -59,6 +59,8 @@ interface RoleSelectorProps {
   selectedRole: string | null
   onSelect: (role: string) => void
   isLoading: boolean
+  expandedDepartments?: Set<string>
+  onExpandedDepartmentsChange?: (expanded: Set<string>) => void
 }
 
 export function RoleSelector({
@@ -66,26 +68,29 @@ export function RoleSelector({
   selectedRole,
   onSelect,
   isLoading,
+  expandedDepartments: externalExpandedDepartments,
+  onExpandedDepartmentsChange,
 }: RoleSelectorProps) {
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set())
+  const [internalExpandedDepts, setInternalExpandedDepts] = useState<Set<string>>(new Set())
+  
+  const expandedDepts = externalExpandedDepartments ?? internalExpandedDepts
+  const setExpandedDepts = onExpandedDepartmentsChange ?? setInternalExpandedDepts
 
-  // Start with all departments expanded when data loads
+  // Start with all departments expanded when data loads (only if using internal state)
   useEffect(() => {
-    if (departments.length > 0) {
+    if (externalExpandedDepartments === undefined && departments.length > 0 && expandedDepts.size === 0) {
       setExpandedDepts(new Set(departments.map((d) => d.departmentName)))
     }
-  }, [departments.length])
+  }, [departments.length, externalExpandedDepartments, expandedDepts.size, setExpandedDepts])
 
   const toggleDept = (dept: string) => {
-    setExpandedDepts((prev) => {
-      const next = new Set(prev)
-      if (next.has(dept)) {
-        next.delete(dept)
-      } else {
-        next.add(dept)
-      }
-      return next
-    })
+    const next = new Set(expandedDepts)
+    if (next.has(dept)) {
+      next.delete(dept)
+    } else {
+      next.add(dept)
+    }
+    setExpandedDepts(next)
   }
 
   if (isLoading) {
@@ -188,7 +193,7 @@ export function RoleSelector({
                         >
                           {role.name}
                         </p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-0.5 text-xs leading-relaxed text-foreground/70">
                           {role.description}
                         </p>
                       </div>

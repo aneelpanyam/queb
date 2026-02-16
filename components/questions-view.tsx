@@ -103,12 +103,10 @@ export function QuestionsView({
 
   useEffect(() => {
     if (perspectives.length > 0 && expandedPerspectives.size === 0) {
+      // Auto-expand first perspective only if none are expanded
       setExpandedPerspectives(new Set([0]))
-      /*setExpandedPerspectives(
-        new Set(perspectives.map((_, i) => i))
-      )*/
     }
-  }, [perspectives, expandedPerspectives.size])
+  }, [perspectives.length]) // Only depend on perspectives.length, not expandedPerspectives.size
 
   useEffect(() => {
     if (perspectives.length > 0 && selectedNode === null) {
@@ -193,10 +191,10 @@ export function QuestionsView({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Export Bar */}
       {perspectives.length > 0 && onExportSite && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+        <div className="flex shrink-0 items-center justify-between rounded-lg border border-border bg-card p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">
               Export as Website
@@ -247,7 +245,7 @@ export function QuestionsView({
       </div>
 
       {isLoading && (
-        <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           Loading more perspectives...
         </div>

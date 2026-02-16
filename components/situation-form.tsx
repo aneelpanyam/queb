@@ -64,7 +64,7 @@ export function SituationForm({
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-4 rounded-lg border border-border bg-card p-3">
-        <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="mb-2 flex items-center gap-2 text-sm text-foreground/80">
           <Lightbulb className="h-4 w-4 text-primary" />
           <span>Context for better questions</span>
         </div>
@@ -94,7 +94,7 @@ export function SituationForm({
             onChange={(e) => onSituationChange(e.target.value)}
             className="min-h-[120px] resize-none bg-card text-sm leading-relaxed"
           />
-          <p className="mt-1.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-foreground/70">
             The more specific you are, the more relevant the questions will be.
           </p>
         </div>
@@ -102,23 +102,25 @@ export function SituationForm({
         {/* Additional Context */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">
-              Additional context
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            {!showContextFields && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs text-primary hover:text-primary"
-                onClick={() => addContextField('')}
-              >
-                <Plus className="h-3 w-3" />
-                Add context
-              </Button>
-            )}
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm font-medium text-foreground">
+                Additional context
+                <span className="ml-1.5 text-xs font-normal text-foreground/60">
+                  (optional)
+                </span>
+              </label>
+              {!showContextFields && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs text-primary hover:text-primary"
+                  onClick={() => addContextField('')}
+                >
+                  <Plus className="h-3 w-3" />
+                  Add context
+                </Button>
+              )}
+            </div>
           </div>
 
           {showContextFields && (

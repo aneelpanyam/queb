@@ -71,23 +71,29 @@ export function QuestionsTreeNav({
   onToggleQuestion,
 }: QuestionsTreeNavProps) {
   return (
-    <aside className="flex w-full flex-col border border-border bg-card lg:w-72 lg:flex-shrink-0">
-      <div className="p-4">
+    <aside className="flex h-full w-full flex-col border border-border bg-card lg:w-72 lg:flex-shrink-0">
+      <div className="shrink-0 p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Question Library
         </h2>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 pb-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {perspectives.map((perspective, pIndex) => {
           const isPerspectiveOpen = expandedPerspectives.has(pIndex)
           const questionCount = perspective.questions?.length ?? 0
+          const isPerspectiveActive = selectedNode?.pIndex === pIndex
 
           return (
             <div key={pIndex} className="mb-1">
               <button
                 type="button"
                 onClick={() => onTogglePerspective(pIndex)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium text-foreground hover:bg-muted"
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors",
+                  isPerspectiveActive
+                    ? "bg-primary/10 text-primary font-semibold"
+                    : "text-foreground hover:bg-muted"
+                )}
               >
                 {isPerspectiveOpen ? (
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -125,18 +131,18 @@ export function QuestionsTreeNav({
                           type="button"
                           onClick={() => onSelect(questionNode)}
                           className={cn(
-                            'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm',
+                            'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
                             isQuestionSelected
-                              ? 'bg-primary/10 font-medium text-primary'
-                              : 'text-foreground hover:bg-muted'
+                              ? 'bg-primary/15 font-semibold text-primary shadow-sm shadow-primary/5'
+                              : 'text-foreground hover:bg-muted/70'
                           )}
                         >
                           <span
                             className={cn(
-                              'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                              'mt-1.5 h-2 w-2 shrink-0 rounded-full transition-all',
                               isQuestionSelected
-                                ? 'bg-primary'
-                                : 'bg-muted-foreground'
+                                ? 'bg-primary ring-2 ring-primary/30'
+                                : 'bg-muted-foreground/50'
                             )}
                           />
                           <span className="line-clamp-2">{q.question}</span>

@@ -33,7 +33,21 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}
       >
         {children}
-        <Toaster theme="light" position="bottom-right" richColors closeButton />
+        <Toaster 
+          theme="light" 
+          position="bottom-right" 
+          closeButton 
+          toastOptions={{
+            classNames: {
+              toast: 'bg-card border-border text-foreground shadow-lg',
+              description: 'text-foreground/80',
+              success: 'bg-card border-green-500/20 text-foreground',
+              error: 'bg-card border-red-500/20 text-foreground',
+              warning: 'bg-card border-amber-500/20 text-foreground',
+              info: 'bg-card border-primary/20 text-foreground',
+            },
+          }}
+        />
       </body>
     </html>
   )

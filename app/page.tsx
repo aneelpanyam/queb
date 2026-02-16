@@ -111,9 +111,15 @@ export default function QuestionBookPage() {
   const [authenticated, setAuthenticated] = useState(false)
 
   const wasAuthenticated = useRef(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const checkingRef = useRef(false)
 
   useEffect(() => {
     const checkSession = async () => {
+      // Prevent concurrent calls
+      if (checkingRef.current) return
+      checkingRef.current = true
+
       try {
         const res = await fetch('/api/auth')
         if (res.ok) {
@@ -130,11 +136,22 @@ export default function QuestionBookPage() {
         setAuthenticated(false)
       } finally {
         setAuthChecked(true)
+        checkingRef.current = false
       }
     }
+    
+    // Initial check
     checkSession()
-    const interval = setInterval(checkSession, SESSION_CHECK_INTERVAL)
-    return () => clearInterval(interval)
+    
+    // Set up interval
+    intervalRef.current = setInterval(checkSession, SESSION_CHECK_INTERVAL)
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
   }, [])
 
   const handleLogout = useCallback(async () => {
@@ -160,10 +177,14 @@ export default function QuestionBookPage() {
 
   // Step 3 - Activity
   const [selectedActivity, setSelectedActivity] = useState<string | null>(null)
+  const [expandedActivityCategories, setExpandedActivityCategories] = useState<Set<string>>(new Set())
 
   // Step 4 - Situation
   const [situation, setSituation] = useState('')
   const [additionalContext, setAdditionalContext] = useState<AdditionalContextItem[]>([])
+  
+  // Step 2 - Role expanded state
+  const [expandedRoleDepartments, setExpandedRoleDepartments] = useState<Set<string>>(new Set())
 
   // Step 5 - Enrichment tracking for export
   const [exportLoading, setExportLoading] = useState(false)
@@ -875,7 +896,7 @@ export default function QuestionBookPage() {
 
             {/* Main content */}
             <div className="flex flex-1 flex-col overflow-auto">
-              <div className="flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+              <div className="flex-1 px-4 py-8 pb-20 sm:px-6 sm:py-10 sm:pb-24 lg:px-8">
                 {step <= 4 ? (
                   /* Steps 1–4: full-width card in main pane */
                   <div className="w-full max-w-full rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
@@ -978,6 +999,8 @@ export default function QuestionBookPage() {
                 selectedRole={selectedRole}
                 onSelect={handleSelectRole}
                 isLoading={rolesLoading}
+                expandedDepartments={expandedRoleDepartments}
+                onExpandedDepartmentsChange={setExpandedRoleDepartments}
               />
             )}
 
@@ -987,6 +1010,8 @@ export default function QuestionBookPage() {
                 selectedActivity={selectedActivity}
                 onSelect={handleSelectActivity}
                 isLoading={activitiesLoading}
+                expandedCategories={expandedActivityCategories}
+                onExpandedCategoriesChange={setExpandedActivityCategories}
               />
             )}
 
@@ -1094,7 +1119,7 @@ export default function QuestionBookPage() {
               </div>
 
               {/* Navigation */}
-              <div className="mt-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+              <div className="mt-8 mb-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
               {step > 1 ? (
                 <Button variant="ghost" onClick={handleBack} className="gap-2">
                   <ArrowLeft className="h-4 w-4" />

@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowRight, ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Activity {
   name: string
@@ -20,6 +20,8 @@ interface ActivitySelectorProps {
   selectedActivity: string | null
   onSelect: (activity: string) => void
   isLoading: boolean
+  expandedCategories?: Set<string>
+  onExpandedCategoriesChange?: (expanded: Set<string>) => void
 }
 
 export function ActivitySelector({
@@ -27,22 +29,33 @@ export function ActivitySelector({
   selectedActivity,
   onSelect,
   isLoading,
+  expandedCategories: externalExpandedCategories,
+  onExpandedCategoriesChange,
 }: ActivitySelectorProps) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+  const [internalExpandedCategories, setInternalExpandedCategories] = useState<Set<string>>(
     () => new Set(categories.map((c) => c.category))
   )
+  
+  const expandedCategories = externalExpandedCategories ?? internalExpandedCategories
+  const setExpandedCategories = onExpandedCategoriesChange ?? setInternalExpandedCategories
 
   const toggleCategory = (category: string) => {
-    setExpandedCategories((prev) => {
-      const next = new Set(prev)
-      if (next.has(category)) {
-        next.delete(category)
-      } else {
-        next.add(category)
-      }
-      return next
-    })
+    const next = new Set(expandedCategories)
+    if (next.has(category)) {
+      next.delete(category)
+    } else {
+      next.add(category)
+    }
+    setExpandedCategories(next)
   }
+  
+  // Initialize external state if provided and empty
+  useEffect(() => {
+    if (externalExpandedCategories !== undefined && externalExpandedCategories.size === 0 && categories.length > 0) {
+      const initial = new Set(categories.map((c) => c.category))
+      onExpandedCategoriesChange?.(initial)
+    }
+  }, [categories.length, externalExpandedCategories, onExpandedCategoriesChange])
 
   if (isLoading) {
     return (
@@ -149,7 +162,7 @@ export function ActivitySelector({
                             )}
                           />
                         </div>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-0.5 text-xs leading-relaxed text-foreground/70">
                           {activity.description}
                         </p>
                       </div>
