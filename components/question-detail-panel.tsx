@@ -76,6 +76,7 @@ export function QuestionDetailPanel({
 }: QuestionDetailPanelProps) {
   const [dissectionLoading, setDissectionLoading] = useState(false)
   const [deeperLoading, setDeeperLoading] = useState(false)
+  const [hiddenDissections, setHiddenDissections] = useState<Set<string>>(new Set())
 
   if (!selectedNode || !perspectives.length) {
     return (
@@ -156,6 +157,12 @@ export function QuestionDetailPanel({
       }
       const data = await res.json()
       onDissectionUpdate(key, data)
+      // Ensure the dissection is shown when newly generated
+      setHiddenDissections(prev => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
       toast.success('Deep dive generated')
     } catch (err) {
       toast.error('Failed to generate deep dive', {
@@ -259,7 +266,16 @@ export function QuestionDetailPanel({
             size="sm"
             onClick={() => {
               if (dissection && !dissectionLoading) {
-                onDissectionUpdate(key, null)
+                // Toggle visibility instead of deleting data
+                setHiddenDissections(prev => {
+                  const next = new Set(prev)
+                  if (next.has(key)) {
+                    next.delete(key)
+                  } else {
+                    next.add(key)
+                  }
+                  return next
+                })
               } else {
                 handleDissect()
               }
@@ -267,7 +283,7 @@ export function QuestionDetailPanel({
             disabled={dissectionLoading}
             className={cn(
               'gap-2',
-              dissection && 'border-primary/50 bg-primary/5 text-primary'
+              dissection && !hiddenDissections.has(key) && 'border-primary/50 bg-primary/5 text-primary'
             )}
           >
             {dissectionLoading ? (
@@ -277,7 +293,7 @@ export function QuestionDetailPanel({
             )}
             {dissectionLoading
               ? 'Generating...'
-              : dissection
+              : dissection && !hiddenDissections.has(key)
                 ? 'Hide deep dive'
                 : 'Deep dive'}
           </Button>
@@ -307,7 +323,7 @@ export function QuestionDetailPanel({
         </div>
 
         {/* Deep dive content */}
-        {(dissectionLoading || dissection) && (
+        {(dissectionLoading || (dissection && !hiddenDissections.has(key))) && (
           <div className="mt-10 space-y-8">
             {dissectionLoading && !dissection && (
               <div className="space-y-4">
@@ -316,7 +332,7 @@ export function QuestionDetailPanel({
                 <Skeleton className="h-24 w-full" />
               </div>
             )}
-            {dissection && <QuestionDissection data={dissection} />}
+            {dissection && !hiddenDissections.has(key) && <QuestionDissection data={dissection} />}
           </div>
         )}
 
