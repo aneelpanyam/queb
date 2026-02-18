@@ -1001,70 +1001,71 @@ export default function QuestionBookPage() {
                   onExportSite={handleExportSite}
                   exportLoading={exportLoading}
                 />
+                {/* Navigation */}
+                <div className="mt-8 mb-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
+                {step > 1 ? (
+                  <Button variant="ghost" onClick={handleBack} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-2">
+                  {/* Save Button on step 5 */}
+                  {step === 5 && questionsData?.perspectives && questionsData.perspectives.length > 0 && (
+                    <Button
+                      variant={saveStatus === 'saved' ? 'secondary' : 'outline'}
+                      onClick={handleSaveSession}
+                      disabled={saveStatus === 'saved'}
+                      className="gap-2"
+                    >
+                      {saveStatus === 'saved' ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-accent" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          Save Session
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {step === 5 && (
+                    <>
+                      {questionsData?.perspectives?.length && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleGenerateQuestions()}
+                          disabled={questionsLoading}
+                          className="gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Regenerate
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={handleStartOver}
+                        className="gap-2"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Start Over
+                      </Button>
+                    </>
+                  )}
+                </div>
+                </div>
                 </div>
               )}
             </div>
 
-            {/* Navigation */}
-            <div className="mt-8 mb-8 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-            {step > 1 ? (
-              <Button variant="ghost" onClick={handleBack} className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-            ) : (
-              <div />
-            )}
-
-            <div className="flex items-center gap-2">
-              {/* Save Button on step 5 */}
-              {step === 5 && questionsData?.perspectives && questionsData.perspectives.length > 0 && (
-                <Button
-                  variant={saveStatus === 'saved' ? 'secondary' : 'outline'}
-                  onClick={handleSaveSession}
-                  disabled={saveStatus === 'saved'}
-                  className="gap-2"
-                >
-                  {saveStatus === 'saved' ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 text-accent" />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Save Session
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {step === 5 && (
-                <>
-                  {questionsData?.perspectives?.length && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleGenerateQuestions()}
-                      disabled={questionsLoading}
-                      className="gap-1.5 text-muted-foreground hover:text-foreground"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Regenerate
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={handleStartOver}
-                    className="gap-2"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Start Over
-                  </Button>
-                </>
-              )}
-            </div>
-            </div>
+            
           </>
         )}
       </main>
