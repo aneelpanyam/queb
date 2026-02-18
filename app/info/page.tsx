@@ -1,5 +1,14 @@
 import Link from 'next/link'
-import { BookOpen, ChevronRight, Lightbulb, Target, Users, Zap } from 'lucide-react'
+import { 
+  BookOpen, 
+  Lightbulb, 
+  Target, 
+  Users, 
+  Zap,
+  ArrowRight,
+  CheckCircle2,
+  LayoutGrid
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function InfoPage() {
@@ -26,12 +35,18 @@ export default function InfoPage() {
             <span className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
               About
             </span>
+            <Link
+              href="/info/lean-canvas"
+              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Lean Canvas
+            </Link>
           </nav>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:py-16">
+      <main className="mx-auto max-w-full px-4 py-8 sm:px-6 sm:py-12 lg:py-16">
         {/* Hero Section */}
         <div className="mb-12 text-center">
           <h1 className="font-display text-4xl font-bold text-balance text-foreground sm:text-5xl">
@@ -40,11 +55,19 @@ export default function InfoPage() {
           <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
             An AI-powered tool that helps you think more deeply about your work
           </p>
+          {/*<div className="mt-6 flex justify-center">
+            <Link href="/info/lean-canvas">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LayoutGrid className="h-4 w-4" />
+                View Lean Canvas
+              </Button>
+            </Link>
+          </div>*/}  
         </div>
 
         {/* The Problem Section */}
-        <section className="mb-12">
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <section className="mb-8">
+          <div className="rounded-xl border-2 border-red-200 bg-card p-6 shadow-sm sm:p-8">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
                 <Target className="h-5 w-5 text-red-600" />
@@ -59,19 +82,19 @@ export default function InfoPage() {
               </p>
               <ul className="space-y-3 pl-6">
                 <li className="flex gap-3">
-                  <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-red-600" />
                   <span><strong className="text-foreground">Rush to solutions</strong> without fully understanding the problem space</span>
                 </li>
                 <li className="flex gap-3">
-                  <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-red-600" />
                   <span><strong className="text-foreground">Miss critical perspectives</strong> from stakeholders who will be affected by our decisions</span>
                 </li>
                 <li className="flex gap-3">
-                  <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-red-600" />
                   <span><strong className="text-foreground">Overlook important questions</strong> that could reveal risks or opportunities</span>
                 </li>
                 <li className="flex gap-3">
-                  <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-primary" />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-red-600" />
                   <span><strong className="text-foreground">Lack structured frameworks</strong> for exploring complex situations</span>
                 </li>
               </ul>
@@ -82,20 +105,20 @@ export default function InfoPage() {
           </div>
         </section>
 
-        {/* Our Approach Section */}
-        <section className="mb-12">
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        {/* Our Solution Section */}
+        <section className="mb-8">
+          <div className="rounded-xl border-2 border-green-200 bg-card p-6 shadow-sm sm:p-8">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
                 <Lightbulb className="h-5 w-5 text-green-600" />
               </div>
               <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
-                Our Approach
+                Our Solution
               </h2>
             </div>
             <div className="space-y-6 text-muted-foreground">
               <p className="text-base sm:text-lg">
-                Question Book uses AI to generate contextually relevant questions from multiple perspectives, helping you:
+                Question Book uses AI to generate contextually relevant questions from multiple perspectives, helping you explore your challenges systematically and thoroughly.
               </p>
               
               <div className="grid gap-6 sm:grid-cols-2">
@@ -147,32 +170,59 @@ export default function InfoPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="rounded-lg bg-primary/5 p-6">
-                <h3 className="mb-3 font-semibold text-foreground">The Process</h3>
-                <ol className="space-y-2 text-sm">
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
-                    <span><strong>Define your context:</strong> Tell us about your organization, role, and what you're working on</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
-                    <span><strong>Describe your situation:</strong> Add specific details about your current challenge or opportunity</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
-                    <span><strong>Generate your question book:</strong> AI creates perspective-organized questions tailored to your needs</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">4</span>
-                    <span><strong>Explore and enrich:</strong> Dive deeper into any question with frameworks, checklists, and follow-up questions</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">5</span>
-                    <span><strong>Export and reuse:</strong> Save your question sets or export them as standalone references</span>
-                  </li>
-                </ol>
+        {/* How It Works Section */}
+        <section className="mb-8">
+          <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 shadow-sm sm:p-8">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
               </div>
+              <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
+                How It Works
+              </h2>
+            </div>
+            <div className="space-y-4">
+              <ol className="space-y-4 text-sm sm:text-base">
+                <li className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">1</span>
+                  <div>
+                    <strong className="text-foreground">Define your context:</strong>
+                    <span className="text-muted-foreground"> Tell us about your organization, role, and what you're working on</span>
+                  </div>
+                </li>
+                <li className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">2</span>
+                  <div>
+                    <strong className="text-foreground">Pick your activity:</strong>
+                    <span className="text-muted-foreground"> Select from role-specific activities generated for your context</span>
+                  </div>
+                </li>
+                <li className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">3</span>
+                  <div>
+                    <strong className="text-foreground">Describe your situation:</strong>
+                    <span className="text-muted-foreground"> Add specific details about your current challenge or opportunity</span>
+                  </div>
+                </li>
+                <li className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">4</span>
+                  <div>
+                    <strong className="text-foreground">Generate your question book:</strong>
+                    <span className="text-muted-foreground"> AI creates perspective-organized questions tailored to your needs</span>
+                  </div>
+                </li>
+                <li className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">5</span>
+                  <div>
+                    <strong className="text-foreground">Explore and enrich:</strong>
+                    <span className="text-muted-foreground"> Dive deeper into any question with frameworks, checklists, and follow-up questions</span>
+                  </div>
+                </li>
+              </ol>
             </div>
           </div>
         </section>
