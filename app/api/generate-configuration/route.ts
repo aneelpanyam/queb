@@ -79,43 +79,40 @@ ${fieldsList}
 AVAILABLE OUTPUT TYPES (use these IDs for outputs):
 ${outputTypesList}
 
+HARD CONSTRAINT: The configuration must use AT MOST 5 fields total (library fields + ad-hoc fields combined). Choose only the highest-impact inputs. If you identify more than 5 needs, merge or drop the least essential ones.
+
 ═══════════════════════════════════════════════
 STEP 1: IDENTIFY WHAT CONTEXT THIS IDEA NEEDS
 ═══════════════════════════════════════════════
-Before picking any fields, analyze the user's description and ask: "What specific pieces of context does this idea need from the user to produce great output?"
+Analyze the user's description and determine: "What specific pieces of context does this idea need from the user to produce great output?"
 
-For example:
-- "Know your role: Pain points of CISO" → needs: which industry, what the CISO's specific role scope is, maybe the organization's security maturity level, relevant compliance frameworks
-- "SaaS onboarding email course" → needs: which industry, the SaaS product/service, who the target audience is, what onboarding stage to focus on, product complexity level
-- "Sales battle cards for enterprise deals" → needs: industry, the service/product being sold, who the competitor is, deal size range, buyer persona
+For each candidate input, apply this test: "Would the generated content be noticeably different if this value changed?" If not, drop it.
 
-List out 3-7 contextual inputs that would meaningfully shape the output quality. Each input should answer: "Would the generated content be noticeably different if this value changed?"
+Aim for 3-5 high-impact contextual inputs. Examples:
+- "Know your role: Pain points of CISO" → industry, role scope, security maturity level (3 fields)
+- "SaaS onboarding email course" → industry, service, target audience, onboarding stage (4 fields)
+- "Sales battle cards for enterprise deals" → service, competitor, buyer persona, deal size (4 fields)
 
 ═══════════════════════════════════════════════
-STEP 2: MATCH NEEDS TO LIBRARY FIELDS
+STEP 2: MATCH NEEDS TO LIBRARY, FILL GAPS
 ═══════════════════════════════════════════════
-For each contextual input identified above, check if an existing library field captures it well enough. Only use a library field if it's a genuine match — don't force-fit.
+For each contextual input identified above:
+1. Check if an existing library field captures it. Only use it if it's a genuine match — don't force-fit.
+2. If no library field matches, define a NEW AD-HOC FIELD in the step's "newFields" array:
+   - Unique camelCase ID (e.g., "securityMaturityLevel", "dealSize", "onboardingStage")
+   - A clear prompt that generates relevant suggestions (use {{otherFieldId}} placeholders for dependencies)
+   - Appropriate selectionMode: "single" for exclusive choices, "multi" for things like applicable frameworks
+   - A descriptive category (e.g., "Topic-Specific", "Audience", "Scope")
 
 Rules:
-- Do NOT include library fields just because they exist. A typical configuration uses 3-6 fields total.
-- Skip fields that won't meaningfully change the generated output for this specific idea.
-- If "industry" isn't relevant to the idea (e.g., a generic personal productivity topic), don't include it.
+- Do NOT include library fields just because they exist.
+- If "industry" or "role" isn't relevant to the idea, skip them.
+- Ad-hoc fields are preferred when the idea has specific, topic-level context that generic library fields can't capture well.
 
 ═══════════════════════════════════════════════
-STEP 3: CREATE AD-HOC FIELDS FOR GAPS
+STEP 3: ORGANIZE INTO STEPS & OUTPUTS
 ═══════════════════════════════════════════════
-For each contextual input that has no good library match, define a NEW AD-HOC FIELD in the "newFields" array:
-- Give it a unique camelCase ID (e.g., "securityMaturityLevel", "dealSize", "onboardingStage")
-- Write a clear prompt that generates relevant suggestions (use {{otherFieldId}} to reference fields the user fills earlier)
-- Set the right selectionMode: "single" for choices like maturity level, "multi" for things like applicable frameworks
-- Assign a descriptive category (e.g., "Topic-Specific", "Audience", "Scope")
-
-Ad-hoc fields make the configuration laser-focused on the user's specific topic instead of relying only on generic fields.
-
-═══════════════════════════════════════════════
-STEP 4: ORGANIZE INTO STEPS & OUTPUTS
-═══════════════════════════════════════════════
-- Group fields into logical wizard steps. Put broad context first (industry, service) and specific/dependent context later.
+- Group fields into 1-3 wizard steps. Put broad context first and specific/dependent context later.
 - Fields have dependencies via {{fieldId}} prompt placeholders: ensure referenced fields appear in earlier steps.
 - Choose the most appropriate output type(s) for what the user wants to create.
 
