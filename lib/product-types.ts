@@ -34,6 +34,11 @@ export interface ProductSection {
 }
 
 export interface DissectionData {
+  frameworkUsed?: {
+    id: string
+    name: string
+    shortDescription: string
+  }
   thinkingFramework: { step: number; title: string; description: string }[]
   checklist: { item: string; description: string; isRequired: boolean }[]
   resources: { title: string; type: string; url: string; description: string }[]

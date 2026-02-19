@@ -13,33 +13,9 @@ import {
   Users,
   BarChart3,
   Library,
+  Compass,
 } from 'lucide-react'
-
-interface ThinkingStep {
-  step: number
-  title: string
-  description: string
-}
-
-interface ChecklistItem {
-  item: string
-  description: string
-  isRequired: boolean
-}
-
-interface Resource {
-  title: string
-  type: string
-  url: string
-  description: string
-}
-
-interface DissectionData {
-  thinkingFramework: ThinkingStep[]
-  checklist: ChecklistItem[]
-  resources: Resource[]
-  keyInsight: string
-}
+import type { DissectionData } from '@/lib/product-types'
 
 interface QuestionDissectionProps {
   data: DissectionData
@@ -85,11 +61,25 @@ export function QuestionDissection({ data }: QuestionDissectionProps) {
 
   return (
     <div className="mt-4 space-y-6">
+      {/* Framework badge */}
+      {data.frameworkUsed && (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4">
+          <Compass className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-foreground">{data.frameworkUsed.name}</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">Framework</span>
+            </div>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{data.frameworkUsed.shortDescription}</p>
+          </div>
+        </div>
+      )}
+
       {/* Thinking Framework */}
       <div>
         <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
           <Lightbulb className="h-4 w-4 text-primary" />
-          Thinking Framework
+          {data.frameworkUsed ? `${data.frameworkUsed.name} Analysis` : 'Thinking Framework'}
         </h4>
         <div className="space-y-2">
           {data.thinkingFramework.map((step) => (

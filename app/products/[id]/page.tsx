@@ -766,6 +766,10 @@ export default function ProductEditorPage() {
                       const elAnnotations = product.annotations[`${sIndex}-${eIndex}`]?.length || 0
                       const label = el.fields[primaryFieldDef.key] || '(empty)'
                       const short = label.length > 60 ? label.slice(0, 57) + '...' : label
+                      const elPrimary = el.fields[primaryFieldDef.key] || Object.values(el.fields)[0] || ''
+                      const hasElSuggestions = assistantData?.suggestions.some(
+                        (s) => s.targetSection === section.name && matchesElement(s, elPrimary)
+                      ) || false
 
                       return (
                         <div key={eIndex} className={cn(elHidden && 'opacity-40')}>
@@ -780,6 +784,7 @@ export default function ProductEditorPage() {
                               {short}
                             </button>
                             <div className="flex shrink-0 items-center gap-0.5 pr-1">
+                              {hasElSuggestions && <Sparkles className="h-3 w-3 text-amber-500" />}
                               {elAnnotations > 0 && <MessageSquareText className="h-3 w-3 text-primary/60" />}
                               <button onClick={() => toggleElementVisibility(sIndex, eIndex)} className="rounded p-0.5 text-muted-foreground/50 transition-colors hover:text-foreground">
                                 {elHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}

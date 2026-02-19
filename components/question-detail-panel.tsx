@@ -19,12 +19,7 @@ interface DeeperData {
   thirdOrder: DeeperQuestion[]
 }
 
-interface DissectionData {
-  thinkingFramework: { step: number; title: string; description: string }[]
-  checklist: { item: string; description: string; isRequired: boolean }[]
-  resources: { title: string; type: string; url: string; description: string }[]
-  keyInsight: string
-}
+import type { DissectionData } from '@/lib/product-types'
 
 interface Question {
   question: string
