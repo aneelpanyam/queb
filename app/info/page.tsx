@@ -7,9 +7,16 @@ import {
   Zap,
   ArrowRight,
   CheckCircle2,
-  LayoutGrid
+  LayoutGrid,
+  ChevronDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 
 export default function InfoPage() {
   return (
@@ -17,7 +24,7 @@ export default function InfoPage() {
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-card shadow-sm">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/products" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 text-primary">
               <BookOpen className="h-4 w-4" />
             </div>
@@ -27,10 +34,22 @@ export default function InfoPage() {
           </Link>
           <nav className="flex items-center gap-1">
             <Link
-              href="/"
+              href="/products"
               className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Home
+              Products
+            </Link>
+            <Link
+              href="/configurations"
+              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Configurations
+            </Link>
+            <Link
+              href="/library"
+              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Library
             </Link>
             <span className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
               About
@@ -41,6 +60,18 @@ export default function InfoPage() {
             >
               Lean Canvas
             </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  Legacy
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild><a href="/legacy">Home</a></DropdownMenuItem>
+                <DropdownMenuItem asChild><a href="/legacy?view=history">History</a></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
       </header>
@@ -265,7 +296,7 @@ export default function InfoPage() {
             <p className="mb-6 text-muted-foreground">
               Start exploring your next challenge with AI-powered perspective-based questioning
             </p>
-            <Link href="/">
+            <Link href="/products">
               <Button size="lg" className="gap-2">
                 <BookOpen className="h-5 w-5" />
                 Get Started

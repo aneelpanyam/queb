@@ -11,6 +11,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+import {
   BookOpen,
   LogOut,
   Plus,
@@ -22,6 +28,7 @@ import {
   Zap,
   FileOutput,
   Lock,
+  ChevronDown,
 } from 'lucide-react'
 
 // ============================================================
@@ -329,17 +336,29 @@ export default function LibraryPage() {
       <header className="sticky top-0 z-10 border-b border-border bg-card shadow-sm">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-6">
-            <button onClick={() => router.push('/')} className="flex items-center gap-2.5">
+            <button onClick={() => router.push('/products')} className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 text-primary">
                 <BookOpen className="h-4 w-4" />
               </div>
               <h1 className="font-display text-lg font-bold text-foreground">DigiCraft</h1>
             </button>
             <nav className="hidden items-center gap-1 sm:flex">
-              <button onClick={() => router.push('/')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Home</button>
-              <button className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">Library</button>
-              <button onClick={() => router.push('/configurations')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Configurations</button>
               <button onClick={() => router.push('/products')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Products</button>
+              <button onClick={() => router.push('/configurations')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Configurations</button>
+              <button className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">Library</button>
+              <button onClick={() => router.push('/info')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">About</button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    Legacy
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => router.push('/legacy')}>Home</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/legacy?view=history')}>History</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="h-8 gap-1.5 text-sm text-muted-foreground hover:text-foreground">
