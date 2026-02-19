@@ -16,22 +16,25 @@ const singleStageSchema = z.object({
   ),
 })
 
+function formatContext(context: Record<string, string>): string {
+  return Object.entries(context)
+    .filter(([, v]) => v?.trim())
+    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
+    .join('\n')
+}
+
 async function generateForStage(
   stage: { name: string; description: string },
-  context: { role: string; activity: string; situation: string; industry: string; service: string },
+  context: Record<string, string>,
 ) {
-  const { role, activity, situation, industry, service } = context
+  const contextBlock = formatContext(context)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
     prompt: `You are an expert email course creator and instructional designer.
 
 CONTEXT:
-- Industry: ${industry}
-- Service: ${service}
-- Role: ${role}
-- Activity: ${activity}
-- Situation: "${situation}"
+${contextBlock}
 
 TASK:
 Generate 2-4 emails for the "${stage.name}" module of an email course.
@@ -43,7 +46,7 @@ GUIDELINES:
 - Each email should be self-contained but build on the overall module theme.
 - Subject lines must be compelling and specific — avoid generic titles.
 - Email bodies should be 150-300 words: educational, conversational, and packed with actionable insight.
-- Include specific examples, frameworks, or tips relevant to this role and industry.
+- Include specific examples, frameworks, or tips relevant to the provided context.
 - Each email must end with a clear, specific call to action.
 - Write as an expert peer, not a lecturer.
 - If this stage is not very relevant to the context, still include at least 1 email.`,
@@ -55,13 +58,13 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { role, activity, situation, additionalContext, industry, service } = await req.json()
-    console.log(`[generate-email-course] Role: ${role}, Activity: ${activity}`)
+    const { context } = (await req.json()) as { context: Record<string, string> }
+    console.log(`[generate-email-course] Context keys: ${Object.keys(context).join(', ')}`)
 
     const startTime = Date.now()
 
     const promises = EMAIL_COURSE_STAGES.map((stage) =>
-      generateForStage(stage, { role, activity, situation, industry, service }).catch((err) => {
+      generateForStage(stage, context).catch((err) => {
         console.error(`[generate-email-course] Error for ${stage.name}:`, err)
         return { moduleName: stage.name, moduleDescription: stage.description, emails: [] }
       })

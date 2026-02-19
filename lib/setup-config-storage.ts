@@ -1,12 +1,36 @@
 import type { SetupConfiguration } from './setup-config-types'
 
 const STORAGE_KEY = 'queb-setup-configurations'
+const MIGRATION_KEY = 'queb-config-migration-v2'
+
+function migrateIfNeeded(configs: SetupConfiguration[]): SetupConfiguration[] {
+  if (typeof window === 'undefined') return configs
+  if (localStorage.getItem(MIGRATION_KEY)) return configs
+
+  let changed = false
+  for (const config of configs) {
+    for (const step of config.steps) {
+      for (const field of step.fields) {
+        if ('dependsOn' in field) {
+          delete (field as Record<string, unknown>)['dependsOn']
+          changed = true
+        }
+      }
+    }
+  }
+  if (changed) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
+  }
+  localStorage.setItem(MIGRATION_KEY, '1')
+  return configs
+}
 
 function getAll(): SetupConfiguration[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const configs: SetupConfiguration[] = raw ? JSON.parse(raw) : []
+    return migrateIfNeeded(configs)
   } catch {
     return []
   }

@@ -2,11 +2,16 @@
 // Setup Configuration — assembles steps, fields, and outputs
 // ============================================================
 
+export type InputMapping =
+  | { type: 'field'; fieldId: string }
+  | { type: 'text' }
+
 export interface ConfigStepField {
   fieldId: string
-  dependsOn: string[]
   required: boolean
   promptOverride?: string
+  /** Maps unresolved prompt placeholders to either an existing field or a text input */
+  inputMappings?: Record<string, InputMapping>
 }
 
 export interface ConfigStep {

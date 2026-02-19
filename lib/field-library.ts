@@ -173,6 +173,123 @@ export function extractDependencies(prompt: string): string[] {
 }
 
 // ============================================================
+// Dependency computation — derives deps from prompt templates
+// ============================================================
+
+export interface ComputedDeps {
+  resolved: string[]
+  unresolved: string[]
+}
+
+/**
+ * Splits prompt placeholder references into those that match a library field
+ * and those that don't.
+ */
+export function computeDependencies(
+  fieldOrPrompt: FieldDefinition | string,
+  promptOverride?: string,
+): ComputedDeps {
+  const prompt =
+    typeof fieldOrPrompt === 'string'
+      ? fieldOrPrompt
+      : promptOverride || fieldOrPrompt.prompt
+  const refs = extractDependencies(prompt)
+  const allFields = getAll()
+  const knownIds = new Set(allFields.map((f) => f.id))
+  const resolved: string[] = []
+  const unresolved: string[] = []
+  for (const ref of refs) {
+    if (knownIds.has(ref)) {
+      resolved.push(ref)
+    } else {
+      unresolved.push(ref)
+    }
+  }
+  return { resolved, unresolved }
+}
+
+/**
+ * Recursively collects all upstream field dependencies for a given field,
+ * following the prompt-based dependency chain through the library.
+ */
+export function getTransitiveDependencies(fieldId: string): string[] {
+  const allFields = getAll()
+  const visited = new Set<string>()
+  const result: string[] = []
+
+  function walk(id: string) {
+    if (visited.has(id)) return
+    visited.add(id)
+    const field = allFields.find((f) => f.id === id)
+    if (!field) return
+    const { resolved } = computeDependencies(field)
+    for (const dep of resolved) {
+      walk(dep)
+      if (!result.includes(dep)) result.push(dep)
+    }
+  }
+
+  walk(fieldId)
+  return result
+}
+
+/**
+ * Returns warnings for prompt placeholder references that don't match
+ * any field in the library.
+ */
+export function validatePromptRefs(prompt: string): string[] {
+  const { unresolved } = computeDependencies(prompt)
+  return unresolved.map(
+    (ref) => `Prompt references "{{${ref}}}" which is not a field in the library`,
+  )
+}
+
+/**
+ * Topologically sorts field IDs so that dependencies come before the fields
+ * that need them. Fields with no dependencies among the set come first.
+ * Accepts an optional promptOverrides map (fieldId -> prompt) for config-level overrides.
+ */
+export function sortFieldsByDependency(
+  fieldIds: string[],
+  promptOverrides?: Record<string, string>,
+): string[] {
+  const idSet = new Set(fieldIds)
+  const adjMap = new Map<string, string[]>()
+
+  for (const id of fieldIds) {
+    const field = getAll().find((f) => f.id === id)
+    if (!field) {
+      adjMap.set(id, [])
+      continue
+    }
+    const { resolved } = computeDependencies(field, promptOverrides?.[id])
+    adjMap.set(id, resolved.filter((d) => idSet.has(d)))
+  }
+
+  const sorted: string[] = []
+  const visited = new Set<string>()
+  const visiting = new Set<string>()
+
+  function visit(id: string) {
+    if (visited.has(id)) return
+    if (visiting.has(id)) return // cycle — skip to avoid infinite loop
+    visiting.add(id)
+    for (const dep of adjMap.get(id) || []) {
+      visit(dep)
+    }
+    visiting.delete(id)
+    visited.add(id)
+    sorted.push(id)
+  }
+
+  for (const id of fieldIds) {
+    visit(id)
+  }
+
+  return sorted
+}
+
+// ============================================================
 // Storage with auto-seeding
 // ============================================================
 

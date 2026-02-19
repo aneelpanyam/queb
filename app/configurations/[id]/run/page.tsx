@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
 import { valuesToLegacyContext } from '@/lib/setup-config-types'
-import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
+import { fieldStorage, type FieldDefinition, sortFieldsByDependency } from '@/lib/field-library'
 import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
 import { productStorage } from '@/lib/product-storage'
 import type { ProductSection } from '@/lib/product-types'
@@ -140,23 +140,16 @@ export default function RunConfigPage() {
         const otDef = allOutputTypes.find((ot) => ot.id === co.outputTypeId)
         if (!otDef) return null
 
-        const baseName = productName.trim() || `${legacy.role} in ${legacy.industry}`
+        const contextLabel = Object.values(flat).filter(Boolean).slice(0, 2).join(' in ') || 'Output'
+        const baseName = productName.trim() || contextLabel
         const name = total > 1 ? `${otDef.name}: ${baseName}` : baseName
 
-        // Resolve {{fieldId}} placeholders in the output type prompt
         const resolvedPrompt = (co.promptOverride || otDef.prompt).replace(
           /\{\{(\w+)\}\}/g,
           (match, fieldId) => flat[fieldId] || match,
         )
 
-        const contextBody = {
-          role: legacy.role,
-          activity: legacy.activity,
-          situation: legacy.situation,
-          additionalContext: legacy.additionalContext,
-          industry: legacy.industry,
-          service: legacy.service,
-        }
+        const contextPayload = { context: flat }
 
         let sections: ProductSection[]
 
@@ -164,7 +157,7 @@ export default function RunConfigPage() {
           const res = await fetch('/api/generate-questions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextBody),
+            body: JSON.stringify(contextPayload),
           })
           if (!res.ok) throw new Error(`${otDef.name} generation failed`)
           const data: { perspectives: ApiPerspective[] } = await res.json()
@@ -174,7 +167,7 @@ export default function RunConfigPage() {
           const res = await fetch('/api/generate-checklist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextBody),
+            body: JSON.stringify(contextPayload),
           })
           if (!res.ok) throw new Error(`${otDef.name} generation failed`)
           const data: { dimensions: ApiChecklistDimension[] } = await res.json()
@@ -184,7 +177,7 @@ export default function RunConfigPage() {
           const res = await fetch('/api/generate-email-course', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextBody),
+            body: JSON.stringify(contextPayload),
           })
           if (!res.ok) throw new Error(`${otDef.name} generation failed`)
           const data: { modules: ApiEmailModule[] } = await res.json()
@@ -194,7 +187,7 @@ export default function RunConfigPage() {
           const res = await fetch('/api/generate-prompts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextBody),
+            body: JSON.stringify(contextPayload),
           })
           if (!res.ok) throw new Error(`${otDef.name} generation failed`)
           const data: { categories: ApiPromptCategory[] } = await res.json()
@@ -227,6 +220,7 @@ export default function RunConfigPage() {
           status: 'draft',
           configurationId: config.id,
           outputType: co.outputTypeId,
+          contextFields: flat,
           ...legacy,
           sections,
           dissections: {},
@@ -289,10 +283,19 @@ export default function RunConfigPage() {
   if (!config) return null
 
   const currentStep = config.steps[stepIndex]
-  const stepFields = currentStep?.fields
-    .map((csf) => {
-      const def = allFields.find((f) => f.id === csf.fieldId)
-      return def ? { def, csf } : null
+  const promptOverrides: Record<string, string> = {}
+  for (const csf of currentStep?.fields || []) {
+    if (csf.promptOverride) promptOverrides[csf.fieldId] = csf.promptOverride
+  }
+  const sortedIds = sortFieldsByDependency(
+    (currentStep?.fields || []).map((f) => f.fieldId),
+    promptOverrides,
+  )
+  const stepFields = sortedIds
+    .map((id) => {
+      const csf = currentStep.fields.find((f) => f.fieldId === id)
+      const def = allFields.find((f) => f.id === id)
+      return csf && def ? { def, csf } : null
     })
     .filter(Boolean) as { def: FieldDefinition; csf: (typeof currentStep.fields)[number] }[]
 
@@ -384,17 +387,38 @@ export default function RunConfigPage() {
           </div>
 
           <div className="space-y-5">
-            {stepFields.map(({ def, csf }) => (
-              <SmartField
-                key={def.id}
-                field={def}
-                value={values[def.id] || (def.selectionMode === 'multi' ? [] : '')}
-                allValues={values}
-                promptOverride={csf.promptOverride}
-                dependsOn={csf.dependsOn}
-                onChange={(v) => handleFieldChange(def.id, v)}
-              />
-            ))}
+            {stepFields.map(({ def, csf }) => {
+              const textInputRefs = csf.inputMappings
+                ? Object.entries(csf.inputMappings)
+                    .filter(([, m]) => m.type === 'text')
+                    .map(([ref]) => ref)
+                : []
+
+              return (
+                <div key={def.id}>
+                  {/* Text inputs for unmapped prompt references */}
+                  {textInputRefs.map((ref) => (
+                    <div key={ref} className="mb-3">
+                      <label className="mb-1 block text-sm font-medium text-foreground capitalize">{ref}</label>
+                      <Input
+                        value={(values[ref] as string) || ''}
+                        onChange={(e) => handleFieldChange(ref, e.target.value)}
+                        placeholder={`Enter ${ref}...`}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  ))}
+                  <SmartField
+                    field={def}
+                    value={values[def.id] || (def.selectionMode === 'multi' ? [] : '')}
+                    allValues={values}
+                    promptOverride={csf.promptOverride}
+                    inputMappings={csf.inputMappings}
+                    onChange={(v) => handleFieldChange(def.id, v)}
+                  />
+                </div>
+              )
+            })}
           </div>
         </div>
 

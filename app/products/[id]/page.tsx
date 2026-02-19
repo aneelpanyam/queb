@@ -60,6 +60,25 @@ function annotationKey(node: SelectedNode): string {
 
 const SECTION_NAV_TYPES = new Set(['checklist'])
 
+function formatFieldLabel(key: string): string {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()
+}
+
+function getContextEntries(product: Product): { label: string; value: string }[] {
+  if (product.contextFields && Object.keys(product.contextFields).length > 0) {
+    return Object.entries(product.contextFields)
+      .filter(([, v]) => v?.trim())
+      .map(([k, v]) => ({ label: formatFieldLabel(k), value: v }))
+  }
+  const legacy = [
+    { label: 'Industry', value: product.industry },
+    { label: 'Service', value: product.service },
+    { label: 'Role', value: product.role },
+    { label: 'Activity', value: product.activity },
+  ]
+  return legacy.filter((e) => e.value?.trim())
+}
+
 export default function ProductEditorPage() {
   const router = useRouter()
   const params = useParams()
@@ -494,11 +513,15 @@ export default function ProductEditorPage() {
         {/* Tree Nav Sidebar */}
         <aside className="flex w-[340px] min-w-[340px] flex-col border-r border-border bg-card">
           <div className="shrink-0 border-b border-border p-4">
-            <div className="mb-1 text-xs leading-relaxed text-muted-foreground">
-              <strong className="font-semibold text-foreground">{product.role}</strong> · {product.activity}
-              <br />{product.industry} · {product.service}
+            <div className="mb-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs leading-relaxed text-muted-foreground">
+              {getContextEntries(product).map((e, i) => (
+                <span key={e.label}>
+                  {i > 0 && <span className="mr-1">·</span>}
+                  <strong className="font-semibold text-foreground">{e.value}</strong>
+                </span>
+              ))}
             </div>
-            {product.targetAudience && (
+            {product.targetAudience && !product.contextFields && (
               <div className="mt-1.5 text-[10px] font-medium text-primary">Audience: {product.targetAudience}</div>
             )}
           </div>
@@ -637,10 +660,9 @@ export default function ProductEditorPage() {
         {/* Detail Panel */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex shrink-0 flex-wrap items-center gap-6 border-b border-border bg-card/95 px-8 py-3.5 text-xs text-muted-foreground backdrop-blur-sm">
-            <span><strong className="font-semibold text-foreground">Industry:</strong> {product.industry}</span>
-            <span><strong className="font-semibold text-foreground">Service:</strong> {product.service}</span>
-            <span><strong className="font-semibold text-foreground">Role:</strong> {product.role}</span>
-            <span><strong className="font-semibold text-foreground">Activity:</strong> {product.activity}</span>
+            {getContextEntries(product).map((e) => (
+              <span key={e.label}><strong className="font-semibold text-foreground">{e.label}:</strong> {e.value}</span>
+            ))}
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto bg-background">

@@ -16,22 +16,25 @@ const singleUseCaseSchema = z.object({
   ),
 })
 
+function formatContext(context: Record<string, string>): string {
+  return Object.entries(context)
+    .filter(([, v]) => v?.trim())
+    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
+    .join('\n')
+}
+
 async function generateForUseCase(
   useCase: { name: string; description: string },
-  context: { role: string; activity: string; situation: string; industry: string; service: string },
+  context: Record<string, string>,
 ) {
-  const { role, activity, situation, industry, service } = context
+  const contextBlock = formatContext(context)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
     prompt: `You are an expert AI prompt engineer who creates highly effective prompt templates.
 
 CONTEXT:
-- Industry: ${industry}
-- Service: ${service}
-- Role: ${role}
-- Activity: ${activity}
-- Situation: "${situation}"
+${contextBlock}
 
 TASK:
 Generate 3-5 ready-to-use AI prompt templates for the "${useCase.name}" use case.
@@ -42,7 +45,7 @@ ${useCase.name}: ${useCase.description}
 GUIDELINES:
 - Each prompt must be complete and copy-paste ready — a user should be able to use it immediately.
 - Include [bracketed placeholders] where the user needs to fill in specifics.
-- Prompts should leverage the role's domain knowledge and industry terminology.
+- Prompts should leverage domain knowledge and terminology relevant to the provided context.
 - The "context" field should describe the specific trigger or situation when this prompt is most useful.
 - The "expectedOutput" should set realistic expectations for what the AI will produce.
 - Vary the complexity — include both quick tactical prompts and deeper strategic ones.
@@ -55,13 +58,13 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { role, activity, situation, additionalContext, industry, service } = await req.json()
-    console.log(`[generate-prompts] Role: ${role}, Activity: ${activity}`)
+    const { context } = (await req.json()) as { context: Record<string, string> }
+    console.log(`[generate-prompts] Context keys: ${Object.keys(context).join(', ')}`)
 
     const startTime = Date.now()
 
     const promises = PROMPT_USE_CASES.map((uc) =>
-      generateForUseCase(uc, { role, activity, situation, industry, service }).catch((err) => {
+      generateForUseCase(uc, context).catch((err) => {
         console.error(`[generate-prompts] Error for ${uc.name}:`, err)
         return { categoryName: uc.name, categoryDescription: uc.description, prompts: [] }
       })

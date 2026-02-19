@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration, ConfigStep, ConfigStepField, ConfigOutput } from '@/lib/setup-config-types'
-import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
+import { fieldStorage, type FieldDefinition, computeDependencies, getTransitiveDependencies, sortFieldsByDependency } from '@/lib/field-library'
 import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import {
   BookOpen,
   LogOut,
   Plus,
-  Pencil,
+  Pencil as PencilSmall,
   Trash2,
   X,
   Check,
@@ -25,8 +25,7 @@ import {
   Play,
   ChevronDown,
   ChevronRight,
-  GripVertical,
-  Link2,
+  AlertTriangle,
   FileOutput,
 } from 'lucide-react'
 
@@ -110,13 +109,29 @@ function ConfigBuilder({
     })
   }
 
-  // Field management within a step
+  // Field management within a step — auto-pulls prompt-derived dependencies
   const addFieldToStep = (stepId: string, fieldId: string) => {
-    const csf: ConfigStepField = { fieldId, dependsOn: [], required: false }
-    updateStep(stepId, {
-      fields: [...(state.steps.find((s) => s.id === stepId)?.fields || []), csf],
-    })
+    const currentFieldIds = new Set(state.steps.flatMap((s) => s.fields.map((f) => f.fieldId)))
+    const transitiveDeps = getTransitiveDependencies(fieldId)
+    const missingDeps = transitiveDeps.filter((d) => !currentFieldIds.has(d))
+
+    const newFields: ConfigStepField[] = [
+      ...missingDeps.map((depId) => ({ fieldId: depId, required: false } as ConfigStepField)),
+      { fieldId, required: false },
+    ]
+
+    const step = state.steps.find((s) => s.id === stepId)
+    if (!step) return
+    const existingIds = new Set(step.fields.map((f) => f.fieldId))
+    const toAdd = newFields.filter((f) => !existingIds.has(f.fieldId))
+
+    updateStep(stepId, { fields: [...step.fields, ...toAdd] })
     setShowFieldPicker(null)
+
+    if (missingDeps.length > 0) {
+      const names = missingDeps.map((d) => allFields.find((f) => f.id === d)?.name || d).join(', ')
+      toast?.(`Auto-added dependencies: ${names}`)
+    }
   }
 
   const removeFieldFromStep = (stepId: string, fieldId: string) => {
@@ -228,65 +243,147 @@ function ConfigBuilder({
                       </div>
                     </div>
 
-                    {/* Fields in this step */}
+                    {/* Fields in this step — sorted by dependency order */}
                     <div className="space-y-1.5">
-                      {step.fields.map((csf) => {
+                      {(() => {
+                        const overrides: Record<string, string> = {}
+                        for (const f of step.fields) { if (f.promptOverride) overrides[f.fieldId] = f.promptOverride }
+                        return sortFieldsByDependency(step.fields.map((f) => f.fieldId), overrides)
+                      })().map((sortedId) => {
+                        const csf = step.fields.find((f) => f.fieldId === sortedId)
+                        if (!csf) return null
                         const fieldDef = allFields.find((f) => f.id === csf.fieldId)
                         if (!fieldDef) return null
+                        const deps = computeDependencies(fieldDef, csf.promptOverride)
+                        const allConfigFieldIds = state.steps.flatMap((s) => s.fields.map((f) => f.fieldId))
+                        const missingFromConfig = deps.resolved.filter((d) => !allConfigFieldIds.includes(d))
+
+                        const fieldStepIdx = state.steps.findIndex((s) => s.fields.some((f) => f.fieldId === csf.fieldId))
+                        const orderWarnings = deps.resolved.filter((depId) => {
+                          const depStepIdx = state.steps.findIndex((s) => s.fields.some((f) => f.fieldId === depId))
+                          return depStepIdx > fieldStepIdx
+                        })
+
                         return (
-                          <div key={csf.fieldId} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-foreground">{fieldDef.name}</span>
-                                <code className="text-[10px] text-muted-foreground">{fieldDef.id}</code>
-                                <span className="text-[10px] text-muted-foreground">{fieldDef.selectionMode}</span>
+                          <div key={csf.fieldId} className="rounded-md border border-border bg-card px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-foreground">{fieldDef.name}</span>
+                                  <code className="text-[10px] text-muted-foreground">{fieldDef.id}</code>
+                                  <span className="text-[10px] text-muted-foreground">{fieldDef.selectionMode}</span>
+                                </div>
                               </div>
-                              {/* Dependencies */}
-                              <div className="mt-1 flex flex-wrap items-center gap-1">
-                                <Link2 className="h-3 w-3 text-muted-foreground/50" />
-                                <span className="text-[10px] text-muted-foreground">Depends on:</span>
-                                {allFieldIdsInConfig
-                                  .filter((fid) => fid !== csf.fieldId)
-                                  .map((fid) => {
-                                    const dep = allFields.find((f) => f.id === fid)
-                                    const isDependent = csf.dependsOn.includes(fid)
-                                    return (
-                                      <button
-                                        key={fid}
-                                        type="button"
-                                        onClick={() => {
-                                          const newDeps = isDependent
-                                            ? csf.dependsOn.filter((d) => d !== fid)
-                                            : [...csf.dependsOn, fid]
-                                          updateFieldInStep(step.id, csf.fieldId, { dependsOn: newDeps })
-                                        }}
-                                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                                          isDependent
-                                            ? 'bg-primary/10 text-primary border border-primary/30'
-                                            : 'bg-muted text-muted-foreground border border-transparent hover:border-primary/30'
-                                        }`}
-                                      >
-                                        {dep?.name || fid}
-                                      </button>
-                                    )
-                                  })}
-                                {allFieldIdsInConfig.filter((fid) => fid !== csf.fieldId).length === 0 && (
-                                  <span className="text-[10px] text-muted-foreground/50 italic">none available</span>
-                                )}
-                              </div>
+                              <label className="flex items-center gap-1 text-[10px]">
+                                <input
+                                  type="checkbox"
+                                  checked={csf.required}
+                                  onChange={(e) => updateFieldInStep(step.id, csf.fieldId, { required: e.target.checked })}
+                                  className="rounded"
+                                />
+                                Required
+                              </label>
+                              <button onClick={() => removeFieldFromStep(step.id, csf.fieldId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
                             </div>
-                            <label className="flex items-center gap-1 text-[10px]">
-                              <input
-                                type="checkbox"
-                                checked={csf.required}
-                                onChange={(e) => updateFieldInStep(step.id, csf.fieldId, { required: e.target.checked })}
-                                className="rounded"
-                              />
-                              Required
-                            </label>
-                            <button onClick={() => removeFieldFromStep(step.id, csf.fieldId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
-                              <X className="h-3 w-3" />
-                            </button>
+
+                            {/* Computed dependencies (read-only) */}
+                            {deps.resolved.length > 0 && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground">Requires:</span>
+                                {deps.resolved.map((depId) => {
+                                  const depName = allFields.find((f) => f.id === depId)?.name || depId
+                                  const isMissing = missingFromConfig.includes(depId)
+                                  const hasOrderIssue = orderWarnings.includes(depId)
+                                  return (
+                                    <span
+                                      key={depId}
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                                        isMissing
+                                          ? 'bg-destructive/10 text-destructive border-destructive/30'
+                                          : hasOrderIssue
+                                            ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                                            : 'bg-primary/10 text-primary border-primary/30'
+                                      }`}
+                                    >
+                                      {depName}
+                                      {isMissing && ' (missing)'}
+                                      {hasOrderIssue && !isMissing && ' (later step)'}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Unresolved prompt references */}
+                            {deps.unresolved.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                <span className="text-[10px] text-amber-600">
+                                  Unknown refs: {deps.unresolved.map((r) => `{{${r}}}`).join(', ')}
+                                </span>
+                                {deps.unresolved.map((ref) => {
+                                  const mapping = csf.inputMappings?.[ref]
+                                  const isText = mapping?.type === 'text'
+                                  return (
+                                    <button
+                                      key={ref}
+                                      type="button"
+                                      onClick={() => {
+                                        const current = csf.inputMappings || {}
+                                        if (isText) {
+                                          const { [ref]: _, ...rest } = current
+                                          updateFieldInStep(step.id, csf.fieldId, {
+                                            inputMappings: Object.keys(rest).length > 0 ? rest : undefined,
+                                          })
+                                        } else {
+                                          updateFieldInStep(step.id, csf.fieldId, {
+                                            inputMappings: { ...current, [ref]: { type: 'text' } },
+                                          })
+                                        }
+                                      }}
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                        isText
+                                          ? 'bg-primary/10 text-primary border border-primary/30'
+                                          : 'bg-muted text-muted-foreground border border-transparent hover:border-primary/30'
+                                      }`}
+                                    >
+                                      {ref}: {isText ? 'text input' : 'unmapped'}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Prompt override */}
+                            {csf.promptOverride !== undefined && (
+                              <div className="mt-1.5">
+                                <textarea
+                                  value={csf.promptOverride}
+                                  onChange={(e) => updateFieldInStep(step.id, csf.fieldId, { promptOverride: e.target.value })}
+                                  rows={2}
+                                  className="w-full rounded border border-border bg-muted/30 px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  placeholder="Custom prompt override..."
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateFieldInStep(step.id, csf.fieldId, { promptOverride: undefined })}
+                                  className="mt-0.5 text-[10px] text-muted-foreground hover:text-destructive"
+                                >
+                                  Remove override
+                                </button>
+                              </div>
+                            )}
+                            {csf.promptOverride === undefined && (
+                              <button
+                                type="button"
+                                onClick={() => updateFieldInStep(step.id, csf.fieldId, { promptOverride: fieldDef.prompt })}
+                                className="mt-1 flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-primary"
+                              >
+                                <PencilSmall className="h-2.5 w-2.5" /> Customize prompt
+                              </button>
+                            )}
                           </div>
                         )
                       })}
@@ -573,7 +670,7 @@ export default function ConfigurationsPage() {
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => openEdit(config)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Edit">
-                        <Pencil className="h-3.5 w-3.5" />
+                        <PencilSmall className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleDelete(config.id)} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />

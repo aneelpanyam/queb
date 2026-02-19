@@ -136,7 +136,11 @@ export default function ProductsPage() {
                         <p className="mb-2 line-clamp-1 text-sm text-muted-foreground">{product.description}</p>
                       )}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span><strong className="font-medium text-foreground">Audience:</strong> {product.targetAudience || `${product.role} in ${product.industry}`}</span>
+                        <span><strong className="font-medium text-foreground">Context:</strong> {
+                          product.contextFields && Object.keys(product.contextFields).length > 0
+                            ? Object.values(product.contextFields).filter(Boolean).slice(0, 3).join(' · ')
+                            : product.targetAudience || `${product.role} in ${product.industry}`
+                        }</span>
                         <span>{visibleElements(product)} {otDef?.elementLabel.toLowerCase() || 'element'}s</span>
                         <span className="flex items-center gap-1">
                           <MessageSquareText className="h-3 w-3" />

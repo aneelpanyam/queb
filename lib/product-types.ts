@@ -58,7 +58,10 @@ export interface Product {
   configurationId?: string
   outputType: string
 
-  // Denormalized context (copied from configuration at generation time)
+  // Dynamic context — all field values captured by the configuration
+  contextFields?: Record<string, string>
+
+  // Legacy denormalized context (kept for backward compatibility with older products)
   targetAudience: string
   industry: string
   service: string

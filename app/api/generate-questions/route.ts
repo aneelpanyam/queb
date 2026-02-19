@@ -33,42 +33,25 @@ export const questionsSchema = z.object({
   perspectives: z.array(singlePerspectiveSchema),
 })
 
-// Helper function to generate questions for a single perspective
+function formatContext(context: Record<string, string>): string {
+  return Object.entries(context)
+    .filter(([, v]) => v?.trim())
+    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
+    .join('\n')
+}
+
 async function generateQuestionsForPerspective(
   perspective: { name: string; description: string },
-  context: {
-    role: string
-    activity: string
-    situation: string
-    additionalContext: any
-    industry: string
-    service: string
-  }
+  context: Record<string, string>,
 ) {
-  const { role, activity, situation, additionalContext, industry, service } = context
-
-  // Format additional context if provided
-  let additionalContextBlock = ''
-  if (additionalContext && Array.isArray(additionalContext) && additionalContext.length > 0) {
-    const items = additionalContext
-      .filter((c: { label: string; value: string }) => c.label?.trim() && c.value?.trim())
-      .map((c: { label: string; value: string }) => `- ${c.label}: ${c.value}`)
-      .join('\n')
-    if (items) {
-      additionalContextBlock = `\n\nADDITIONAL CONTEXT:\n${items}`
-    }
-  }
+  const contextBlock = formatContext(context)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
     prompt: `You are an expert thinking coach and organizational consultant.
 
 CONTEXT:
-- Industry: ${industry}
-- Service: ${service}
-- Role: ${role}
-- Activity: ${activity}
-- Situation: "${situation}"${additionalContextBlock}
+${contextBlock}
 
 TASK:
 Generate 3-5 thoughtful, probing questions specifically from the "${perspective.name}" perspective.
@@ -77,13 +60,13 @@ PERSPECTIVE DEFINITION:
 ${perspective.name}: ${perspective.description}
 
 GUIDELINES:
-- Only generate questions if this perspective is genuinely relevant to the given role, activity, and situation. If not relevant, return an empty questions array.
-- Every question must be specific to the described situation, not generic.
-- Actively incorporate any additional context provided (team size, budget, timeline, stakeholders, challenges, etc.) to make questions sharper and more actionable.
+- Only generate questions if this perspective is genuinely relevant to the given context. If not relevant, return an empty questions array.
+- Every question must be specific to the described context, not generic.
+- Actively incorporate all context provided to make questions sharper and more actionable.
 - Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.
 - Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").
 - Questions should provoke deep thinking and help uncover blind spots.
-- Consider the industry norms and the service being delivered when framing questions.`,
+- Tailor questions to the specific context fields provided.`,
     output: Output.object({ schema: singlePerspectiveSchema }),
   })
 
@@ -92,22 +75,14 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { role, activity, situation, additionalContext, industry, service } = await req.json()
-    console.log(`[generate-questions] Role: ${role}, Activity: ${activity}, Industry: ${industry}`)
+    const { context } = (await req.json()) as { context: Record<string, string> }
+    console.log(`[generate-questions] Context keys: ${Object.keys(context).join(', ')}`)
     console.log(`[generate-questions] Starting parallel generation for ${BUSINESS_PERSPECTIVES.length} perspectives`)
 
     const startTime = Date.now()
 
-    // Generate questions for all perspectives in parallel
     const perspectivePromises = BUSINESS_PERSPECTIVES.map((perspective) =>
-      generateQuestionsForPerspective(perspective, {
-        role,
-        activity,
-        situation,
-        additionalContext,
-        industry,
-        service,
-      }).catch((error) => {
+      generateQuestionsForPerspective(perspective, context).catch((error) => {
         console.error(`[generate-questions] Error for perspective ${perspective.name}:`, error)
         // Return a fallback perspective with empty questions on error
         return {

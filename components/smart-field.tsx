@@ -12,7 +12,8 @@ import {
   Plus,
 } from 'lucide-react'
 import type { FieldDefinition } from '@/lib/field-library'
-import { resolvePrompt, extractDependencies } from '@/lib/field-library'
+import { resolvePrompt, computeDependencies } from '@/lib/field-library'
+import type { InputMapping } from '@/lib/setup-config-types'
 
 // ============================================================
 // SmartField — renders any field from the library, fetches
@@ -24,7 +25,7 @@ export interface SmartFieldProps {
   value: string | string[]
   allValues: Record<string, string | string[]>
   promptOverride?: string
-  dependsOn: string[]
+  inputMappings?: Record<string, InputMapping>
   onChange: (value: string | string[]) => void
   disabled?: boolean
 }
@@ -39,7 +40,7 @@ export function SmartField({
   value,
   allValues,
   promptOverride,
-  dependsOn,
+  inputMappings,
   onChange,
   disabled,
 }: SmartFieldProps) {
@@ -57,7 +58,19 @@ export function SmartField({
     flat[k] = stringVal(v)
   }
 
-  // Check that all declared dependencies have values
+  // Compute dependencies from the prompt template
+  const { resolved: dependsOn } = computeDependencies(field, promptOverride)
+
+  // Text-input mappings contribute values too — fold mapped field values in
+  if (inputMappings) {
+    for (const [ref, mapping] of Object.entries(inputMappings)) {
+      if (mapping.type === 'field' && flat[mapping.fieldId]) {
+        flat[ref] = flat[mapping.fieldId]
+      }
+    }
+  }
+
+  // Check that all resolved dependencies have values
   const depsMet = dependsOn.every((d) => flat[d]?.trim())
   const depsKey = dependsOn.map((d) => flat[d] || '').join('\x00')
 
