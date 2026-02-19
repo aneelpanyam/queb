@@ -4,7 +4,7 @@
 
 export interface ExportBundle<T> {
   version: 1
-  type: 'configurations' | 'products' | 'full-backup'
+  type: 'configurations' | 'products' | 'ideas' | 'full-backup'
   exportedAt: string
   items: T[]
 }

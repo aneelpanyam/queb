@@ -56,6 +56,7 @@ export default function NewProductPage() {
               <h1 className="font-display text-lg font-bold text-foreground">DigiCraft</h1>
             </button>
             <nav className="hidden items-center gap-1 sm:flex">
+              <button onClick={() => router.push('/ideas')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Ideas</button>
               <button onClick={() => router.push('/products')} className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">Products</button>
               <button onClick={() => router.push('/configurations')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Configurations</button>
               <button onClick={() => router.push('/library')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Library</button>

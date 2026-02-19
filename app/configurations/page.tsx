@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
@@ -848,7 +848,45 @@ function ConfigBuilder({
 // ============================================================
 
 export default function ConfigurationsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ConfigurationsPageInner />
+    </Suspense>
+  )
+}
+
+interface AINewField {
+  id: string
+  name: string
+  description: string
+  prompt: string
+  selectionMode: 'single' | 'multi'
+  category: string
+}
+
+interface AIStep {
+  name: string
+  description: string
+  fieldIds: string[]
+  newFields?: AINewField[]
+}
+
+interface AIOutput {
+  outputTypeId: string
+  sectionDrivers?: { name: string; description: string }[]
+  instructionDirectives?: { label: string; content: string }[]
+}
+
+function ConfigurationsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { authChecked, authenticated, setAuthenticated, handleLogout } = useAuth()
 
   const [configs, setConfigs] = useState<SetupConfiguration[]>([])
@@ -868,11 +906,103 @@ export default function ConfigurationsPage() {
   const [selectedForExport, setSelectedForExport] = useState<Set<string>>(new Set())
   const [selectMode, setSelectMode] = useState(false)
 
-  useEffect(() => {
-    setConfigs(configStorage.getAll())
-    setAllFields(fieldStorage.getAll())
-    setAllOutputTypes(outputTypeStorage.getAll())
+  const processAIConfiguration = useCallback((
+    configuration: { name?: string; description?: string; steps?: AIStep[]; outputs?: AIOutput[] },
+    currentFields: FieldDefinition[],
+  ): { builderState: BuilderState; createdFieldCount: number } => {
+    const knownFieldIds = new Set(currentFields.map((f) => f.id))
+    let createdFieldCount = 0
+
+    const steps = (configuration.steps || []).map((step: AIStep, i: number) => {
+      const stepFields: ConfigStepField[] = []
+
+      if (step.newFields?.length) {
+        for (const nf of step.newFields) {
+          if (knownFieldIds.has(nf.id)) continue
+          fieldStorage.save({
+            id: nf.id,
+            name: nf.name,
+            description: nf.description,
+            prompt: nf.prompt,
+            selectionMode: nf.selectionMode || 'single',
+            allowCustomValues: true,
+            category: nf.category || 'AI Generated',
+            isBuiltIn: false,
+          })
+          knownFieldIds.add(nf.id)
+          createdFieldCount++
+        }
+      }
+
+      for (const fid of (step.fieldIds || [])) {
+        if (knownFieldIds.has(fid)) {
+          stepFields.push({ fieldId: fid, required: false })
+        }
+      }
+
+      if (step.newFields?.length) {
+        for (const nf of step.newFields) {
+          if (!stepFields.some((sf) => sf.fieldId === nf.id)) {
+            stepFields.push({ fieldId: nf.id, required: false })
+          }
+        }
+      }
+
+      return {
+        id: `s-${Date.now()}-${i}`,
+        name: step.name,
+        description: step.description || '',
+        fields: stepFields,
+      }
+    })
+
+    return {
+      builderState: {
+        name: configuration.name || '',
+        description: configuration.description || '',
+        steps,
+        outputs: (configuration.outputs || []).map((out: AIOutput) => ({
+          outputTypeId: out.outputTypeId,
+          sectionDrivers: out.sectionDrivers?.length ? out.sectionDrivers : undefined,
+          instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
+        })),
+      },
+      createdFieldCount,
+    }
   }, [])
+
+  useEffect(() => {
+    const fields = fieldStorage.getAll()
+    const outputTypes = outputTypeStorage.getAll()
+    setConfigs(configStorage.getAll())
+    setAllFields(fields)
+    setAllOutputTypes(outputTypes)
+
+    // Auto-open builder when navigated from Idea Book with a generated config
+    const ideaConfigParam = searchParams.get('ideaConfig')
+    if (ideaConfigParam) {
+      try {
+        const configuration = JSON.parse(ideaConfigParam)
+        const { builderState, createdFieldCount } = processAIConfiguration(configuration, fields)
+
+        if (createdFieldCount > 0) {
+          setAllFields(fieldStorage.getAll())
+        }
+
+        setBuilderInit(builderState)
+        setEditingId(null)
+        setBuilderMode('create')
+        toast.success(
+          createdFieldCount > 0
+            ? `Configuration generated from idea with ${createdFieldCount} new field${createdFieldCount !== 1 ? 's' : ''} added to library!`
+            : 'Configuration generated from idea! Review and save below.'
+        )
+        router.replace('/configurations')
+      } catch {
+        // Ignore malformed param
+      }
+    }
+  }, [searchParams, router, processAIConfiguration])
 
   const openCreate = () => {
     setBuilderInit(emptyBuilder())
@@ -952,26 +1082,10 @@ export default function ConfigurationsPage() {
       }
       const { configuration } = await res.json()
 
-      const builderState: BuilderState = {
-        name: configuration.name || '',
-        description: configuration.description || '',
-        steps: (configuration.steps || []).map((step: { name: string; description: string; fieldIds: string[] }, i: number) => ({
-          id: `s-${Date.now()}-${i}`,
-          name: step.name,
-          description: step.description || '',
-          fields: (step.fieldIds || [])
-            .filter((fid: string) => allFields.some((f) => f.id === fid))
-            .map((fid: string) => ({ fieldId: fid, required: false })),
-        })),
-        outputs: (configuration.outputs || []).map((out: {
-          outputTypeId: string
-          sectionDrivers?: { name: string; description: string }[]
-          instructionDirectives?: { label: string; content: string }[]
-        }) => ({
-          outputTypeId: out.outputTypeId,
-          sectionDrivers: out.sectionDrivers?.length ? out.sectionDrivers : undefined,
-          instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
-        })),
+      const { builderState, createdFieldCount } = processAIConfiguration(configuration, allFields)
+
+      if (createdFieldCount > 0) {
+        setAllFields(fieldStorage.getAll())
       }
 
       setWizardOpen(false)
@@ -979,7 +1093,11 @@ export default function ConfigurationsPage() {
       setBuilderInit(builderState)
       setEditingId(null)
       setBuilderMode('create')
-      toast.success('Configuration generated! Review and save below.')
+      toast.success(
+        createdFieldCount > 0
+          ? `Configuration generated with ${createdFieldCount} new field${createdFieldCount !== 1 ? 's' : ''} added to library!`
+          : 'Configuration generated! Review and save below.'
+      )
     } catch (err) {
       setWizardError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -1069,6 +1187,7 @@ export default function ConfigurationsPage() {
               <h1 className="font-display text-lg font-bold text-foreground">DigiCraft</h1>
             </button>
             <nav className="hidden items-center gap-1 sm:flex">
+              <button onClick={() => router.push('/ideas')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Ideas</button>
               <button onClick={() => router.push('/products')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Products</button>
               <button className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">Configurations</button>
               <button onClick={() => router.push('/library')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Library</button>

@@ -3,6 +3,15 @@ import { z } from 'zod'
 
 export const maxDuration = 120
 
+const newFieldSchema = z.object({
+  id: z.string().describe('A unique camelCase identifier for this new field (e.g. "budgetRange", "teamSize")'),
+  name: z.string().describe('Human-readable field name'),
+  description: z.string().describe('What this field captures'),
+  prompt: z.string().describe('Prompt to generate suggestions. Use {{otherFieldId}} placeholders to reference other fields'),
+  selectionMode: z.enum(['single', 'multi']).describe('Whether the user picks one or multiple values'),
+  category: z.string().describe('Category grouping (e.g. "Core", "Context", "Audience", "Topic-Specific")'),
+})
+
 const configSchema = z.object({
   name: z.string().describe('Short, catchy configuration name'),
   description: z.string().describe('One-sentence summary of what this configuration produces'),
@@ -12,7 +21,10 @@ const configSchema = z.object({
       description: z.string().describe('Brief description of what this step captures'),
       fieldIds: z
         .array(z.string())
-        .describe('IDs of fields to include in this step, ordered by dependency'),
+        .describe('IDs of existing library fields to include in this step, ordered by dependency'),
+      newFields: z
+        .array(newFieldSchema)
+        .describe('Ad-hoc field definitions for fields NOT in the library that this configuration needs'),
     })
   ),
   outputs: z.array(
@@ -61,26 +73,62 @@ A user wants to create a configuration that generates a specific product. Based 
 USER'S DESCRIPTION:
 "${description}"
 
-AVAILABLE FIELDS (use these IDs in your steps — fields have dependency chains, so order matters):
+AVAILABLE FIELDS in the library (you may reference these by ID):
 ${fieldsList}
 
 AVAILABLE OUTPUT TYPES (use these IDs for outputs):
 ${outputTypesList}
 
-DESIGN RULES:
-1. Choose fields that are relevant to the user's description. Group them into logical steps.
-2. Fields have dependencies implied by their order: industry → service → role → activity → situation is the typical chain.
-3. Steps should be organized logically — put prerequisite fields in earlier steps.
-4. Choose the most appropriate output type(s) for what the user wants to create.
-5. Design custom section drivers that are specific to the user's topic, NOT generic. Each driver should represent a meaningful category or angle for the content.
-6. Design instruction directives that tell the AI exactly how to generate content for this specific topic. Typically include:
-   - A "Role" directive describing who the AI should act as
-   - A "Task" directive describing what to generate
-   - Additional directives for tone, specificity, format, etc.
-7. Section drivers should have 4-8 entries, each with a descriptive name and a 1-2 sentence description.
-8. Instruction directives should have 4-8 entries covering role, task, guidelines, and constraints.
-9. Make the configuration name catchy and descriptive.
-10. Focus on the USER's specific topic — avoid generic content.
+═══════════════════════════════════════════════
+STEP 1: IDENTIFY WHAT CONTEXT THIS IDEA NEEDS
+═══════════════════════════════════════════════
+Before picking any fields, analyze the user's description and ask: "What specific pieces of context does this idea need from the user to produce great output?"
+
+For example:
+- "Know your role: Pain points of CISO" → needs: which industry, what the CISO's specific role scope is, maybe the organization's security maturity level, relevant compliance frameworks
+- "SaaS onboarding email course" → needs: which industry, the SaaS product/service, who the target audience is, what onboarding stage to focus on, product complexity level
+- "Sales battle cards for enterprise deals" → needs: industry, the service/product being sold, who the competitor is, deal size range, buyer persona
+
+List out 3-7 contextual inputs that would meaningfully shape the output quality. Each input should answer: "Would the generated content be noticeably different if this value changed?"
+
+═══════════════════════════════════════════════
+STEP 2: MATCH NEEDS TO LIBRARY FIELDS
+═══════════════════════════════════════════════
+For each contextual input identified above, check if an existing library field captures it well enough. Only use a library field if it's a genuine match — don't force-fit.
+
+Rules:
+- Do NOT include library fields just because they exist. A typical configuration uses 3-6 fields total.
+- Skip fields that won't meaningfully change the generated output for this specific idea.
+- If "industry" isn't relevant to the idea (e.g., a generic personal productivity topic), don't include it.
+
+═══════════════════════════════════════════════
+STEP 3: CREATE AD-HOC FIELDS FOR GAPS
+═══════════════════════════════════════════════
+For each contextual input that has no good library match, define a NEW AD-HOC FIELD in the "newFields" array:
+- Give it a unique camelCase ID (e.g., "securityMaturityLevel", "dealSize", "onboardingStage")
+- Write a clear prompt that generates relevant suggestions (use {{otherFieldId}} to reference fields the user fills earlier)
+- Set the right selectionMode: "single" for choices like maturity level, "multi" for things like applicable frameworks
+- Assign a descriptive category (e.g., "Topic-Specific", "Audience", "Scope")
+
+Ad-hoc fields make the configuration laser-focused on the user's specific topic instead of relying only on generic fields.
+
+═══════════════════════════════════════════════
+STEP 4: ORGANIZE INTO STEPS & OUTPUTS
+═══════════════════════════════════════════════
+- Group fields into logical wizard steps. Put broad context first (industry, service) and specific/dependent context later.
+- Fields have dependencies via {{fieldId}} prompt placeholders: ensure referenced fields appear in earlier steps.
+- Choose the most appropriate output type(s) for what the user wants to create.
+
+Section drivers (4-8 entries):
+- Design custom drivers specific to the user's topic. Each driver represents a meaningful angle/category for the content.
+
+Instruction directives (4-8 entries):
+- Tell the AI exactly how to generate content for this topic. Typically include:
+  - A "Role" directive: who the AI should act as (domain expert persona)
+  - A "Task" directive: what to generate and to what standard
+  - Directives for tone, specificity, depth, format, constraints, etc.
+
+Configuration name: make it catchy and descriptive.
 
 Generate a complete configuration.`
 
