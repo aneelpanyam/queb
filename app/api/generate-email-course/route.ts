@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
+import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
@@ -16,22 +17,12 @@ const singleStageSchema = z.object({
   ),
 })
 
-function formatContext(context: Record<string, string>): string {
-  return Object.entries(context)
-    .filter(([, v]) => v?.trim())
-    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
-    .join('\n')
-}
-
-async function generateForStage(
+function buildDefaultPrompt(
   stage: { name: string; description: string },
   context: Record<string, string>,
 ) {
   const contextBlock = formatContext(context)
-
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an expert email course creator and instructional designer.
+  return `You are an expert email course creator and instructional designer.
 
 CONTEXT:
 ${contextBlock}
@@ -49,7 +40,21 @@ GUIDELINES:
 - Include specific examples, frameworks, or tips relevant to the provided context.
 - Each email must end with a clear, specific call to action.
 - Write as an expert peer, not a lecturer.
-- If this stage is not very relevant to the context, still include at least 1 email.`,
+- If this stage is not very relevant to the context, still include at least 1 email.`
+}
+
+async function generateForStage(
+  stage: { name: string; description: string },
+  context: Record<string, string>,
+  directives?: { label: string; content: string }[],
+) {
+  const prompt = directives?.length
+    ? assembleDirectivesPrompt(context, stage, 'Module', directives)
+    : buildDefaultPrompt(stage, context)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singleStageSchema }),
   })
 
@@ -58,13 +63,19 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { context } = (await req.json()) as { context: Record<string, string> }
-    console.log(`[generate-email-course] Context keys: ${Object.keys(context).join(', ')}`)
+    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+      context: Record<string, string>
+      sectionDrivers?: { name: string; description: string }[]
+      instructionDirectives?: { label: string; content: string }[]
+    }
+
+    const stages = sectionDrivers?.length ? sectionDrivers : EMAIL_COURSE_STAGES
+    console.log(`[generate-email-course] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom stages)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
 
-    const promises = EMAIL_COURSE_STAGES.map((stage) =>
-      generateForStage(stage, context).catch((err) => {
+    const promises = stages.map((stage) =>
+      generateForStage(stage, context, instructionDirectives).catch((err) => {
         console.error(`[generate-email-course] Error for ${stage.name}:`, err)
         return { moduleName: stage.name, moduleDescription: stage.description, emails: [] }
       })
@@ -73,7 +84,7 @@ export async function POST(req: Request) {
     const allModules = await Promise.all(promises)
     const relevant = allModules.filter((m) => m.emails.length > 0)
 
-    console.log(`[generate-email-course] ${relevant.length}/${EMAIL_COURSE_STAGES.length} modules in ${Date.now() - startTime}ms`)
+    console.log(`[generate-email-course] ${relevant.length}/${stages.length} modules in ${Date.now() - startTime}ms`)
 
     return Response.json({ modules: relevant })
   } catch (error) {

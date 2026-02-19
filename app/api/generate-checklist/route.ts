@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
+import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
@@ -16,22 +17,12 @@ const singleDimensionSchema = z.object({
   ),
 })
 
-function formatContext(context: Record<string, string>): string {
-  return Object.entries(context)
-    .filter(([, v]) => v?.trim())
-    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
-    .join('\n')
-}
-
-async function generateForDimension(
+function buildDefaultPrompt(
   dimension: { name: string; description: string },
   context: Record<string, string>,
 ) {
   const contextBlock = formatContext(context)
-
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an expert process consultant and operations advisor.
+  return `You are an expert process consultant and operations advisor.
 
 CONTEXT:
 ${contextBlock}
@@ -48,7 +39,21 @@ GUIDELINES:
 - Each item must be concrete and verifiable — not vague guidance.
 - Assign priority: High (must-do, blocking), Medium (should-do, important), Low (nice-to-have, optimization).
 - The description should explain WHY this matters and HOW to execute it well.
-- Tailor everything to the specific context provided.`,
+- Tailor everything to the specific context provided.`
+}
+
+async function generateForDimension(
+  dimension: { name: string; description: string },
+  context: Record<string, string>,
+  directives?: { label: string; content: string }[],
+) {
+  const prompt = directives?.length
+    ? assembleDirectivesPrompt(context, dimension, 'Dimension', directives)
+    : buildDefaultPrompt(dimension, context)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singleDimensionSchema }),
   })
 
@@ -57,13 +62,19 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { context } = (await req.json()) as { context: Record<string, string> }
-    console.log(`[generate-checklist] Context keys: ${Object.keys(context).join(', ')}`)
+    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+      context: Record<string, string>
+      sectionDrivers?: { name: string; description: string }[]
+      instructionDirectives?: { label: string; content: string }[]
+    }
+
+    const dimensions = sectionDrivers?.length ? sectionDrivers : CHECKLIST_DIMENSIONS
+    console.log(`[generate-checklist] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom dimensions)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
 
-    const promises = CHECKLIST_DIMENSIONS.map((dim) =>
-      generateForDimension(dim, context).catch((err) => {
+    const promises = dimensions.map((dim) =>
+      generateForDimension(dim, context, instructionDirectives).catch((err) => {
         console.error(`[generate-checklist] Error for ${dim.name}:`, err)
         return { dimensionName: dim.name, dimensionDescription: dim.description, items: [] }
       })
@@ -72,7 +83,7 @@ export async function POST(req: Request) {
     const allDimensions = await Promise.all(promises)
     const relevant = allDimensions.filter((d) => d.items.length > 0)
 
-    console.log(`[generate-checklist] ${relevant.length}/${CHECKLIST_DIMENSIONS.length} relevant in ${Date.now() - startTime}ms`)
+    console.log(`[generate-checklist] ${relevant.length}/${dimensions.length} relevant in ${Date.now() - startTime}ms`)
 
     return Response.json({ dimensions: relevant })
   } catch (error) {

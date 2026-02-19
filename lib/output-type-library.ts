@@ -4,6 +4,12 @@
 // Prompts use {{fieldId}} placeholders resolved at generation time.
 // ============================================================
 
+import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
+import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
+import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
+import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
+import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
+
 export interface OutputTypeField {
   key: string
   label: string
@@ -22,6 +28,8 @@ export interface OutputTypeDefinition {
   fields: OutputTypeField[]
   supportsDeepDive?: boolean
   supportsDeeperQuestions?: boolean
+  defaultSectionDrivers?: SectionDriver[]
+  defaultInstructionDirectives?: InstructionDirective[]
   isBuiltIn: boolean
   createdAt: string
   updatedAt: string
@@ -62,6 +70,7 @@ GUIDELINES:
     ],
     supportsDeepDive: true,
     supportsDeeperQuestions: true,
+    defaultSectionDrivers: BUSINESS_PERSPECTIVES.map((p) => ({ name: p.name, description: p.description })),
     isBuiltIn: true,
   },
   {
@@ -95,6 +104,7 @@ GUIDELINES:
       { key: 'priority', label: 'Priority', type: 'short-text' },
     ],
     supportsDeepDive: true,
+    defaultSectionDrivers: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
     isBuiltIn: true,
   },
   {
@@ -128,6 +138,7 @@ GUIDELINES:
       { key: 'callToAction', label: 'Call to Action', type: 'short-text' },
     ],
     supportsDeepDive: true,
+    defaultSectionDrivers: EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
     isBuiltIn: true,
   },
   {
@@ -161,6 +172,7 @@ GUIDELINES:
       { key: 'expectedOutput', label: 'Expected Output', type: 'long-text' },
     ],
     supportsDeepDive: true,
+    defaultSectionDrivers: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
     isBuiltIn: true,
   },
   {
@@ -268,4 +280,72 @@ export const outputTypeStorage = { getAll, getById, save, update, remove }
 
 export function getPrimaryField(ot: OutputTypeDefinition): OutputTypeField {
   return ot.fields.find((f) => f.primary) || ot.fields[0]
+}
+
+// ============================================================
+// Default instruction directives per built-in output type.
+// Each directive is a discrete, editable rule the AI follows.
+// ============================================================
+
+const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
+  questions: [
+    { label: 'Role', content: 'You are an expert thinking coach and organizational consultant.' },
+    { label: 'Task', content: 'Generate 3-5 thoughtful, probing questions from this perspective.' },
+    { label: 'Relevance filter', content: 'Only generate questions if this perspective is genuinely relevant to the given context. If not relevant, return an empty questions array.' },
+    { label: 'Specificity', content: 'Every question must be specific to the described context, not generic.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make questions sharper and more actionable.' },
+    { label: 'Relevance notes', content: 'Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.' },
+    { label: 'Actionable info prompts', content: 'Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").' },
+    { label: 'Deep thinking', content: 'Questions should provoke deep thinking and help uncover blind spots.' },
+    { label: 'Tailoring', content: 'Tailor questions to the specific context fields provided.' },
+  ],
+  checklist: [
+    { label: 'Role', content: 'You are an expert process consultant and operations advisor.' },
+    { label: 'Task', content: 'Generate a thorough checklist for this dimension.' },
+    { label: 'Item count', content: 'Generate 4-8 specific, actionable checklist items relevant to the given context.' },
+    { label: 'Relevance filter', content: 'Only include items if this dimension is genuinely relevant. If not relevant, return an empty items array.' },
+    { label: 'Concreteness', content: 'Each item must be concrete and verifiable — not vague guidance.' },
+    { label: 'Priority levels', content: 'Assign priority: High (must-do, blocking), Medium (should-do, important), Low (nice-to-have, optimization).' },
+    { label: 'Descriptions', content: 'The description should explain WHY this matters and HOW to execute it well.' },
+    { label: 'Tailoring', content: 'Tailor everything to the specific context provided.' },
+  ],
+  'email-course': [
+    { label: 'Role', content: 'You are an expert email course creator and instructional designer.' },
+    { label: 'Task', content: 'Generate 2-4 emails for this module of an email course.' },
+    { label: 'Self-contained', content: 'Each email should be self-contained but build on the overall module theme.' },
+    { label: 'Subject lines', content: 'Subject lines must be compelling and specific — avoid generic titles.' },
+    { label: 'Email body length', content: 'Email bodies should be 150-300 words: educational, conversational, and packed with actionable insight.' },
+    { label: 'Examples', content: 'Include specific examples, frameworks, or tips relevant to the provided context.' },
+    { label: 'Call to action', content: 'Each email must end with a clear, specific call to action.' },
+    { label: 'Tone', content: 'Write as an expert peer, not a lecturer.' },
+    { label: 'Minimum output', content: 'If this module is not very relevant to the context, still include at least 1 email.' },
+  ],
+  prompts: [
+    { label: 'Role', content: 'You are an expert AI prompt engineer who creates highly effective prompt templates.' },
+    { label: 'Task', content: 'Generate 3-5 ready-to-use AI prompt templates for this use case.' },
+    { label: 'Copy-paste ready', content: 'Each prompt must be complete and copy-paste ready — a user should be able to use it immediately.' },
+    { label: 'Placeholders', content: 'Include [bracketed placeholders] where the user needs to fill in specifics.' },
+    { label: 'Domain knowledge', content: 'Prompts should leverage domain knowledge and terminology relevant to the provided context.' },
+    { label: 'Context field', content: 'The "context" field should describe the specific trigger or situation when this prompt is most useful.' },
+    { label: 'Expected output', content: 'The "expectedOutput" should set realistic expectations for what the AI will produce.' },
+    { label: 'Complexity range', content: 'Vary the complexity — include both quick tactical prompts and deeper strategic ones.' },
+    { label: 'Minimum output', content: 'If this use case is not very relevant, still include at least 1 prompt.' },
+  ],
+}
+
+/** Returns default instruction directives for an output type, from definition or built-in fallback */
+export function getDefaultInstructionDirectives(ot: OutputTypeDefinition): InstructionDirective[] {
+  return ot.defaultInstructionDirectives ?? BUILTIN_INSTRUCTION_DIRECTIVES[ot.id] ?? []
+}
+
+const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
+  questions: BUSINESS_PERSPECTIVES.map((p) => ({ name: p.name, description: p.description })),
+  checklist: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
+  'email-course': EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
+  prompts: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
+}
+
+/** Returns default section drivers for an output type, from definition or built-in fallback */
+export function getDefaultSectionDrivers(ot: OutputTypeDefinition): SectionDriver[] {
+  return ot.defaultSectionDrivers ?? BUILTIN_SECTION_DRIVERS[ot.id] ?? []
 }

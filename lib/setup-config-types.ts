@@ -21,9 +21,23 @@ export interface ConfigStep {
   fields: ConfigStepField[]
 }
 
+export interface SectionDriver {
+  name: string
+  description: string
+}
+
+export interface InstructionDirective {
+  label: string
+  content: string
+}
+
 export interface ConfigOutput {
   outputTypeId: string
   promptOverride?: string
+  /** Custom section drivers (perspectives, dimensions, stages, etc.) to use instead of defaults */
+  sectionDrivers?: SectionDriver[]
+  /** Custom instruction directives — individual rules/guidelines the AI follows when generating. Uses full defaults when omitted. */
+  instructionDirectives?: InstructionDirective[]
 }
 
 export interface SetupConfiguration {

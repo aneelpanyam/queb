@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
+import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
@@ -16,22 +17,12 @@ const singleUseCaseSchema = z.object({
   ),
 })
 
-function formatContext(context: Record<string, string>): string {
-  return Object.entries(context)
-    .filter(([, v]) => v?.trim())
-    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
-    .join('\n')
-}
-
-async function generateForUseCase(
+function buildDefaultPrompt(
   useCase: { name: string; description: string },
   context: Record<string, string>,
 ) {
   const contextBlock = formatContext(context)
-
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an expert AI prompt engineer who creates highly effective prompt templates.
+  return `You are an expert AI prompt engineer who creates highly effective prompt templates.
 
 CONTEXT:
 ${contextBlock}
@@ -49,7 +40,21 @@ GUIDELINES:
 - The "context" field should describe the specific trigger or situation when this prompt is most useful.
 - The "expectedOutput" should set realistic expectations for what the AI will produce.
 - Vary the complexity — include both quick tactical prompts and deeper strategic ones.
-- If this use case is not very relevant, still include at least 1 prompt.`,
+- If this use case is not very relevant, still include at least 1 prompt.`
+}
+
+async function generateForUseCase(
+  useCase: { name: string; description: string },
+  context: Record<string, string>,
+  directives?: { label: string; content: string }[],
+) {
+  const prompt = directives?.length
+    ? assembleDirectivesPrompt(context, useCase, 'Use Case', directives)
+    : buildDefaultPrompt(useCase, context)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singleUseCaseSchema }),
   })
 
@@ -58,13 +63,19 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { context } = (await req.json()) as { context: Record<string, string> }
-    console.log(`[generate-prompts] Context keys: ${Object.keys(context).join(', ')}`)
+    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+      context: Record<string, string>
+      sectionDrivers?: { name: string; description: string }[]
+      instructionDirectives?: { label: string; content: string }[]
+    }
+
+    const useCases = sectionDrivers?.length ? sectionDrivers : PROMPT_USE_CASES
+    console.log(`[generate-prompts] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom use cases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
 
-    const promises = PROMPT_USE_CASES.map((uc) =>
-      generateForUseCase(uc, context).catch((err) => {
+    const promises = useCases.map((uc) =>
+      generateForUseCase(uc, context, instructionDirectives).catch((err) => {
         console.error(`[generate-prompts] Error for ${uc.name}:`, err)
         return { categoryName: uc.name, categoryDescription: uc.description, prompts: [] }
       })
@@ -73,7 +84,7 @@ export async function POST(req: Request) {
     const allCategories = await Promise.all(promises)
     const relevant = allCategories.filter((c) => c.prompts.length > 0)
 
-    console.log(`[generate-prompts] ${relevant.length}/${PROMPT_USE_CASES.length} categories in ${Date.now() - startTime}ms`)
+    console.log(`[generate-prompts] ${relevant.length}/${useCases.length} categories in ${Date.now() - startTime}ms`)
 
     return Response.json({ categories: relevant })
   } catch (error) {

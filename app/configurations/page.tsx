@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration, ConfigStep, ConfigStepField, ConfigOutput } from '@/lib/setup-config-types'
 import { fieldStorage, type FieldDefinition, computeDependencies, getTransitiveDependencies, sortFieldsByDependency } from '@/lib/field-library'
-import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
+import { outputTypeStorage, type OutputTypeDefinition, getDefaultSectionDrivers, getDefaultInstructionDirectives } from '@/lib/output-type-library'
+import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +28,9 @@ import {
   ChevronRight,
   AlertTriangle,
   FileOutput,
+  Layers,
+  RotateCcw,
+  ScrollText,
 } from 'lucide-react'
 
 // ============================================================
@@ -76,6 +80,7 @@ function ConfigBuilder({
   const [expandedStep, setExpandedStep] = useState<string | null>(initial.steps[0]?.id || null)
   const [showFieldPicker, setShowFieldPicker] = useState<string | null>(null)
   const [showOutputPicker, setShowOutputPicker] = useState(false)
+  const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
 
   const allFieldIdsInConfig = state.steps.flatMap((s) => s.fields.map((f) => f.fieldId))
 
@@ -150,7 +155,17 @@ function ConfigBuilder({
 
   // Output management
   const addOutput = (otId: string) => {
-    setState((p) => ({ ...p, outputs: [...p.outputs, { outputTypeId: otId }] }))
+    const otDef = allOutputTypes.find((ot) => ot.id === otId)
+    const driverDefaults = otDef ? getDefaultSectionDrivers(otDef) : []
+    const directiveDefaults = otDef ? getDefaultInstructionDirectives(otDef) : []
+    setState((p) => ({
+      ...p,
+      outputs: [...p.outputs, {
+        outputTypeId: otId,
+        sectionDrivers: driverDefaults.length > 0 ? driverDefaults.map((d) => ({ ...d })) : undefined,
+        instructionDirectives: directiveDefaults.length > 0 ? directiveDefaults.map((d) => ({ ...d })) : undefined,
+      }],
+    }))
     setShowOutputPicker(false)
   }
 
@@ -162,6 +177,112 @@ function ConfigBuilder({
     setState((p) => ({
       ...p,
       outputs: p.outputs.map((o) => (o.outputTypeId === otId ? { ...o, ...updates } : o)),
+    }))
+  }
+
+  const addSectionDriver = (otId: string) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, sectionDrivers: [...(o.sectionDrivers || []), { name: '', description: '' }] }
+          : o
+      ),
+    }))
+  }
+
+  const removeSectionDriver = (otId: string, idx: number) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const drivers = [...(o.sectionDrivers || [])]
+        drivers.splice(idx, 1)
+        return { ...o, sectionDrivers: drivers.length > 0 ? drivers : undefined }
+      }),
+    }))
+  }
+
+  const updateSectionDriver = (otId: string, idx: number, updates: Partial<SectionDriver>) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const drivers = [...(o.sectionDrivers || [])]
+        drivers[idx] = { ...drivers[idx], ...updates }
+        return { ...o, sectionDrivers: drivers }
+      }),
+    }))
+  }
+
+  const resetSectionDrivers = (otId: string) => {
+    const otDef = allOutputTypes.find((ot) => ot.id === otId)
+    const defaults = otDef ? getDefaultSectionDrivers(otDef) : []
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, sectionDrivers: defaults.length > 0 ? defaults.map((d) => ({ ...d })) : undefined }
+          : o
+      ),
+    }))
+  }
+
+  // Instruction directive management
+  const addDirective = (otId: string) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, instructionDirectives: [...(o.instructionDirectives || []), { label: '', content: '' }] }
+          : o
+      ),
+    }))
+  }
+
+  const removeDirective = (otId: string, idx: number) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const dirs = [...(o.instructionDirectives || [])]
+        dirs.splice(idx, 1)
+        return { ...o, instructionDirectives: dirs.length > 0 ? dirs : undefined }
+      }),
+    }))
+  }
+
+  const updateDirective = (otId: string, idx: number, updates: Partial<InstructionDirective>) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const dirs = [...(o.instructionDirectives || [])]
+        dirs[idx] = { ...dirs[idx], ...updates }
+        return { ...o, instructionDirectives: dirs }
+      }),
+    }))
+  }
+
+  const resetDirectives = (otId: string) => {
+    const otDef = allOutputTypes.find((ot) => ot.id === otId)
+    const defaults = otDef ? getDefaultInstructionDirectives(otDef) : []
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, instructionDirectives: defaults.length > 0 ? defaults.map((d) => ({ ...d })) : undefined }
+          : o
+      ),
+    }))
+  }
+
+  const clearDirectives = (otId: string) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId ? { ...o, instructionDirectives: undefined } : o
+      ),
     }))
   }
 
@@ -441,15 +562,225 @@ function ConfigBuilder({
           {state.outputs.map((co) => {
             const otDef = allOutputTypes.find((ot) => ot.id === co.outputTypeId)
             if (!otDef) return null
+            const isExpanded = expandedOutput === co.outputTypeId
+            const drivers = co.sectionDrivers || []
+            const defaults = getDefaultSectionDrivers(otDef)
+            const defaultDirectives = getDefaultInstructionDirectives(otDef)
+            const directives = co.instructionDirectives || []
+            const hasCustomDirectives = co.instructionDirectives !== undefined
             return (
-              <div key={co.outputTypeId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-foreground">{otDef.name}</span>
-                  <span className="ml-2 text-[10px] text-muted-foreground">{otDef.sectionLabel} → {otDef.elementLabel}</span>
+              <div key={co.outputTypeId} className="rounded-lg border border-border">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <button onClick={() => setExpandedOutput(isExpanded ? null : co.outputTypeId)} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
+                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-foreground">{otDef.name}</span>
+                    <span className="ml-2 text-[10px] text-muted-foreground">{otDef.sectionLabel} → {otDef.elementLabel}</span>
+                    {drivers.length > 0 && (
+                      <span className="ml-2 text-[10px] text-primary">{drivers.length} {otDef.sectionLabel.toLowerCase()}s</span>
+                    )}
+                    {hasCustomDirectives && (
+                      <span className="ml-1.5 text-[10px] text-amber-600">{directives.length} directives</span>
+                    )}
+                  </div>
+                  <button onClick={() => removeOutput(co.outputTypeId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
-                <button onClick={() => removeOutput(co.outputTypeId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
-                  <X className="h-3 w-3" />
-                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-4">
+                    {/* Section drivers */}
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Layers className="h-3 w-3 text-primary/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                            {otDef.sectionLabel} Drivers
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            — the AI generates one {otDef.sectionLabel.toLowerCase()} per driver
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {defaults.length > 0 && (
+                            <button
+                              onClick={() => resetSectionDrivers(co.outputTypeId)}
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                              title="Reset to defaults"
+                            >
+                              <RotateCcw className="h-2.5 w-2.5" /> Reset
+                            </button>
+                          )}
+                          <button
+                            onClick={() => addSectionDriver(co.outputTypeId)}
+                            className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                          >
+                            <Plus className="h-2.5 w-2.5" /> Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {drivers.length === 0 ? (
+                        <div className="rounded-md border border-dashed border-border bg-card px-3 py-4 text-center">
+                          <p className="text-[11px] text-muted-foreground">
+                            No {otDef.sectionLabel.toLowerCase()} drivers defined. The AI will auto-generate sections.
+                          </p>
+                          {defaults.length > 0 && (
+                            <button
+                              onClick={() => resetSectionDrivers(co.outputTypeId)}
+                              className="mt-1.5 text-[11px] font-medium text-primary hover:underline"
+                            >
+                              Load {defaults.length} defaults
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {drivers.map((driver, idx) => (
+                            <div key={idx} className="group/driver flex items-start gap-2 rounded-md border border-border bg-card px-2 py-1.5">
+                              <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded bg-primary/10 text-[9px] font-bold text-primary">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <input
+                                  value={driver.name}
+                                  onChange={(e) => updateSectionDriver(co.outputTypeId, idx, { name: e.target.value })}
+                                  placeholder={`${otDef.sectionLabel} name...`}
+                                  className="w-full border-none bg-transparent px-0 text-[11px] font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                                />
+                                <input
+                                  value={driver.description}
+                                  onChange={(e) => updateSectionDriver(co.outputTypeId, idx, { description: e.target.value })}
+                                  placeholder="Description..."
+                                  className="w-full border-none bg-transparent px-0 text-[10px] text-muted-foreground placeholder:text-muted-foreground/30 focus:outline-none"
+                                />
+                              </div>
+                              <button
+                                onClick={() => removeSectionDriver(co.outputTypeId, idx)}
+                                className="mt-0.5 rounded p-0.5 text-muted-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover/driver:opacity-100"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Instruction directives */}
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <ScrollText className="h-3 w-3 text-primary/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                            Instruction Directives
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            — rules the AI follows per {otDef.sectionLabel.toLowerCase()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {hasCustomDirectives && defaultDirectives.length > 0 && (
+                            <button
+                              onClick={() => clearDirectives(co.outputTypeId)}
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                              title="Use defaults (don't customize)"
+                            >
+                              <X className="h-2.5 w-2.5" /> Use defaults
+                            </button>
+                          )}
+                          {hasCustomDirectives && defaultDirectives.length > 0 && (
+                            <button
+                              onClick={() => resetDirectives(co.outputTypeId)}
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                              title="Reset to defaults"
+                            >
+                              <RotateCcw className="h-2.5 w-2.5" /> Reset
+                            </button>
+                          )}
+                          {hasCustomDirectives && (
+                            <button
+                              onClick={() => addDirective(co.outputTypeId)}
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                            >
+                              <Plus className="h-2.5 w-2.5" /> Add
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {hasCustomDirectives ? (
+                        directives.length === 0 ? (
+                          <div className="rounded-md border border-dashed border-border bg-card px-3 py-4 text-center">
+                            <p className="text-[11px] text-muted-foreground">
+                              No directives defined. The AI will have no specific instructions.
+                            </p>
+                            {defaultDirectives.length > 0 && (
+                              <button
+                                onClick={() => resetDirectives(co.outputTypeId)}
+                                className="mt-1.5 text-[11px] font-medium text-primary hover:underline"
+                              >
+                                Load {defaultDirectives.length} defaults
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {directives.map((dir, idx) => (
+                              <div key={idx} className="group/dir flex items-start gap-2 rounded-md border border-border bg-card px-2 py-1.5">
+                                <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded bg-amber-500/10 text-[9px] font-bold text-amber-700">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0 flex-1 space-y-0.5">
+                                  <input
+                                    value={dir.label}
+                                    onChange={(e) => updateDirective(co.outputTypeId, idx, { label: e.target.value })}
+                                    placeholder="Directive label..."
+                                    className="w-full border-none bg-transparent px-0 text-[11px] font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                                  />
+                                  <textarea
+                                    value={dir.content}
+                                    onChange={(e) => updateDirective(co.outputTypeId, idx, { content: e.target.value })}
+                                    placeholder="Instruction content..."
+                                    rows={1}
+                                    className="w-full resize-none border-none bg-transparent px-0 text-[10px] text-muted-foreground placeholder:text-muted-foreground/30 focus:outline-none"
+                                    onInput={(e) => {
+                                      const el = e.currentTarget
+                                      el.style.height = 'auto'
+                                      el.style.height = el.scrollHeight + 'px'
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeDirective(co.outputTypeId, idx)}
+                                  className="mt-0.5 rounded p-0.5 text-muted-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover/dir:opacity-100"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      ) : (
+                        <div className="rounded-md border border-dashed border-border bg-card px-3 py-3 text-center">
+                          <p className="text-[11px] text-muted-foreground">
+                            {defaultDirectives.length > 0
+                              ? `Using ${defaultDirectives.length} default directives.`
+                              : 'No directives configured.'}
+                          </p>
+                          <button
+                            onClick={() => resetDirectives(co.outputTypeId)}
+                            className="mt-1.5 flex items-center gap-0.5 mx-auto text-[11px] font-medium text-primary hover:underline"
+                          >
+                            <PencilSmall className="h-2.5 w-2.5" /> Customize directives
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

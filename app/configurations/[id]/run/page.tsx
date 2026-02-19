@@ -149,7 +149,9 @@ export default function RunConfigPage() {
           (match, fieldId) => flat[fieldId] || match,
         )
 
-        const contextPayload = { context: flat }
+        const drivers = co.sectionDrivers?.length ? co.sectionDrivers : undefined
+        const directives = co.instructionDirectives?.length ? co.instructionDirectives : undefined
+        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives }
 
         let sections: ProductSection[]
 
@@ -202,6 +204,8 @@ export default function RunConfigPage() {
               sectionLabel: otDef.sectionLabel,
               elementLabel: otDef.elementLabel,
               fields: otDef.fields,
+              sectionDrivers: drivers,
+              instructionDirectives: directives,
             }),
           })
           if (!res.ok) throw new Error(`${otDef.name} generation failed`)

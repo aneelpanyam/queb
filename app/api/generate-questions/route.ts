@@ -1,10 +1,10 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
+import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
-// Schema for a single perspective's questions
 const singlePerspectiveSchema = z.object({
   perspectiveName: z.string().describe('The name of the perspective'),
   perspectiveDescription: z
@@ -33,22 +33,12 @@ export const questionsSchema = z.object({
   perspectives: z.array(singlePerspectiveSchema),
 })
 
-function formatContext(context: Record<string, string>): string {
-  return Object.entries(context)
-    .filter(([, v]) => v?.trim())
-    .map(([k, v]) => `- ${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${v}`)
-    .join('\n')
-}
-
-async function generateQuestionsForPerspective(
+function buildDefaultPrompt(
   perspective: { name: string; description: string },
   context: Record<string, string>,
 ) {
   const contextBlock = formatContext(context)
-
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an expert thinking coach and organizational consultant.
+  return `You are an expert thinking coach and organizational consultant.
 
 CONTEXT:
 ${contextBlock}
@@ -66,7 +56,21 @@ GUIDELINES:
 - Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.
 - Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").
 - Questions should provoke deep thinking and help uncover blind spots.
-- Tailor questions to the specific context fields provided.`,
+- Tailor questions to the specific context fields provided.`
+}
+
+async function generateQuestionsForPerspective(
+  perspective: { name: string; description: string },
+  context: Record<string, string>,
+  directives?: { label: string; content: string }[],
+) {
+  const prompt = directives?.length
+    ? assembleDirectivesPrompt(context, perspective, 'Perspective', directives)
+    : buildDefaultPrompt(perspective, context)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singlePerspectiveSchema }),
   })
 
@@ -75,16 +79,21 @@ GUIDELINES:
 
 export async function POST(req: Request) {
   try {
-    const { context } = (await req.json()) as { context: Record<string, string> }
+    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+      context: Record<string, string>
+      sectionDrivers?: { name: string; description: string }[]
+      instructionDirectives?: { label: string; content: string }[]
+    }
+
+    const perspectives = sectionDrivers?.length ? sectionDrivers : BUSINESS_PERSPECTIVES
     console.log(`[generate-questions] Context keys: ${Object.keys(context).join(', ')}`)
-    console.log(`[generate-questions] Starting parallel generation for ${BUSINESS_PERSPECTIVES.length} perspectives`)
+    console.log(`[generate-questions] Starting parallel generation for ${perspectives.length} perspectives${sectionDrivers?.length ? ' (custom)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
 
-    const perspectivePromises = BUSINESS_PERSPECTIVES.map((perspective) =>
-      generateQuestionsForPerspective(perspective, context).catch((error) => {
+    const perspectivePromises = perspectives.map((perspective) =>
+      generateQuestionsForPerspective(perspective, context, instructionDirectives).catch((error) => {
         console.error(`[generate-questions] Error for perspective ${perspective.name}:`, error)
-        // Return a fallback perspective with empty questions on error
         return {
           perspectiveName: perspective.name,
           perspectiveDescription: perspective.description,
@@ -94,13 +103,11 @@ export async function POST(req: Request) {
     )
 
     const allPerspectives = await Promise.all(perspectivePromises)
-
-    // Filter out perspectives with no questions (not relevant)
     const relevantPerspectives = allPerspectives.filter((p) => p.questions.length > 0)
 
     const duration = Date.now() - startTime
     console.log(
-      `[generate-questions] Success: ${relevantPerspectives.length}/${BUSINESS_PERSPECTIVES.length} relevant perspectives in ${duration}ms`
+      `[generate-questions] Success: ${relevantPerspectives.length}/${perspectives.length} relevant perspectives in ${duration}ms`
     )
 
     return Response.json({ perspectives: relevantPerspectives })
