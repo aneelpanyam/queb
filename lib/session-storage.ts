@@ -28,7 +28,7 @@ export interface SavedSession {
   }>
 }
 
-const STORAGE_KEY = 'question-book-sessions'
+const STORAGE_KEY = 'digicraft-sessions'
 
 function getAll(): SavedSession[] {
   if (typeof window === 'undefined') return []

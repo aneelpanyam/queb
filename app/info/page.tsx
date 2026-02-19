@@ -22,7 +22,7 @@ export default function InfoPage() {
               <BookOpen className="h-4 w-4" />
             </div>
             <h1 className="font-display text-lg font-bold text-foreground">
-              Question Book
+              DigiCraft
             </h1>
           </Link>
           <nav className="flex items-center gap-1">
@@ -118,7 +118,7 @@ export default function InfoPage() {
             </div>
             <div className="space-y-6 text-muted-foreground">
               <p className="text-base sm:text-lg">
-                Question Book uses AI to generate contextually relevant questions from multiple perspectives, helping you explore your challenges systematically and thoroughly.
+                DigiCraft uses AI to generate contextually relevant questions from multiple perspectives, helping you explore your challenges systematically and thoroughly.
               </p>
               
               <div className="grid gap-6 sm:grid-cols-2">
@@ -211,7 +211,7 @@ export default function InfoPage() {
                 <li className="flex gap-4">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">4</span>
                   <div>
-                    <strong className="text-foreground">Generate your question book:</strong>
+                    <strong className="text-foreground">Generate your digital product:</strong>
                     <span className="text-muted-foreground"> AI creates perspective-organized questions tailored to your needs</span>
                   </div>
                 </li>
@@ -268,7 +268,7 @@ export default function InfoPage() {
             <Link href="/">
               <Button size="lg" className="gap-2">
                 <BookOpen className="h-5 w-5" />
-                Create Your Question Book
+                Get Started
               </Button>
             </Link>
           </div>
@@ -277,7 +277,7 @@ export default function InfoPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <p>Question Book - AI-Powered Decision Support</p>
+        <p>DigiCraft - AI-Powered Digital Product Creation</p>
       </footer>
     </div>
   )

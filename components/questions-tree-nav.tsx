@@ -94,7 +94,7 @@ export function QuestionsTreeNav({
       {false && context && (
         <div className="shrink-0 border-b border-border p-5">
           {/*<h1 className="text-base font-bold tracking-tight text-foreground">
-            Question Book
+            DigiCraft
           </h1>*/}
           <div className="text-xs leading-relaxed text-muted-foreground">
             <strong className="font-semibold text-foreground">{context.role}</strong> · {context.activity}

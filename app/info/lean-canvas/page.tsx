@@ -25,7 +25,7 @@ export default function LeanCanvasPage() {
               <BookOpen className="h-4 w-4" />
             </div>
             <h1 className="font-display text-lg font-bold text-foreground">
-              Question Book
+              DigiCraft
             </h1>
           </Link>
           <nav className="flex items-center gap-1">
@@ -145,7 +145,7 @@ export default function LeanCanvasPage() {
                 Context-aware AI questioning that thinks like a coach, not a chatbot
               </p>
               <p className="text-sm text-muted-foreground">
-                Unlike generic AI assistants or static templates, Question Book generates deeply contextual questions organized by stakeholder perspectives, with the ability to dive infinitely deeper into any area that matters.
+                Unlike generic AI assistants or static templates, DigiCraft generates deeply contextual digital products organized by stakeholder perspectives, with the ability to dive infinitely deeper into any area that matters.
               </p>
               <div className="rounded-lg bg-primary/10 p-3 text-xs text-foreground">
                 <strong>Single Clear Message:</strong> Get the questions you didn't know you needed to ask
@@ -190,7 +190,7 @@ export default function LeanCanvasPage() {
             <div className="space-y-2 text-sm text-muted-foreground">
               <ul className="space-y-1.5">
                 <li>• Active users per month</li>
-                <li>• Question books generated</li>
+                <li>• Products generated</li>
                 <li>• Deep dives per session</li>
                 <li>• Exported question sets</li>
                 <li>• Session retention rate</li>
@@ -232,7 +232,7 @@ export default function LeanCanvasPage() {
             <div className="space-y-2 text-sm text-muted-foreground">
               <ul className="space-y-1.5">
                 <li>• Direct web app access</li>
-                <li>• Exported HTML question books (viral)</li>
+                <li>• Exported HTML products (viral)</li>
                 <li>• Professional networks (LinkedIn)</li>
                 <li>• Consulting/coaching communities</li>
                 <li>• Product management forums</li>
@@ -293,7 +293,7 @@ export default function LeanCanvasPage() {
             <Link href="/">
               <Button size="lg" className="gap-2">
                 <BookOpen className="h-5 w-5" />
-                Create Your Question Book
+                Get Started
               </Button>
             </Link>
           </div>
@@ -302,7 +302,7 @@ export default function LeanCanvasPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <p>Question Book - AI-Powered Decision Support</p>
+        <p>DigiCraft - AI-Powered Digital Product Creation</p>
       </footer>
     </div>
   )

@@ -80,7 +80,7 @@ export function SessionHistory({
         </p>
         <Button variant="outline" onClick={onBack} className="mt-6 gap-2">
           <ChevronRight className="h-4 w-4 rotate-180" />
-          Back to Question Book
+          Back to DigiCraft
         </Button>
       </div>
     )

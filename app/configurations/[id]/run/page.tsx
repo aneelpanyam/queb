@@ -321,7 +321,7 @@ export default function RunConfigPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 text-primary">
                 <BookOpen className="h-4 w-4" />
               </div>
-              <h1 className="font-display text-lg font-bold text-foreground">Question Book</h1>
+              <h1 className="font-display text-lg font-bold text-foreground">DigiCraft</h1>
             </button>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="h-8 gap-1.5 text-sm text-muted-foreground hover:text-foreground">

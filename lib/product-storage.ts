@@ -1,6 +1,6 @@
 import type { Product } from './product-types'
 
-const STORAGE_KEY = 'question-book-products'
+const STORAGE_KEY = 'digicraft-products'
 
 function getAll(): Product[] {
   if (typeof window === 'undefined') return []

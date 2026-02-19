@@ -124,10 +124,10 @@ export default function ProductsPage() {
         if (existingIds.has(item.id)) {
           productStorage.update(item.id, item)
         } else {
-          const raw = localStorage.getItem('question-book-products')
+          const raw = localStorage.getItem('digicraft-products')
           const all: Product[] = raw ? JSON.parse(raw) : []
           all.unshift(item)
-          localStorage.setItem('question-book-products', JSON.stringify(all.slice(0, 100)))
+          localStorage.setItem('digicraft-products', JSON.stringify(all.slice(0, 100)))
         }
         imported++
       }
@@ -268,7 +268,7 @@ export default function ProductsPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 text-primary">
                 <BookOpen className="h-4 w-4" />
               </div>
-              <h1 className="font-display text-lg font-bold text-foreground">Question Book</h1>
+              <h1 className="font-display text-lg font-bold text-foreground">DigiCraft</h1>
             </button>
             <nav className="hidden items-center gap-1 sm:flex">
               <button onClick={() => router.push('/')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Home</button>

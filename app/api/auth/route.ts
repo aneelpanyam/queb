@@ -4,7 +4,7 @@ import { SignJWT, jwtVerify } from 'jose'
 const SESSION_DURATION = 15 * 60 // 15 minutes in seconds
 
 function getSecret() {
-  const secret = process.env.SESSION_SECRET || 'question-book-default-secret-change-me'
+  const secret = process.env.SESSION_SECRET || 'digicraft-default-secret-change-me'
   return new TextEncoder().encode(secret)
 }
 

@@ -225,7 +225,7 @@ function buildSiteHtml(data: {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Question Book: ${esc(role)} - ${esc(activity)}</title>
+<title>DigiCraft: ${esc(role)} - ${esc(activity)}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f7f9fb;color:#27313a;overflow:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -321,7 +321,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 <div class="app">
   <aside class="sidebar">
     <div class="sidebar-head">
-      <h1>Question Book</h1>
+      <h1>DigiCraft</h1>
       <div class="meta">
         <strong>${esc(role)}</strong> &middot; ${esc(activity)}<br/>
         ${esc(industry)} &middot; ${esc(service)}

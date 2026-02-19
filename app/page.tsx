@@ -105,7 +105,7 @@ const COMMON_INDUSTRIES = [
 
 const SESSION_CHECK_INTERVAL = 60_000
 
-export default function QuestionBookPage() {
+export default function DigiCraftPage() {
   // Auth state
   const [authChecked, setAuthChecked] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
@@ -360,7 +360,7 @@ export default function QuestionBookPage() {
       setSaveStatus('idle')
       dissectionsRef.current = {}
       deeperRef.current = {}
-      toast.info('Generating your question book...', { duration: 8000 })
+      toast.info('Generating your questions...', { duration: 8000 })
       try {
         const result = await triggerQuestions({
           role: selectedRole,
@@ -370,7 +370,7 @@ export default function QuestionBookPage() {
           industry: industry.trim(),
           service: service.trim(),
         })
-        toast.success('Question book ready!')
+        toast.success('Questions ready!')
         // Auto-save to history when questions are generated
         if (result?.perspectives?.length) {
           try {
@@ -583,7 +583,7 @@ export default function QuestionBookPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `question-book-${(contextRole || 'guide').toLowerCase().replace(/\s+/g, '-')}.html`
+      a.download = `digicraft-${(contextRole || 'guide').toLowerCase().replace(/\s+/g, '-')}.html`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -693,7 +693,7 @@ export default function QuestionBookPage() {
                 <BookOpen className="h-4 w-4" />
               </div>
               <h1 className="font-display text-lg font-bold text-foreground">
-                Question Book
+                DigiCraft
               </h1>
             </button>
             <nav className="hidden items-center gap-1 sm:flex">
@@ -815,7 +815,7 @@ export default function QuestionBookPage() {
           </div>
         )}
 
-        {/* ===== VIEW SAVED SESSION ===== (same layout as step 5 Question Book) */}
+        {/* ===== VIEW SAVED SESSION ===== */}
         {view === 'view-session' && viewingSession && (
           <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <QuestionsView
@@ -992,7 +992,7 @@ export default function QuestionBookPage() {
                       onClick={() => setStep(5)}
                       className="gap-2"
                     >
-                      View your question book
+                      View your questions
                     </Button>
                   </div>
                 ) : null}
@@ -1001,7 +1001,7 @@ export default function QuestionBookPage() {
                   </div>
                 </div>
               ) : (
-                /* Step 5: full-width Question Book with tree + detail */
+                /* Step 5: full-width questions view with tree + detail */
                 <div className="flex h-full min-h-0 w-full flex-1 flex-col">
                 <QuestionsView
                   perspectives={questionsData?.perspectives || []}

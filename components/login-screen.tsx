@@ -30,7 +30,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
       })
 
       if (res.ok) {
-        toast.success('Welcome to Question Book!')
+        toast.success('Welcome to DigiCraft!')
         onSuccess()
       } else {
         const data = await res.json()
@@ -57,7 +57,7 @@ export function LoginScreen({ onSuccess }: LoginScreenProps) {
               <BookOpen className="h-7 w-7" />
             </div>
             <h1 className="font-display text-2xl font-bold text-foreground">
-              Question Book
+              DigiCraft
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Enter your access code to continue

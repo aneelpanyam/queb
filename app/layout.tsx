@@ -11,9 +11,9 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Question Book - AI-Powered Role Activity Questions',
+  title: 'DigiCraft - AI-Powered Digital Product Creation',
   description:
-    'Explore thoughtful questions from multiple perspectives for any role and activity. AI-powered coaching tool for deeper thinking.',
+    'Create AI-powered digital products like question books, checklists, email courses, and more. Your digital product crafting platform.',
 }
 
 export const viewport: Viewport = {
