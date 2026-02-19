@@ -1,0 +1,591 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { useAuth } from '@/lib/use-auth'
+import { configStorage } from '@/lib/setup-config-storage'
+import type { SetupConfiguration, ConfigStep, ConfigStepField, ConfigOutput } from '@/lib/setup-config-types'
+import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
+import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
+import { LoginScreen } from '@/components/login-screen'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  BookOpen,
+  LogOut,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Settings2,
+  Copy,
+  Play,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Link2,
+  FileOutput,
+} from 'lucide-react'
+
+// ============================================================
+// Types for the builder form
+// ============================================================
+
+interface BuilderState {
+  name: string
+  description: string
+  steps: ConfigStep[]
+  outputs: ConfigOutput[]
+}
+
+const emptyBuilder = (): BuilderState => ({
+  name: '',
+  description: '',
+  steps: [{ id: `s-${Date.now()}`, name: 'Step 1', description: '', fields: [] }],
+  outputs: [],
+})
+
+function configToBuilder(c: SetupConfiguration): BuilderState {
+  return { name: c.name, description: c.description, steps: c.steps, outputs: c.outputs }
+}
+
+function uid() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+}
+
+// ============================================================
+// Configuration builder component
+// ============================================================
+
+function ConfigBuilder({
+  initial,
+  allFields,
+  allOutputTypes,
+  onSave,
+  onCancel,
+}: {
+  initial: BuilderState
+  allFields: FieldDefinition[]
+  allOutputTypes: OutputTypeDefinition[]
+  onSave: (data: BuilderState) => void
+  onCancel: () => void
+}) {
+  const [state, setState] = useState<BuilderState>(initial)
+  const [expandedStep, setExpandedStep] = useState<string | null>(initial.steps[0]?.id || null)
+  const [showFieldPicker, setShowFieldPicker] = useState<string | null>(null)
+  const [showOutputPicker, setShowOutputPicker] = useState(false)
+
+  const allFieldIdsInConfig = state.steps.flatMap((s) => s.fields.map((f) => f.fieldId))
+
+  const canSave = state.name.trim() && state.steps.length > 0 && state.outputs.length > 0
+
+  // Step management
+  const addStep = () => {
+    const newStep: ConfigStep = { id: `s-${uid()}`, name: `Step ${state.steps.length + 1}`, description: '', fields: [] }
+    setState((p) => ({ ...p, steps: [...p.steps, newStep] }))
+    setExpandedStep(newStep.id)
+  }
+
+  const removeStep = (stepId: string) => {
+    setState((p) => ({ ...p, steps: p.steps.filter((s) => s.id !== stepId) }))
+  }
+
+  const updateStep = (stepId: string, updates: Partial<ConfigStep>) => {
+    setState((p) => ({
+      ...p,
+      steps: p.steps.map((s) => (s.id === stepId ? { ...s, ...updates } : s)),
+    }))
+  }
+
+  const moveStep = (stepId: string, dir: -1 | 1) => {
+    setState((p) => {
+      const idx = p.steps.findIndex((s) => s.id === stepId)
+      if (idx === -1 || idx + dir < 0 || idx + dir >= p.steps.length) return p
+      const steps = [...p.steps]
+      ;[steps[idx], steps[idx + dir]] = [steps[idx + dir], steps[idx]]
+      return { ...p, steps }
+    })
+  }
+
+  // Field management within a step
+  const addFieldToStep = (stepId: string, fieldId: string) => {
+    const csf: ConfigStepField = { fieldId, dependsOn: [], required: false }
+    updateStep(stepId, {
+      fields: [...(state.steps.find((s) => s.id === stepId)?.fields || []), csf],
+    })
+    setShowFieldPicker(null)
+  }
+
+  const removeFieldFromStep = (stepId: string, fieldId: string) => {
+    const step = state.steps.find((s) => s.id === stepId)
+    if (!step) return
+    updateStep(stepId, { fields: step.fields.filter((f) => f.fieldId !== fieldId) })
+  }
+
+  const updateFieldInStep = (stepId: string, fieldId: string, updates: Partial<ConfigStepField>) => {
+    const step = state.steps.find((s) => s.id === stepId)
+    if (!step) return
+    updateStep(stepId, {
+      fields: step.fields.map((f) => (f.fieldId === fieldId ? { ...f, ...updates } : f)),
+    })
+  }
+
+  // Output management
+  const addOutput = (otId: string) => {
+    setState((p) => ({ ...p, outputs: [...p.outputs, { outputTypeId: otId }] }))
+    setShowOutputPicker(false)
+  }
+
+  const removeOutput = (otId: string) => {
+    setState((p) => ({ ...p, outputs: p.outputs.filter((o) => o.outputTypeId !== otId) }))
+  }
+
+  const updateOutput = (otId: string, updates: Partial<ConfigOutput>) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => (o.outputTypeId === otId ? { ...o, ...updates } : o)),
+    }))
+  }
+
+  const outputTypeIds = state.outputs.map((o) => o.outputTypeId)
+
+  // Group available fields by category
+  const grouped = allFields.reduce<Record<string, FieldDefinition[]>>((acc, f) => {
+    ;(acc[f.category] ??= []).push(f)
+    return acc
+  }, {})
+
+  return (
+    <div className="rounded-xl border-2 border-primary/20 bg-card shadow-sm">
+      {/* Header */}
+      <div className="border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <Input
+              value={state.name}
+              onChange={(e) => setState((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Configuration name..."
+              className="max-w-md border-none bg-transparent px-0 text-lg font-bold text-foreground focus-visible:ring-0"
+            />
+            <Input
+              value={state.description}
+              onChange={(e) => setState((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Description..."
+              className="mt-1 max-w-lg border-none bg-transparent px-0 text-sm text-muted-foreground focus-visible:ring-0"
+            />
+          </div>
+          <button onClick={onCancel} className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div className="border-b border-border px-6 py-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-primary">Steps & Fields</h3>
+          <Button variant="outline" size="sm" onClick={addStep} className="h-7 gap-1 text-xs">
+            <Plus className="h-3 w-3" /> Add Step
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {state.steps.map((step, stepIdx) => {
+            const isExpanded = expandedStep === step.id
+            return (
+              <div key={step.id} className="rounded-lg border border-border">
+                {/* Step header */}
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex gap-0.5">
+                    <button onClick={() => moveStep(step.id, -1)} disabled={stepIdx === 0} className="rounded p-0.5 text-muted-foreground/50 hover:text-foreground disabled:opacity-30">▲</button>
+                    <button onClick={() => moveStep(step.id, 1)} disabled={stepIdx === state.steps.length - 1} className="rounded p-0.5 text-muted-foreground/50 hover:text-foreground disabled:opacity-30">▼</button>
+                  </div>
+                  <button onClick={() => setExpandedStep(isExpanded ? null : step.id)} className="flex flex-1 items-center gap-2 text-left">
+                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">{stepIdx + 1}</span>
+                    <span className="text-sm font-semibold text-foreground">{step.name || '(unnamed)'}</span>
+                    <span className="text-[10px] text-muted-foreground">{step.fields.length} fields</span>
+                  </button>
+                  <button onClick={() => removeStep(step.id)} className="rounded p-1 text-muted-foreground hover:text-destructive" title="Remove step">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Step content */}
+                {isExpanded && (
+                  <div className="border-t border-border bg-muted/20 px-4 py-3">
+                    <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Step Name</label>
+                        <Input value={step.name} onChange={(e) => updateStep(step.id, { name: e.target.value })} className="h-8 text-sm" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Description</label>
+                        <Input value={step.description} onChange={(e) => updateStep(step.id, { description: e.target.value })} className="h-8 text-sm" />
+                      </div>
+                    </div>
+
+                    {/* Fields in this step */}
+                    <div className="space-y-1.5">
+                      {step.fields.map((csf) => {
+                        const fieldDef = allFields.find((f) => f.id === csf.fieldId)
+                        if (!fieldDef) return null
+                        return (
+                          <div key={csf.fieldId} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-foreground">{fieldDef.name}</span>
+                                <code className="text-[10px] text-muted-foreground">{fieldDef.id}</code>
+                                <span className="text-[10px] text-muted-foreground">{fieldDef.selectionMode}</span>
+                              </div>
+                              {/* Dependencies */}
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <Link2 className="h-3 w-3 text-muted-foreground/50" />
+                                <span className="text-[10px] text-muted-foreground">Depends on:</span>
+                                {allFieldIdsInConfig
+                                  .filter((fid) => fid !== csf.fieldId)
+                                  .map((fid) => {
+                                    const dep = allFields.find((f) => f.id === fid)
+                                    const isDependent = csf.dependsOn.includes(fid)
+                                    return (
+                                      <button
+                                        key={fid}
+                                        type="button"
+                                        onClick={() => {
+                                          const newDeps = isDependent
+                                            ? csf.dependsOn.filter((d) => d !== fid)
+                                            : [...csf.dependsOn, fid]
+                                          updateFieldInStep(step.id, csf.fieldId, { dependsOn: newDeps })
+                                        }}
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                          isDependent
+                                            ? 'bg-primary/10 text-primary border border-primary/30'
+                                            : 'bg-muted text-muted-foreground border border-transparent hover:border-primary/30'
+                                        }`}
+                                      >
+                                        {dep?.name || fid}
+                                      </button>
+                                    )
+                                  })}
+                                {allFieldIdsInConfig.filter((fid) => fid !== csf.fieldId).length === 0 && (
+                                  <span className="text-[10px] text-muted-foreground/50 italic">none available</span>
+                                )}
+                              </div>
+                            </div>
+                            <label className="flex items-center gap-1 text-[10px]">
+                              <input
+                                type="checkbox"
+                                checked={csf.required}
+                                onChange={(e) => updateFieldInStep(step.id, csf.fieldId, { required: e.target.checked })}
+                                className="rounded"
+                              />
+                              Required
+                            </label>
+                            <button onClick={() => removeFieldFromStep(step.id, csf.fieldId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Add field */}
+                    <div className="relative mt-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowFieldPicker(showFieldPicker === step.id ? null : step.id)} className="h-7 gap-1 text-xs">
+                        <Plus className="h-3 w-3" /> Add Field
+                      </Button>
+                      {showFieldPicker === step.id && (
+                        <div className="absolute left-0 top-8 z-50 max-h-60 w-72 overflow-auto rounded-lg border border-border bg-popover p-2 shadow-lg">
+                          {Object.entries(grouped).map(([cat, catFields]) => (
+                            <div key={cat}>
+                              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{cat}</div>
+                              {catFields.map((f) => {
+                                const inUse = allFieldIdsInConfig.includes(f.id)
+                                return (
+                                  <button
+                                    key={f.id}
+                                    disabled={inUse}
+                                    onClick={() => addFieldToStep(step.id, f.id)}
+                                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                                      inUse ? 'opacity-40' : 'hover:bg-muted'
+                                    }`}
+                                  >
+                                    <span className="font-medium text-foreground">{f.name}</span>
+                                    <code className="text-[10px] text-muted-foreground">{f.id}</code>
+                                    {inUse && <Check className="ml-auto h-3 w-3 text-primary" />}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Outputs */}
+      <div className="border-b border-border px-6 py-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-primary">
+            <FileOutput className="mr-1 inline h-3 w-3" /> Outputs to Produce
+          </h3>
+        </div>
+
+        <div className="space-y-2">
+          {state.outputs.map((co) => {
+            const otDef = allOutputTypes.find((ot) => ot.id === co.outputTypeId)
+            if (!otDef) return null
+            return (
+              <div key={co.outputTypeId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-semibold text-foreground">{otDef.name}</span>
+                  <span className="ml-2 text-[10px] text-muted-foreground">{otDef.sectionLabel} → {otDef.elementLabel}</span>
+                </div>
+                <button onClick={() => removeOutput(co.outputTypeId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="relative mt-2">
+          <Button variant="outline" size="sm" onClick={() => setShowOutputPicker(!showOutputPicker)} className="h-7 gap-1 text-xs">
+            <Plus className="h-3 w-3" /> Add Output
+          </Button>
+          {showOutputPicker && (
+            <div className="absolute left-0 top-8 z-50 max-h-48 w-72 overflow-auto rounded-lg border border-border bg-popover p-2 shadow-lg">
+              {allOutputTypes.map((ot) => {
+                const inUse = outputTypeIds.includes(ot.id)
+                return (
+                  <button
+                    key={ot.id}
+                    disabled={inUse}
+                    onClick={() => addOutput(ot.id)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${inUse ? 'opacity-40' : 'hover:bg-muted'}`}
+                  >
+                    <span className="font-medium text-foreground">{ot.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{ot.description}</span>
+                    {inUse && <Check className="ml-auto h-3 w-3 text-primary" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-6 py-4">
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSave(state)} disabled={!canSave} className="gap-1.5">
+          <Check className="h-3.5 w-3.5" /> Save Configuration
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// Configurations list page
+// ============================================================
+
+export default function ConfigurationsPage() {
+  const router = useRouter()
+  const { authChecked, authenticated, setAuthenticated, handleLogout } = useAuth()
+
+  const [configs, setConfigs] = useState<SetupConfiguration[]>([])
+  const [allFields, setAllFields] = useState<FieldDefinition[]>([])
+  const [allOutputTypes, setAllOutputTypes] = useState<OutputTypeDefinition[]>([])
+  const [builderMode, setBuilderMode] = useState<'closed' | 'create' | 'edit'>('closed')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [builderInit, setBuilderInit] = useState<BuilderState>(emptyBuilder())
+
+  useEffect(() => {
+    setConfigs(configStorage.getAll())
+    setAllFields(fieldStorage.getAll())
+    setAllOutputTypes(outputTypeStorage.getAll())
+  }, [])
+
+  const openCreate = () => {
+    setBuilderInit(emptyBuilder())
+    setEditingId(null)
+    setBuilderMode('create')
+  }
+
+  const openEdit = (config: SetupConfiguration) => {
+    setBuilderInit(configToBuilder(config))
+    setEditingId(config.id)
+    setBuilderMode('edit')
+  }
+
+  const openDuplicate = (config: SetupConfiguration) => {
+    setBuilderInit({ ...configToBuilder(config), name: `${config.name} (copy)` })
+    setEditingId(null)
+    setBuilderMode('create')
+  }
+
+  const closeBuilder = () => {
+    setBuilderMode('closed')
+    setEditingId(null)
+  }
+
+  const handleSave = (data: BuilderState) => {
+    const payload = {
+      name: data.name.trim(),
+      description: data.description.trim(),
+      steps: data.steps,
+      outputs: data.outputs,
+    }
+    if (builderMode === 'create') {
+      configStorage.save(payload)
+      toast.success('Configuration created')
+    } else if (editingId) {
+      configStorage.update(editingId, payload)
+      toast.success('Configuration updated')
+    }
+    setConfigs(configStorage.getAll())
+    closeBuilder()
+  }
+
+  const handleDelete = (id: string) => {
+    configStorage.remove(id)
+    setConfigs(configStorage.getAll())
+    toast.success('Configuration deleted')
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+  if (!authenticated) return <LoginScreen onSuccess={() => setAuthenticated(true)} />
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border bg-card shadow-sm">
+        <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="flex items-center gap-6">
+            <button onClick={() => router.push('/')} className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 text-primary">
+                <BookOpen className="h-4 w-4" />
+              </div>
+              <h1 className="font-display text-lg font-bold text-foreground">Question Book</h1>
+            </button>
+            <nav className="hidden items-center gap-1 sm:flex">
+              <button onClick={() => router.push('/')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Home</button>
+              <button onClick={() => router.push('/library')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Library</button>
+              <button className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">Configurations</button>
+              <button onClick={() => router.push('/products')} className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Products</button>
+            </nav>
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="h-8 gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+            <LogOut className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Sign out</span>
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Configurations</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Assemble steps, fields, and outputs into reusable generation workflows
+            </p>
+          </div>
+          {builderMode === 'closed' && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" /> New Configuration
+            </Button>
+          )}
+        </div>
+
+        {builderMode !== 'closed' && (
+          <div className="mb-8">
+            <ConfigBuilder
+              initial={builderInit}
+              allFields={allFields}
+              allOutputTypes={allOutputTypes}
+              onSave={handleSave}
+              onCancel={closeBuilder}
+            />
+          </div>
+        )}
+
+        {configs.length === 0 && builderMode === 'closed' ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-20 text-center">
+            <Settings2 className="mb-4 h-12 w-12 text-muted-foreground/40" />
+            <h3 className="text-lg font-semibold text-foreground">No configurations yet</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              Define steps, pull in fields from the library, choose outputs, and create a reusable generation workflow.
+            </p>
+            <Button onClick={openCreate} className="mt-6 gap-2">
+              <Plus className="h-4 w-4" /> Create Your First Configuration
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {configs.map((config) => {
+              const totalFields = config.steps.reduce((sum, s) => sum + s.fields.length, 0)
+              const outputNames = config.outputs
+                .map((o) => allOutputTypes.find((ot) => ot.id === o.outputTypeId)?.name)
+                .filter(Boolean)
+              return (
+                <div key={config.id} className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/30">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-semibold text-foreground">{config.name}</h3>
+                      {config.description && (
+                        <p className="mt-0.5 text-sm text-muted-foreground">{config.description}</p>
+                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>{config.steps.length} steps</span>
+                        <span>{totalFields} fields</span>
+                        <span className="font-medium text-primary">
+                          Outputs: {outputNames.length > 0 ? outputNames.join(', ') : '(none)'}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {config.steps.map((step) => (
+                          <span key={step.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            {step.name} ({step.fields.length})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="default" size="sm" onClick={() => router.push(`/configurations/${config.id}/run`)} className="h-8 gap-1.5 text-xs" title="Run">
+                        <Play className="h-3 w-3" /> Run
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openDuplicate(config)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Duplicate">
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(config)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(config.id)} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

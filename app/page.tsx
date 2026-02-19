@@ -730,6 +730,24 @@ export default function QuestionBookPage() {
                 )}
               </button>
               <a
+                href="/library"
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                Library
+              </a>
+              <a
+                href="/configurations"
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                Configurations
+              </a>
+              <a
+                href="/products"
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                Products
+              </a>
+              <a
                 href="/info"
                 className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
