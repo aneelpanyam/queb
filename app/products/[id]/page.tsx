@@ -405,26 +405,24 @@ export default function ProductEditorPage() {
 
   // Export
   const handleExport = useCallback(async () => {
-    if (!product) return
+    if (!product || !outputTypeDef) return
     setExportLoading(true)
     toast.info('Generating product website...')
     try {
-      const enrichedPerspectives = product.sections
+      const sections = product.sections
         .filter((s) => !s.hidden)
         .map((section) => {
           const origSIdx = product.sections.indexOf(section)
           return {
-            perspective: section.name,
+            name: section.name,
             description: section.description,
-            questions: section.elements
+            elements: section.elements
               .filter((el) => !el.hidden)
               .map((el) => {
                 const origEIdx = product.sections[origSIdx].elements.indexOf(el)
                 const key = `${origSIdx}-${origEIdx}`
                 return {
-                  question: el.fields.question || el.fields[Object.keys(el.fields)[0]] || '',
-                  relevance: el.fields.relevance || '',
-                  infoPrompt: el.fields.infoPrompt || '',
+                  fields: el.fields,
                   dissection: dissectionMap[key] || undefined,
                   deeperQuestions: deeperMap[key] || undefined,
                   answer: answerMap[key] || undefined,
@@ -438,12 +436,19 @@ export default function ProductEditorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          industry: product.industry, service: product.service,
-          role: product.role, activity: product.activity,
-          situation: product.situation, additionalContext: product.additionalContext,
-          perspectives: enrichedPerspectives,
-          productName: product.name, productDescription: product.description,
-          targetAudience: product.targetAudience, branding: product.branding,
+          outputType: product.outputType,
+          outputTypeDef: {
+            name: outputTypeDef.name,
+            sectionLabel: outputTypeDef.sectionLabel,
+            elementLabel: outputTypeDef.elementLabel,
+            fields: outputTypeDef.fields,
+            supportsDeepDive: outputTypeDef.supportsDeepDive,
+            supportsDeeperQuestions: outputTypeDef.supportsDeeperQuestions,
+          },
+          contextEntries: getContextEntries(product),
+          sections,
+          productName: product.name,
+          branding: product.branding,
         }),
       })
       if (!res.ok) throw new Error('Failed to generate')
@@ -463,7 +468,7 @@ export default function ProductEditorPage() {
     } finally {
       setExportLoading(false)
     }
-  }, [product, dissectionMap, deeperMap])
+  }, [product, outputTypeDef, dissectionMap, deeperMap, answerMap])
 
   // Inline edit helpers
   const startEdit = (fieldKey: string, currentValue: string) => {

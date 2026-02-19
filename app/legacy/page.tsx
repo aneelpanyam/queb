@@ -576,30 +576,51 @@ function LegacyPageInner() {
 
     toast.info('Generating your website...')
     try {
-      const enrichedPerspectives = perspectives.map((p, pIdx) => ({
-        perspective: p.perspectiveName,
+      const sections = perspectives.map((p, pIdx) => ({
+        name: p.perspectiveName,
         description: p.perspectiveDescription,
-        questions: p.questions.map((q, qIdx) => {
+        elements: p.questions.map((q, qIdx) => {
           const key = `${pIdx}-${qIdx}`
           return {
-            ...q,
+            fields: {
+              question: q.question,
+              relevance: q.relevance,
+              infoPrompt: q.infoPrompt,
+            },
             dissection: dissectionsRef.current[key] || undefined,
             deeperQuestions: deeperRef.current[key] || undefined,
           }
         }),
       }))
 
+      const contextEntries = [
+        { label: 'Industry', value: contextIndustry },
+        { label: 'Service', value: contextService },
+        { label: 'Role', value: contextRole },
+        { label: 'Activity', value: contextActivity },
+      ].filter((e) => e.value?.trim())
+
       const res = await fetch('/api/generate-site', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          industry: contextIndustry,
-          service: contextService,
-          role: contextRole,
-          activity: contextActivity,
-          situation: contextSituation,
-          additionalContext: contextAdditional,
-          perspectives: enrichedPerspectives,
+          outputType: 'questions',
+          outputTypeDef: {
+            name: 'Question Book',
+            sectionLabel: 'Perspective',
+            elementLabel: 'Question',
+            fields: [
+              { key: 'question', label: 'Question', type: 'long-text', primary: true },
+              { key: 'relevance', label: 'Why This Matters', type: 'long-text' },
+              { key: 'infoPrompt', label: 'How to Find the Answer', type: 'long-text' },
+            ],
+            supportsDeepDive: true,
+            supportsDeeperQuestions: true,
+          },
+          contextEntries,
+          sections,
+          productName: `${contextRole} — ${contextActivity}`,
+          branding: { accentColor: '#1a5186', authorName: '', authorBio: '' },
         }),
       })
 

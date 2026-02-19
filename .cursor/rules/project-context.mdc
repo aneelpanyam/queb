@@ -1,0 +1,205 @@
+---
+description: Comprehensive project context for Queb (DigiCraft) — architecture, data models, patterns, and conventions
+alwaysApply: true
+---
+
+# Queb (DigiCraft) — Project Context
+
+## What This App Does
+
+Queb (internally called DigiCraft) is an AI-powered digital product creation platform. Users define a business context (industry, service, role, activity, situation) and the app generates structured "products" — question books, checklists, email courses, prompt packs, and battle cards — using OpenAI. Users can then curate, annotate, enrich (deep-dive, find answers), and export these products.
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript
+- **AI:** Vercel AI SDK (`ai`, `@ai-sdk/openai`) — uses `generateText` with `Output.object` for structured JSON output. Model: `openai/gpt-5.2`
+- **UI:** shadcn/ui (60+ components in `components/ui/`), Radix primitives, Tailwind CSS 3, Lucide icons
+- **Forms:** React Hook Form + Zod
+- **Data Fetching:** SWR
+- **Auth:** Custom JWT via `jose` — access-code login, 15-min rolling sessions, cookie `qb-session`
+- **Storage:** All data in `localStorage` (no database). Products capped at 100, sessions at 50, configs at 200
+- **Fonts:** Inter (sans), Space Grotesk (display)
+- **Dev:** `next dev --turbo`, TypeScript strict mode
+
+## Directory Structure
+
+```
+app/
+  page.tsx                          → redirects to /products
+  layout.tsx                        → root layout (fonts, Toaster)
+  globals.css                       → CSS variables, light/dark theme tokens
+  products/
+    page.tsx                        → product list (filter, group, export/import)
+    new/page.tsx                    → create product via configuration wizard
+    [id]/page.tsx                   → product detail/edit (1300+ lines, main workspace)
+  configurations/
+    page.tsx                        → configuration builder (1300+ lines)
+    [id]/run/page.tsx               → run a configuration (wizard flow)
+  library/page.tsx                  → manage fields and output types
+  info/page.tsx                     → about/info page
+  info/lean-canvas/page.tsx         → lean canvas
+  legacy/page.tsx                   → legacy interface
+  api/                              → 17 API routes (see API section)
+components/
+  ui/                               → 60+ shadcn/ui primitives (don't modify unless needed)
+  smart-field.tsx                   → AI-powered field with suggestions dropdown
+  questions-view.tsx                → renders product sections/elements
+  question-detail-panel.tsx         → detail panel with dissection, answers, deeper questions
+  element-detail.tsx                → generic element detail view
+  checklist-section-detail.tsx      → checklist-specific section view
+  wizard-sidebar.tsx                → sidebar for configuration wizard
+  step-indicator.tsx                → step progress indicator
+  login-screen.tsx                  → access code login form
+  product-annotation.tsx            → annotation CRUD on elements
+  question-dissection.tsx           → dissection display (thinking framework, checklist, resources)
+  session-history.tsx               → session history sidebar
+  org-profile-form.tsx              → organization profile form
+  role-selector.tsx, activity-selector.tsx, situation-form.tsx → legacy wizard step components
+lib/
+  product-types.ts                  → core Product, ProductSection, ProductElement, Annotation types
+  product-storage.ts                → product CRUD (localStorage key: "digicraft-products")
+  session-storage.ts                → legacy session CRUD (localStorage key: "digicraft-sessions")
+  setup-config-types.ts             → SetupConfiguration, ConfigStep, ConfigOutput, SectionDriver, InstructionDirective
+  setup-config-storage.ts           → configuration CRUD (localStorage key: "queb-setup-configurations")
+  field-library.ts                  → FieldDefinition type, field CRUD, prompt resolution, dependency sorting
+  output-type-library.ts            → OutputTypeDefinition type, output type CRUD, built-in types + directives
+  output-types.ts                   → backward-compat re-exports from output-type-library
+  assemble-prompt.ts                → assembleDirectivesPrompt() — builds LLM prompts from directives
+  perspectives.ts                   → 25 BUSINESS_PERSPECTIVES (section drivers for questions)
+  checklist-dimensions.ts           → 12 CHECKLIST_DIMENSIONS (section drivers for checklists)
+  email-course-stages.ts            → 10 EMAIL_COURSE_STAGES (section drivers for email courses)
+  prompt-use-cases.ts               → 10 PROMPT_USE_CASES (section drivers for prompt packs)
+  activity-categories.ts            → 14 ACTIVITY_CATEGORIES
+  deep-dive-frameworks.ts           → frameworks per output type for deep-dive enrichment
+  export-import.ts                  → JSON export/import with ExportBundle<T> format
+  use-auth.ts                       → useAuth() hook (session check, login/logout)
+  utils.ts                          → cn() classname merge utility
+hooks/
+  use-toast.ts                      → toast hook
+  use-mobile.tsx                    → mobile detection hook
+```
+
+## Core Data Model
+
+### Product (the central entity)
+```typescript
+interface Product {
+  id, createdAt, updatedAt, name, description, status ('draft'|'published')
+  configurationId?, outputType (e.g. 'questions', 'checklist', 'email-course', 'prompts', 'battle-cards')
+  contextFields?: Record<string, string>          // dynamic context from config steps
+  industry, service, role, activity, situation     // legacy denormalized context
+  additionalContext: { label, value }[]
+  sections: ProductSection[]                       // the generated content
+  dissections?, deeperQuestions?, answers?          // enrichments (keyed by "sectionIdx-elementIdx")
+  assistantData?: AssistantData                    // AI quality analysis
+  annotations: Record<string, Annotation[]>        // keyed by "sectionIdx-elementIdx"
+  branding: { accentColor, authorName, authorBio }
+}
+```
+
+### ProductSection / ProductElement (generic, output-type-agnostic)
+```typescript
+interface ProductSection { name, description, elements: ProductElement[], hidden? }
+interface ProductElement { fields: Record<string, string>, hidden? }
+```
+
+### SetupConfiguration (defines the wizard flow for creating products)
+```typescript
+interface SetupConfiguration {
+  id, name, description, createdAt, updatedAt
+  steps: ConfigStep[]      // each step has fields (references field library by fieldId)
+  outputs: ConfigOutput[]  // each output references an output type + optional overrides
+}
+interface ConfigStep { id, name, description, fields: ConfigStepField[] }
+interface ConfigStepField { fieldId, required, promptOverride?, inputMappings? }
+interface ConfigOutput { outputTypeId, promptOverride?, sectionDrivers?, instructionDirectives? }
+```
+
+### FieldDefinition (prompt-driven, dynamic fields)
+```typescript
+interface FieldDefinition {
+  id, name, description, prompt, selectionMode ('single'|'multi'), allowCustomValues
+  placeholder?, category, isBuiltIn, createdAt, updatedAt
+}
+```
+Fields use `{{fieldId}}` placeholders in prompts for dependency chains (e.g. service prompt depends on industry). Dependencies are computed from prompt templates and topologically sorted.
+
+### OutputTypeDefinition (defines product types)
+```typescript
+interface OutputTypeDefinition {
+  id, name, description, icon, prompt, sectionLabel, elementLabel
+  fields: OutputTypeField[]                        // schema of each element
+  supportsDeepDive?, supportsDeeperQuestions?
+  defaultSectionDrivers?, defaultInstructionDirectives?
+  isBuiltIn, createdAt, updatedAt
+}
+```
+Built-in output types: questions, checklist, email-course, prompts, battle-cards. Users can create custom ones.
+
+## API Routes Pattern
+
+All API routes live in `app/api/`. They follow this pattern:
+1. Accept POST with JSON body
+2. Use `generateText` from Vercel AI SDK with `Output.object({ schema })` for structured output
+3. Define Zod schemas for the expected response shape
+4. Return `Response.json(result.output)`
+5. Set `maxDuration = 120` for long AI calls
+6. Error handling returns `{ error: string }` with status 500
+
+### Key API Routes
+| Route | Purpose |
+|-------|---------|
+| `auth` | Login (POST), session check (GET), logout (DELETE) |
+| `generate-questions` | Parallel generation across perspectives/section drivers |
+| `generate-checklist` | Checklist generation with dimensions |
+| `generate-email-course` | Email course generation with stages |
+| `generate-output` | Generic output generation (dynamic schema from output type fields) |
+| `generate-configuration` | AI-generates a configuration from description |
+| `generate-field-suggestions` | Generates field value suggestions for smart-field |
+| `generate-roles` | Generates role suggestions |
+| `generate-activities` | Generates activity suggestions |
+| `generate-services` | Generates service suggestions |
+| `generate-prompts` | Generates prompt suggestions |
+| `generate-deeper-questions` | Generates 2nd/3rd order questions |
+| `generate-site` | Generates site content |
+| `dissect-question` | Deep analysis of a single question |
+| `dissect-item` | Deep analysis of a generic element |
+| `find-answer` | Web-search-powered answer finding |
+| `product-assistant` | Quality analysis with improvement suggestions |
+
+## Key Patterns & Conventions
+
+1. **All state is localStorage** — no database, no server-side persistence. Storage modules follow a consistent pattern: `getAll()`, `getById()`, `save()`, `update()`, `remove()` with auto-seeding for built-in items.
+
+2. **Prompt-driven architecture** — fields and output types define LLM prompts with `{{fieldId}}` placeholders. The `assembleDirectivesPrompt()` function combines context, section drivers, and instruction directives into final prompts.
+
+3. **Section drivers** — each output type has a set of "drivers" (perspectives, dimensions, stages, etc.) that define the sections of the generated product. AI generates content for each driver in parallel.
+
+4. **Instruction directives** — ordered, labeled rules the AI follows when generating. Each directive has a `label` and `content`. Configurations can override defaults.
+
+5. **Generic content model** — `ProductSection` and `ProductElement` use `Record<string, string>` fields, making the data model output-type-agnostic. The output type definition specifies which field keys exist.
+
+6. **Enrichment layer** — products can be enriched with dissections (thinking frameworks + checklists + resources), deeper questions (2nd/3rd order), and web-search-powered answers. These are stored as maps keyed by `"sectionIndex-elementIndex"`.
+
+7. **Component patterns** — use shadcn/ui primitives, `cn()` for class merging, Sonner for toasts, React Hook Form + Zod for forms.
+
+8. **No middleware** — auth is checked client-side via `useAuth()` hook polling `/api/auth` every 60s.
+
+## localStorage Keys
+
+| Key | Content | Module |
+|-----|---------|--------|
+| `digicraft-products` | Product[] | product-storage.ts |
+| `digicraft-sessions` | SavedSession[] (legacy) | session-storage.ts |
+| `queb-setup-configurations` | SetupConfiguration[] | setup-config-storage.ts |
+| `queb-field-library` | FieldDefinition[] | field-library.ts |
+| `queb-output-type-library` | OutputTypeDefinition[] | output-type-library.ts |
+
+## Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `ACCESS_CODE` | Login access code |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `AI_GATEWAY_API_KEY` | AI gateway key |
+| `SESSION_SECRET` | JWT signing secret (has default fallback) |
