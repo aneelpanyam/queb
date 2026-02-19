@@ -124,10 +124,14 @@ export default function ProductEditorPage() {
   const [nameValue, setNameValue] = useState('')
 
   // Smart Assistant state
+  type AssistantScope =
+    | { level: 'product' }
+    | { level: 'section'; sectionName: string }
+    | { level: 'element'; sectionName: string; sIndex: number; eIndex: number }
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantScope, setAssistantScope] = useState<AssistantScope>({ level: 'product' })
   const [assistantLoading, setAssistantLoading] = useState(false)
   const [assistantData, setAssistantData] = useState<AssistantData | null>(null)
-  const [sectionAssistantLoading, setSectionAssistantLoading] = useState<string | null>(null)
 
   useEffect(() => {
     if (!productId) return
@@ -447,67 +451,47 @@ export default function ProductEditorPage() {
     })
   }, [product, outputTypeDef])
 
-  const handleAssistant = useCallback(async () => {
-    if (!product || !outputTypeDef) return
+  const openAssistant = useCallback((scope: AssistantScope) => {
+    setAssistantScope(scope)
     setAssistantOpen(true)
+  }, [])
+
+  const runAssistantAnalysis = useCallback(async (scope: AssistantScope) => {
+    if (!product || !outputTypeDef) return
     setAssistantLoading(true)
     try {
       const sectionsPayload = buildSectionsPayload()
       const contextEntries = getContextEntries(product)
       const contextSummary = contextEntries.map((e) => `${e.label}: ${e.value}`).join(', ')
 
-      const res = await fetch('/api/product-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: product.name,
-          productDescription: product.description,
-          outputType: outputTypeDef.name,
-          contextSummary,
-          sections: sectionsPayload,
-          annotationCount: Object.values(product.annotations).reduce((sum, arr) => sum + arr.length, 0),
-          elementCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => !el.hidden).length, 0),
-          hiddenCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => el.hidden).length, 0),
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Request failed')
+      const payload: Record<string, unknown> = {
+        productName: product.name,
+        productDescription: product.description,
+        outputType: outputTypeDef.name,
+        contextSummary,
+        sections: sectionsPayload,
+        annotationCount: Object.values(product.annotations).reduce((sum, arr) => sum + arr.length, 0),
+        elementCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => !el.hidden).length, 0),
+        hiddenCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => el.hidden).length, 0),
       }
-      const data = await res.json()
-      const persisted: AssistantData = { ...data, analyzedAt: new Date().toISOString() }
-      setAssistantData(persisted)
-      setHasUnsavedChanges(true)
-      setSaveStatus('idle')
-    } catch (err) {
-      toast.error('Assistant failed', { description: err instanceof Error ? err.message : 'Please try again' })
-    } finally {
-      setAssistantLoading(false)
-    }
-  }, [product, outputTypeDef, buildSectionsPayload])
 
-  const handleSectionAssistant = useCallback(async (sectionName: string) => {
-    if (!product || !outputTypeDef) return
-    setSectionAssistantLoading(sectionName)
-    try {
-      const sectionsPayload = buildSectionsPayload()
-      const contextEntries = getContextEntries(product)
-      const contextSummary = contextEntries.map((e) => `${e.label}: ${e.value}`).join(', ')
+      if (scope.level === 'section') {
+        payload.focusSection = scope.sectionName
+      } else if (scope.level === 'element') {
+        const el = product.sections[scope.sIndex]?.elements[scope.eIndex]
+        if (el) {
+          payload.focusElement = {
+            sectionName: scope.sectionName,
+            content: Object.values(el.fields)[0] || '',
+            fields: el.fields,
+          }
+        }
+      }
 
       const res = await fetch('/api/product-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: product.name,
-          productDescription: product.description,
-          outputType: outputTypeDef.name,
-          contextSummary,
-          sections: sectionsPayload,
-          annotationCount: Object.values(product.annotations).reduce((sum, arr) => sum + arr.length, 0),
-          elementCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => !el.hidden).length, 0),
-          hiddenCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => el.hidden).length, 0),
-          focusSection: sectionName,
-        }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -517,26 +501,40 @@ export default function ProductEditorPage() {
       const newSuggestions = (data.suggestions || []) as AssistantSuggestion[]
 
       setAssistantData((prev) => {
-        const existingSuggestions = prev?.suggestions.filter(
-          (s) => s.targetSection !== sectionName
-        ) || []
-        const merged: AssistantData = {
-          suggestions: [...existingSuggestions, ...newSuggestions],
+        if (scope.level === 'product') {
+          return { ...data, analyzedAt: new Date().toISOString() }
+        }
+        const keepFilter = scope.level === 'section'
+          ? (s: AssistantSuggestion) => !(s.targetSection === scope.sectionName && !s.targetElement)
+          : (() => {
+              const elPrimary = getElementPrimary(scope.sIndex, scope.eIndex)
+              return (s: AssistantSuggestion) => !(s.targetSection === scope.sectionName && matchesElement(s, elPrimary))
+            })()
+        const existing = prev?.suggestions.filter(keepFilter) || []
+        return {
+          suggestions: [...existing, ...newSuggestions],
           overallAssessment: prev?.overallAssessment || data.overallAssessment || '',
           completenessScore: prev?.completenessScore ?? data.completenessScore ?? 0,
           analyzedAt: new Date().toISOString(),
         }
-        return merged
       })
       setHasUnsavedChanges(true)
       setSaveStatus('idle')
-      toast.success(`Analysis for "${sectionName}" complete`)
+      const label = scope.level === 'product' ? 'Product' : scope.level === 'section' ? `"${scope.sectionName}"` : 'Element'
+      toast.success(`${label} analysis complete`)
     } catch (err) {
-      toast.error('Section analysis failed', { description: err instanceof Error ? err.message : 'Please try again' })
+      toast.error('Analysis failed', { description: err instanceof Error ? err.message : 'Please try again' })
     } finally {
-      setSectionAssistantLoading(null)
+      setAssistantLoading(false)
     }
   }, [product, outputTypeDef, buildSectionsPayload])
+
+  const handleAssistant = useCallback(() => {
+    const scope: AssistantScope = { level: 'product' }
+    setAssistantScope(scope)
+    setAssistantOpen(true)
+    runAssistantAnalysis(scope)
+  }, [runAssistantAnalysis])
 
   if (!authChecked) {
     return (
@@ -571,6 +569,19 @@ export default function ProductEditorPage() {
   }
 
   const primaryFieldDef = getPrimaryField(outputTypeDef)
+
+  const getElementPrimary = (sIdx: number, eIdx: number): string => {
+    const el = product.sections[sIdx]?.elements[eIdx]
+    if (!el) return ''
+    return el.fields[primaryFieldDef.key] || Object.values(el.fields)[0] || ''
+  }
+
+  const matchesElement = (suggestion: AssistantSuggestion, elementPrimary: string): boolean => {
+    if (!suggestion.targetElement || !elementPrimary) return false
+    const te = suggestion.targetElement.toLowerCase()
+    const ep = elementPrimary.toLowerCase()
+    return ep.includes(te) || te.includes(ep.slice(0, 60))
+  }
 
   // Resolve selected element data
   const selectedSection = selectedNode ? product.sections[selectedNode.sIndex] : null
@@ -683,7 +694,7 @@ export default function ProductEditorPage() {
               const annotationsInSection = section.elements.reduce((sum, _, eIdx) => sum + (product.annotations[`${sIndex}-${eIdx}`]?.length || 0), 0)
               const sectionAnnotations = product.annotations[`section-${sIndex}`]?.length || 0
               const totalAnnotations = annotationsInSection + sectionAnnotations
-              const sectionSuggestionCount = assistantData?.suggestions.filter((s) => s.targetSection === section.name).length || 0
+              const sectionSuggestionCount = assistantData?.suggestions.filter((s) => s.targetSection === section.name && !s.targetElement).length || 0
               const useSectionNav = SECTION_NAV_TYPES.has(product.outputType)
 
               if (useSectionNav) {
@@ -707,11 +718,13 @@ export default function ProductEditorPage() {
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center gap-1 pr-1">
-                        {sectionSuggestionCount > 0 && (
-                          <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600" title={`${sectionSuggestionCount} suggestions`}>
-                            <Sparkles className="inline h-2.5 w-2.5" /> {sectionSuggestionCount}
-                          </span>
-                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openAssistant({ level: 'section', sectionName: section.name }) }}
+                          className={cn('rounded p-0.5 transition-colors', sectionSuggestionCount > 0 ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/30 hover:text-primary')}
+                          title={sectionSuggestionCount > 0 ? `${sectionSuggestionCount} suggestions` : 'Analyze section'}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </button>
                         {totalAnnotations > 0 && (
                           <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{totalAnnotations}</span>
                         )}
@@ -729,11 +742,13 @@ export default function ProductEditorPage() {
                   <div className="flex items-center justify-between px-2 py-3">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-primary">{section.name}</span>
                     <div className="flex items-center gap-1">
-                      {sectionSuggestionCount > 0 && (
-                        <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600" title={`${sectionSuggestionCount} suggestions`}>
-                          <Sparkles className="inline h-2.5 w-2.5" /> {sectionSuggestionCount}
-                        </span>
-                      )}
+                      <button
+                        onClick={() => openAssistant({ level: 'section', sectionName: section.name })}
+                        className={cn('rounded p-0.5 transition-colors', sectionSuggestionCount > 0 ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/30 hover:text-primary')}
+                        title={sectionSuggestionCount > 0 ? `${sectionSuggestionCount} suggestions` : 'Analyze section'}
+                      >
+                        <Sparkles className="h-3 w-3" />
+                      </button>
                       {totalAnnotations > 0 && (
                         <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{totalAnnotations}</span>
                       )}
@@ -823,75 +838,7 @@ export default function ProductEditorPage() {
                 </p>
               </div>
             ) : selectedNode.type === 'section' ? (
-              <div className="mx-auto w-full space-y-4 px-6 py-4 pb-12">
-                {/* Analyze section button */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSectionAssistant(selectedSection.name)}
-                    disabled={sectionAssistantLoading === selectedSection.name}
-                    className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
-                  >
-                    {sectionAssistantLoading === selectedSection.name ? (
-                      <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
-                    ) : (
-                      <><Sparkles className="h-3 w-3" /> Analyze this section</>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Inline assistant suggestions for this section */}
-                {(() => {
-                  const sectionSuggestions = assistantData?.suggestions.filter(
-                    (s) => s.targetSection === selectedSection.name
-                  ) || []
-                  if (sectionSuggestions.length === 0) return null
-                  const priorityColors: Record<string, string> = {
-                    high: 'border-red-500/20 bg-red-500/5',
-                    medium: 'border-amber-500/20 bg-amber-500/5',
-                    low: 'border-green-500/20 bg-green-500/5',
-                  }
-                  const priorityBadge: Record<string, string> = {
-                    high: 'bg-red-500/10 text-red-600',
-                    medium: 'bg-amber-500/10 text-amber-600',
-                    low: 'bg-green-500/10 text-green-600',
-                  }
-                  const catIcons: Record<string, React.ReactNode> = {
-                    annotation: <MessageSquareText className="h-3 w-3" />,
-                    content: <FileText className="h-3 w-3" />,
-                    structure: <Layers className="h-3 w-3" />,
-                    audience: <Target className="h-3 w-3" />,
-                    enrichment: <Sparkles className="h-3 w-3" />,
-                  }
-                  return (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-semibold text-primary">
-                          Smart Assistant — {sectionSuggestions.length} suggestion{sectionSuggestions.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {sectionSuggestions.map((s, i) => (
-                          <div key={i} className={cn('rounded-md border p-3', priorityColors[s.priority] || 'border-border bg-card')}>
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className="flex h-5 w-5 items-center justify-center rounded text-primary">
-                                {catIcons[s.category] || <Lightbulb className="h-3 w-3" />}
-                              </span>
-                              <span className="text-xs font-semibold text-foreground">{s.title}</span>
-                              <span className={cn('ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', priorityBadge[s.priority] || '')}>
-                                {s.priority}
-                              </span>
-                            </div>
-                            <p className="pl-7 text-[11px] leading-relaxed text-muted-foreground">{s.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
-
+              <div className="mx-auto w-full px-6 py-4 pb-12">
                 <ChecklistSectionDetail
                   section={selectedSection}
                   sIndex={selectedNode.sIndex}
@@ -909,79 +856,28 @@ export default function ProductEditorPage() {
               </div>
             ) : (
               <div className="mx-auto w-full space-y-5 px-6 py-4 pb-12">
-                {/* Section badge + analyze button */}
+                {/* Section badge with assistant icon */}
                 <div>
-                  <div className="mb-2.5 flex items-center gap-3">
+                  <div className="mb-2.5 flex items-center gap-2">
                     <div className="inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
                       {selectedSection.name}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSectionAssistant(selectedSection.name)}
-                      disabled={sectionAssistantLoading === selectedSection.name}
-                      className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
-                    >
-                      {sectionAssistantLoading === selectedSection.name ? (
-                        <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
-                      ) : (
-                        <><Sparkles className="h-3 w-3" /> Analyze section</>
-                      )}
-                    </Button>
+                    {(() => {
+                      const count = assistantData?.suggestions.filter((s) => s.targetSection === selectedSection.name && !s.targetElement).length || 0
+                      return (
+                        <button
+                          onClick={() => openAssistant({ level: 'section', sectionName: selectedSection.name })}
+                          className={cn('flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors hover:bg-primary/10', count > 0 ? 'bg-amber-500/10 text-amber-600' : 'text-muted-foreground hover:text-primary')}
+                          title={count > 0 ? `${count} section-level suggestions` : 'Open section analysis'}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {count > 0 && count}
+                        </button>
+                      )
+                    })()}
                   </div>
                   <p className="text-sm leading-relaxed text-muted-foreground">{selectedSection.description}</p>
                 </div>
-
-                {/* Inline assistant suggestions for this section */}
-                {(() => {
-                  const sectionSuggestions = assistantData?.suggestions.filter(
-                    (s) => s.targetSection === selectedSection.name
-                  ) || []
-                  if (sectionSuggestions.length === 0) return null
-                  const priorityColors: Record<string, string> = {
-                    high: 'border-red-500/20 bg-red-500/5',
-                    medium: 'border-amber-500/20 bg-amber-500/5',
-                    low: 'border-green-500/20 bg-green-500/5',
-                  }
-                  const priorityBadge: Record<string, string> = {
-                    high: 'bg-red-500/10 text-red-600',
-                    medium: 'bg-amber-500/10 text-amber-600',
-                    low: 'bg-green-500/10 text-green-600',
-                  }
-                  const catIcons: Record<string, React.ReactNode> = {
-                    annotation: <MessageSquareText className="h-3 w-3" />,
-                    content: <FileText className="h-3 w-3" />,
-                    structure: <Layers className="h-3 w-3" />,
-                    audience: <Target className="h-3 w-3" />,
-                    enrichment: <Sparkles className="h-3 w-3" />,
-                  }
-                  return (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-semibold text-primary">
-                          Smart Assistant — {sectionSuggestions.length} suggestion{sectionSuggestions.length !== 1 ? 's' : ''} for this section
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {sectionSuggestions.map((s, i) => (
-                          <div key={i} className={cn('rounded-md border p-3', priorityColors[s.priority] || 'border-border bg-card')}>
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className="flex h-5 w-5 items-center justify-center rounded text-primary">
-                                {catIcons[s.category] || <Lightbulb className="h-3 w-3" />}
-                              </span>
-                              <span className="text-xs font-semibold text-foreground">{s.title}</span>
-                              <span className={cn('ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', priorityBadge[s.priority] || '')}>
-                                {s.priority}
-                              </span>
-                            </div>
-                            <p className="pl-7 text-[11px] leading-relaxed text-muted-foreground">{s.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
 
                 {/* Output-type-specific element rendering */}
                 {selectedNode.type === 'element' && selectedElement ? (
@@ -1012,9 +908,24 @@ export default function ProductEditorPage() {
                   </div>
                 )}
 
-                {/* AI enrichment actions (output-type dependent) */}
-                {(outputTypeDef.supportsDeepDive || outputTypeDef.supportsDeeperQuestions) && (
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                {/* AI enrichment actions */}
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  {selectedNode.type === 'element' && (
+                    <Button variant="outline" size="sm"
+                      onClick={() => openAssistant({ level: 'element', sectionName: selectedSection.name, sIndex: selectedNode.sIndex, eIndex: selectedNode.eIndex })}
+                      className="gap-2 border-primary/30 text-primary hover:bg-primary/5">
+                      <Sparkles className="h-4 w-4" />
+                      {(() => {
+                        const elPrimary = getElementPrimary(selectedNode.sIndex, selectedNode.eIndex)
+                        const elSuggestions = assistantData?.suggestions.filter(
+                          (s) => s.targetSection === selectedSection.name && matchesElement(s, elPrimary)
+                        ).length || 0
+                        return elSuggestions > 0 ? `Suggestions (${elSuggestions})` : 'Analyze'
+                      })()}
+                    </Button>
+                  )}
+                {(outputTypeDef.supportsDeepDive || outputTypeDef.supportsDeeperQuestions) && (<>
+                
                     {outputTypeDef.supportsDeepDive && (
                       <Button variant="outline" size="sm"
                         onClick={() => {
@@ -1039,8 +950,8 @@ export default function ProductEditorPage() {
                         {deeperLoading ? 'Thinking deeper...' : selectedDeeper ? 'Deeper loaded' : 'Go deeper'}
                       </Button>
                     )}
-                  </div>
-                )}
+                </>)}
+                </div>
 
                 {/* Deep dive content */}
                 {(dissectionLoading || (dissection && !hiddenDissections.has(currentDKey))) && (
@@ -1089,16 +1000,20 @@ export default function ProductEditorPage() {
         </div>
       </div>
 
-      {/* Smart Assistant Sheet */}
+      {/* Smart Assistant Sheet — contextual by scope */}
       <Sheet open={assistantOpen} onOpenChange={setAssistantOpen}>
         <SheetContent side="right" className="w-[440px] sm:max-w-[440px] overflow-y-auto">
           <SheetHeader className="pb-4">
             <SheetTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              Smart Assistant
+              {assistantScope.level === 'product' && 'Product Analysis'}
+              {assistantScope.level === 'section' && `Section: ${assistantScope.sectionName}`}
+              {assistantScope.level === 'element' && 'Element Analysis'}
             </SheetTitle>
             <SheetDescription>
-              AI-powered suggestions to elevate your product beyond raw generated content.
+              {assistantScope.level === 'product' && 'Suggestions for the entire product.'}
+              {assistantScope.level === 'section' && `Suggestions for the "${assistantScope.sectionName}" section.`}
+              {assistantScope.level === 'element' && `Suggestions for this specific ${outputTypeDef?.elementLabel?.toLowerCase() || 'element'}.`}
               {assistantData?.analyzedAt && (
                 <span className="mt-1 block text-[11px] text-muted-foreground/70">
                   Last analyzed {new Date(assistantData.analyzedAt).toLocaleString()}
@@ -1107,83 +1022,143 @@ export default function ProductEditorPage() {
             </SheetDescription>
           </SheetHeader>
 
-          {assistantLoading ? (
-            <div className="space-y-4 pt-4">
-              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Analyzing your product...</p>
-                  <p className="text-xs text-muted-foreground">Reviewing content, structure, and enrichment opportunities</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="space-y-2 rounded-lg border border-border p-4">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-2/3" />
-                  </div>
-                ))}
-              </div>
+          {/* Scope navigation breadcrumbs */}
+          {assistantScope.level !== 'product' && (
+            <div className="mb-4 flex items-center gap-1 text-xs">
+              <button onClick={() => setAssistantScope({ level: 'product' })} className="text-primary hover:underline">Product</button>
+              <span className="text-muted-foreground">/</span>
+              {assistantScope.level === 'element' ? (
+                <>
+                  <button onClick={() => setAssistantScope({ level: 'section', sectionName: assistantScope.sectionName })} className="text-primary hover:underline">{assistantScope.sectionName}</button>
+                  <span className="text-muted-foreground">/</span>
+                  <span className="text-foreground font-medium">Element</span>
+                </>
+              ) : (
+                <span className="text-foreground font-medium">{assistantScope.sectionName}</span>
+              )}
             </div>
-          ) : assistantData ? (
-            <div className="space-y-6 pt-2">
-              {/* Completeness Score */}
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product Readiness</span>
-                  <span className={cn(
-                    'text-lg font-bold',
-                    assistantData.completenessScore >= 75 ? 'text-green-600' :
-                    assistantData.completenessScore >= 50 ? 'text-amber-600' : 'text-red-600'
-                  )}>
-                    {assistantData.completenessScore}%
-                  </span>
-                </div>
-                <div className="mb-3 h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all',
-                      assistantData.completenessScore >= 75 ? 'bg-green-500' :
-                      assistantData.completenessScore >= 50 ? 'bg-amber-500' : 'bg-red-500'
-                    )}
-                    style={{ width: `${assistantData.completenessScore}%` }}
-                  />
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">{assistantData.overallAssessment}</p>
-              </div>
+          )}
 
-              {/* Suggestions grouped by category */}
-              {(() => {
-                const categoryMeta: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-                  annotation: { label: 'Add Annotations', icon: <MessageSquareText className="h-4 w-4" />, color: 'text-blue-600 bg-blue-500/10' },
-                  content: { label: 'Improve Content', icon: <FileText className="h-4 w-4" />, color: 'text-purple-600 bg-purple-500/10' },
-                  structure: { label: 'Restructure', icon: <Layers className="h-4 w-4" />, color: 'text-indigo-600 bg-indigo-500/10' },
-                  audience: { label: 'Audience Fit', icon: <Target className="h-4 w-4" />, color: 'text-green-600 bg-green-500/10' },
-                  distribution: { label: 'Distribution', icon: <BarChart3 className="h-4 w-4" />, color: 'text-orange-600 bg-orange-500/10' },
-                  enrichment: { label: 'AI Enrichment', icon: <Sparkles className="h-4 w-4" />, color: 'text-primary bg-primary/10' },
-                }
-                const priorityColors: Record<string, string> = {
-                  high: 'bg-red-500/10 text-red-600 border-red-500/20',
-                  medium: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-                  low: 'bg-green-500/10 text-green-600 border-green-500/20',
-                }
-                const grouped: Record<string, typeof assistantData.suggestions> = {}
-                for (const s of assistantData.suggestions) {
-                  ;(grouped[s.category] ??= []).push(s)
-                }
-                return Object.entries(grouped).map(([cat, items]) => {
+          {/* Analyze button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => runAssistantAnalysis(assistantScope)}
+            disabled={assistantLoading}
+            className="mb-4 w-full gap-2"
+          >
+            {assistantLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {assistantLoading ? 'Analyzing...' : (() => {
+              const scopedSuggestions = (() => {
+                if (!assistantData) return []
+                if (assistantScope.level === 'product') return assistantData.suggestions
+                if (assistantScope.level === 'section') return assistantData.suggestions.filter((s) => s.targetSection === assistantScope.sectionName && !s.targetElement)
+                const elPrimary = getElementPrimary(assistantScope.sIndex, assistantScope.eIndex)
+                return assistantData.suggestions.filter((s) => s.targetSection === assistantScope.sectionName && matchesElement(s, elPrimary))
+              })()
+              return scopedSuggestions.length > 0 ? 'Re-analyze' : 'Run analysis'
+            })()}
+          </Button>
+
+          {assistantLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-border p-4">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : (() => {
+            const scopedSuggestions = (() => {
+              if (!assistantData) return []
+              if (assistantScope.level === 'product') return assistantData.suggestions
+              if (assistantScope.level === 'section') return assistantData.suggestions.filter((s) => s.targetSection === assistantScope.sectionName && !s.targetElement)
+              const elPrimary = getElementPrimary(assistantScope.sIndex, assistantScope.eIndex)
+              return assistantData.suggestions.filter((s) => s.targetSection === assistantScope.sectionName && matchesElement(s, elPrimary))
+            })()
+
+            if (scopedSuggestions.length === 0 && !assistantData) {
+              return (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Sparkles className="mb-3 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No analysis yet. Click the button above to get started.</p>
+                </div>
+              )
+            }
+
+            if (scopedSuggestions.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <CheckCircle2 className="mb-3 h-8 w-8 text-green-500/50" />
+                  <p className="text-sm text-muted-foreground">No suggestions at this level yet. Run analysis to get specific recommendations.</p>
+                </div>
+              )
+            }
+
+            const categoryMeta: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+              annotation: { label: 'Add Annotations', icon: <MessageSquareText className="h-4 w-4" />, color: 'text-blue-600 bg-blue-500/10' },
+              content: { label: 'Improve Content', icon: <FileText className="h-4 w-4" />, color: 'text-purple-600 bg-purple-500/10' },
+              structure: { label: 'Restructure', icon: <Layers className="h-4 w-4" />, color: 'text-indigo-600 bg-indigo-500/10' },
+              audience: { label: 'Audience Fit', icon: <Target className="h-4 w-4" />, color: 'text-green-600 bg-green-500/10' },
+              distribution: { label: 'Distribution', icon: <BarChart3 className="h-4 w-4" />, color: 'text-orange-600 bg-orange-500/10' },
+              enrichment: { label: 'AI Enrichment', icon: <Sparkles className="h-4 w-4" />, color: 'text-primary bg-primary/10' },
+            }
+            const priorityColors: Record<string, string> = {
+              high: 'bg-red-500/10 text-red-600 border-red-500/20',
+              medium: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+              low: 'bg-green-500/10 text-green-600 border-green-500/20',
+            }
+
+            const grouped: Record<string, typeof scopedSuggestions> = {}
+            for (const s of scopedSuggestions) {
+              ;(grouped[s.category] ??= []).push(s)
+            }
+
+            return (
+              <div className="space-y-5">
+                {/* Assessment (product-level only) */}
+                {assistantScope.level === 'product' && assistantData && (
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Readiness</span>
+                      <span className={cn(
+                        'text-lg font-bold',
+                        assistantData.completenessScore >= 75 ? 'text-green-600' :
+                        assistantData.completenessScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                      )}>
+                        {assistantData.completenessScore}%
+                      </span>
+                    </div>
+                    <div className="mb-3 h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          assistantData.completenessScore >= 75 ? 'bg-green-500' :
+                          assistantData.completenessScore >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                        )}
+                        style={{ width: `${assistantData.completenessScore}%` }}
+                      />
+                    </div>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{assistantData.overallAssessment}</p>
+                  </div>
+                )}
+
+                <p className="text-xs font-semibold text-muted-foreground">{scopedSuggestions.length} suggestion{scopedSuggestions.length !== 1 ? 's' : ''}</p>
+
+                {Object.entries(grouped).map(([cat, items]) => {
                   const meta = categoryMeta[cat] || { label: cat, icon: <Lightbulb className="h-4 w-4" />, color: 'text-muted-foreground bg-muted' }
                   return (
                     <div key={cat}>
                       <div className="mb-2 flex items-center gap-2">
-                        <span className={cn('flex h-7 w-7 items-center justify-center rounded-md', meta.color)}>
+                        <span className={cn('flex h-6 w-6 items-center justify-center rounded-md', meta.color)}>
                           {meta.icon}
                         </span>
                         <span className="text-sm font-semibold text-foreground">{meta.label}</span>
                         <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{items.length}</span>
                       </div>
-                      <div className="space-y-2 pl-9">
+                      <div className="space-y-2 pl-8">
                         {items.map((suggestion, idx) => (
                           <div key={idx} className="rounded-lg border border-border bg-card p-3">
                             <div className="mb-1 flex items-start justify-between gap-2">
@@ -1193,9 +1168,17 @@ export default function ProductEditorPage() {
                               </span>
                             </div>
                             <p className="text-xs leading-relaxed text-muted-foreground">{suggestion.description}</p>
-                            {suggestion.targetSection && (
-                              <p className="mt-1.5 text-[10px] font-medium text-primary">
-                                Section: {suggestion.targetSection}
+                            {assistantScope.level === 'product' && suggestion.targetSection && (
+                              <button
+                                onClick={() => setAssistantScope({ level: 'section', sectionName: suggestion.targetSection })}
+                                className="mt-1.5 text-[10px] font-medium text-primary hover:underline"
+                              >
+                                {suggestion.targetSection} &rarr;
+                              </button>
+                            )}
+                            {suggestion.targetElement && (
+                              <p className="mt-1 text-[10px] italic text-muted-foreground/70">
+                                &ldquo;{suggestion.targetElement.length > 80 ? suggestion.targetElement.slice(0, 77) + '...' : suggestion.targetElement}&rdquo;
                               </p>
                             )}
                           </div>
@@ -1203,24 +1186,10 @@ export default function ProductEditorPage() {
                       </div>
                     </div>
                   )
-                })
-              })()}
-
-              {/* Refresh button */}
-              <div className="border-t border-border pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAssistant}
-                  disabled={assistantLoading}
-                  className="w-full gap-2"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Re-analyze product
-                </Button>
+                })}
               </div>
-            </div>
-          ) : null}
+            )
+          })()}
         </SheetContent>
       </Sheet>
     </div>

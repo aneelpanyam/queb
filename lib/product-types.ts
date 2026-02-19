@@ -52,6 +52,7 @@ export interface AssistantSuggestion {
   priority: string
   actionType: string
   targetSection: string
+  targetElement: string
 }
 
 export interface AssistantData {
