@@ -33,6 +33,17 @@ export interface ProductSection {
   hidden?: boolean
 }
 
+export interface AnswerSource {
+  url: string
+  title: string
+}
+
+export interface AnswerData {
+  answer: string
+  sources: AnswerSource[]
+  generatedAt: string
+}
+
 export interface DissectionData {
   frameworkUsed?: {
     id: string
@@ -98,6 +109,7 @@ export interface Product {
   // Enrichments (currently used by 'questions' output type)
   dissections?: Record<string, DissectionData>
   deeperQuestions?: Record<string, DeeperData>
+  answers?: Record<string, AnswerData>
 
   // Smart assistant analysis
   assistantData?: AssistantData

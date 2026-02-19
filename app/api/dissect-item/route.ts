@@ -14,13 +14,13 @@ const dissectionSchema = z.object({
     z.object({
       step: z.number().describe('Step number'),
       title: z.string().describe('Short title for this step, matching the framework stage'),
-      description: z.string().describe('Deep, specific analysis for this framework step applied to the item'),
+      description: z.string().describe('Markdown-formatted analysis. Use bullet lists, numbered lists, and **bold** for structure. Never write dense paragraphs — break into scannable points.'),
     })
   ),
   checklist: z.array(
     z.object({
       item: z.string().describe('Action item'),
-      description: z.string().describe('Why this matters and how to do it'),
+      description: z.string().describe('Markdown-formatted explanation of why this matters and how to do it'),
       isRequired: z.boolean().describe('Must-do vs nice-to-have'),
     })
   ),
@@ -90,7 +90,15 @@ CRITICAL RULES:
 - The thinkingFramework steps MUST follow the selected framework's structure — each step title should reflect a framework stage.
 - Do NOT generate generic steps. Every step must contain analysis specific to the item, context, and framework.
 - For RESOURCES, use real domains and realistic paths (e.g., hbr.org/..., mckinsey.com/..., specific tool websites).
-- Be specific to the role, industry, and situation throughout.`,
+- Be specific to the role, industry, and situation throughout.
+
+FORMATTING RULES (very important):
+- All description fields support Markdown. You MUST use it for readability.
+- NEVER write dense walls of text. Break content into scannable structure.
+- Use **bold** for key terms, concepts, and emphasis.
+- When listing multiple items, stakeholders, actions, or considerations, ALWAYS use bullet lists (- item) or numbered lists (1. item).
+- Start each step description with a brief framing sentence, then break the detail into a bulleted or numbered list.
+- Keep paragraphs to 2-3 sentences max before breaking into a list.`,
     })
 
     return Response.json(result.output)

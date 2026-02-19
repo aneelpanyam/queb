@@ -12,12 +12,14 @@ import type {
   Annotation,
   DissectionData,
   DeeperData,
+  AnswerData,
   AssistantData,
   AssistantSuggestion,
 } from '@/lib/product-types'
 import { LoginScreen } from '@/components/login-screen'
 import { ProductAnnotations } from '@/components/product-annotation'
 import { QuestionDissection } from '@/components/question-dissection'
+import { QuestionAnswer } from '@/components/question-answer'
 import { ElementDetail } from '@/components/element-detail'
 import { ChecklistSectionDetail } from '@/components/checklist-section-detail'
 import { Button } from '@/components/ui/button'
@@ -53,6 +55,7 @@ import {
   FileText,
   BarChart3,
   RefreshCw,
+  Globe,
 } from 'lucide-react'
 
 type SelectedNode =
@@ -116,6 +119,11 @@ export default function ProductEditorPage() {
   const [deeperLoading, setDeeperLoading] = useState(false)
   const [hiddenDissections, setHiddenDissections] = useState<Set<string>>(new Set())
 
+  const [answerMap, setAnswerMap] = useState<Record<string, AnswerData>>({})
+  const [answerLoading, setAnswerLoading] = useState(false)
+  const [activeAnswerKey, setActiveAnswerKey] = useState<string | null>(null)
+  const [hiddenAnswers, setHiddenAnswers] = useState<Set<string>>(new Set())
+
   const [exportLoading, setExportLoading] = useState(false)
 
   const [editingField, setEditingField] = useState<string | null>(null)
@@ -140,6 +148,7 @@ export default function ProductEditorPage() {
       setProduct(p)
       setDissectionMap(p.dissections || {})
       setDeeperMap(p.deeperQuestions || {})
+      setAnswerMap(p.answers || {})
       if (p.assistantData) setAssistantData(p.assistantData)
       const otDef = getOutputType(p.outputType)
       setOutputTypeDef(otDef || null)
@@ -186,6 +195,7 @@ export default function ProductEditorPage() {
       ...product,
       dissections: dissectionMap,
       deeperQuestions: deeperMap,
+      answers: answerMap,
       assistantData: assistantData || undefined,
     })
     if (updated) {
@@ -198,7 +208,7 @@ export default function ProductEditorPage() {
       setSaveStatus('idle')
       toast.error('Failed to save')
     }
-  }, [product, dissectionMap, deeperMap, assistantData])
+  }, [product, dissectionMap, deeperMap, answerMap, assistantData])
 
   // Element editing
   const updateElementField = useCallback(
@@ -351,6 +361,48 @@ export default function ProductEditorPage() {
     [product, deeperMap]
   )
 
+  const handleFindAnswer = useCallback(
+    async (question: string, key: string) => {
+      if (!product) return
+      setAnswerLoading(true)
+      setActiveAnswerKey(key)
+      try {
+        const context: Record<string, string> = {}
+        if (product.contextFields) {
+          Object.entries(product.contextFields).forEach(([k, v]) => {
+            if (v?.trim()) context[k] = v
+          })
+        } else {
+          if (product.industry) context.industry = product.industry
+          if (product.service) context.service = product.service
+          if (product.role) context.role = product.role
+          if (product.activity) context.activity = product.activity
+          if (product.situation) context.situation = product.situation
+        }
+
+        const res = await fetch('/api/find-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, context }),
+        })
+        if (!res.ok) throw new Error('AI research failed')
+        const data: AnswerData = await res.json()
+        setAnswerMap((prev) => ({ ...prev, [key]: data }))
+        setHiddenAnswers((prev) => { const n = new Set(prev); n.delete(key); return n })
+        setHasUnsavedChanges(true)
+        toast.success(`Answer found with ${data.sources.length} source${data.sources.length !== 1 ? 's' : ''}`)
+      } catch (err) {
+        toast.error('Failed to find answer', {
+          description: err instanceof Error ? err.message : 'Please try again',
+        })
+      } finally {
+        setAnswerLoading(false)
+        setActiveAnswerKey(null)
+      }
+    },
+    [product]
+  )
+
   // Export
   const handleExport = useCallback(async () => {
     if (!product) return
@@ -375,6 +427,7 @@ export default function ProductEditorPage() {
                   infoPrompt: el.fields.infoPrompt || '',
                   dissection: dissectionMap[key] || undefined,
                   deeperQuestions: deeperMap[key] || undefined,
+                  answer: answerMap[key] || undefined,
                   annotations: product.annotations[key] || undefined,
                 }
               }),
@@ -607,7 +660,9 @@ export default function ProductEditorPage() {
   const currentDKey = selectedNode ? dissectionKey(selectedNode) : ''
   const currentAKey = selectedNode ? annotationKey(selectedNode) : ''
   const dissection = currentDKey ? dissectionMap[currentDKey] : undefined
+  const currentAnswer = currentDKey ? answerMap[currentDKey] : undefined
   const currentAnnotations = product.annotations[currentAKey] || []
+  const isQuestionBook = product.outputType === 'questions'
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -956,7 +1011,52 @@ export default function ProductEditorPage() {
                       </Button>
                     )}
                 </>)}
+                  {isQuestionBook && (selectedNode.type === 'element' || selectedNode.type === 'second' || selectedNode.type === 'third') && (
+                    <Button variant="outline" size="sm"
+                      onClick={() => {
+                        if (currentAnswer && !answerLoading) {
+                          setHiddenAnswers((prev) => { const n = new Set(prev); if (n.has(currentDKey)) n.delete(currentDKey); else n.add(currentDKey); return n })
+                        } else if (displayPrimary) {
+                          handleFindAnswer(displayPrimary, currentDKey)
+                        }
+                      }}
+                      disabled={answerLoading && activeAnswerKey === currentDKey}
+                      className={cn('gap-2', currentAnswer && !hiddenAnswers.has(currentDKey) && 'border-emerald-500/50 bg-emerald-500/5 text-emerald-600')}>
+                      {answerLoading && activeAnswerKey === currentDKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                      {answerLoading && activeAnswerKey === currentDKey ? 'Researching...' : currentAnswer && !hiddenAnswers.has(currentDKey) ? 'Hide answer' : currentAnswer ? 'Show answer' : 'Find answer'}
+                    </Button>
+                  )}
                 </div>
+
+                {/* AI-researched answer (question book only) */}
+                {isQuestionBook && (answerLoading && activeAnswerKey === currentDKey || (currentAnswer && !hiddenAnswers.has(currentDKey))) && (
+                  <div className="mt-6 space-y-4">
+                    {answerLoading && activeAnswerKey === currentDKey && !currentAnswer && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Searching the web and synthesizing an answer...
+                        </div>
+                        <Skeleton className="h-5 w-56" />
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-4 w-72" />
+                      </div>
+                    )}
+                    {currentAnswer && !hiddenAnswers.has(currentDKey) && (
+                      <div>
+                        <QuestionAnswer data={currentAnswer} />
+                        <div className="mt-3 flex gap-2">
+                          <Button variant="ghost" size="sm"
+                            onClick={() => { if (displayPrimary) handleFindAnswer(displayPrimary, currentDKey) }}
+                            disabled={answerLoading}
+                            className="gap-1.5 text-xs text-muted-foreground">
+                            <RefreshCw className="h-3 w-3" /> Re-research
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Deep dive content */}
                 {(dissectionLoading || (dissection && !hiddenDissections.has(currentDKey))) && (
