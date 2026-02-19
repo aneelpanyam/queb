@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWRMutation from 'swr/mutation'
 import { toast } from 'sonner'
@@ -114,6 +114,21 @@ const COMMON_INDUSTRIES = [
 const SESSION_CHECK_INTERVAL = 60_000
 
 export default function LegacyPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <LegacyPageInner />
+    </Suspense>
+  )
+}
+
+function LegacyPageInner() {
   const searchParams = useSearchParams()
   const initialView = searchParams.get('view') === 'history' ? 'history' : 'wizard'
 
