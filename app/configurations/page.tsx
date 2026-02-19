@@ -34,6 +34,8 @@ import {
   Sparkles,
   Loader2,
   Wand2,
+  Download,
+  Upload,
 } from 'lucide-react'
 import {
   Dialog,
@@ -43,6 +45,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { downloadJson, buildFilename, openFilePicker, readJsonFile, type ExportBundle } from '@/lib/export-import'
 
 // ============================================================
 // Types for the builder form
@@ -855,6 +858,10 @@ export default function ConfigurationsPage() {
   const [wizardLoading, setWizardLoading] = useState(false)
   const [wizardError, setWizardError] = useState<string | null>(null)
 
+  // Export/Import state
+  const [selectedForExport, setSelectedForExport] = useState<Set<string>>(new Set())
+  const [selectMode, setSelectMode] = useState(false)
+
   useEffect(() => {
     setConfigs(configStorage.getAll())
     setAllFields(fieldStorage.getAll())
@@ -974,6 +981,67 @@ export default function ConfigurationsPage() {
     }
   }
 
+  const handleExportAll = () => {
+    if (configs.length === 0) { toast.error('No configurations to export'); return }
+    const bundle: ExportBundle<SetupConfiguration> = {
+      version: 1, type: 'configurations', exportedAt: new Date().toISOString(), items: configs,
+    }
+    downloadJson(bundle, buildFilename('configurations', configs.length))
+    toast.success(`Exported ${configs.length} configuration${configs.length !== 1 ? 's' : ''}`)
+  }
+
+  const handleExportSelected = () => {
+    const selected = configs.filter((c) => selectedForExport.has(c.id))
+    if (selected.length === 0) { toast.error('No configurations selected'); return }
+    const bundle: ExportBundle<SetupConfiguration> = {
+      version: 1, type: 'configurations', exportedAt: new Date().toISOString(), items: selected,
+    }
+    downloadJson(bundle, buildFilename('configurations', selected.length))
+    toast.success(`Exported ${selected.length} configuration${selected.length !== 1 ? 's' : ''}`)
+    setSelectMode(false)
+    setSelectedForExport(new Set())
+  }
+
+  const handleImport = async () => {
+    try {
+      const file = await openFilePicker()
+      if (!file) return
+      const bundle = await readJsonFile<SetupConfiguration>(file)
+      if (bundle.type !== 'configurations' && bundle.type !== 'full-backup') {
+        toast.error('Wrong file type — expected a configurations export')
+        return
+      }
+      const existingIds = new Set(configs.map((c) => c.id))
+      let imported = 0
+      let skipped = 0
+      for (const item of bundle.items) {
+        if (!item.id || !item.name || !item.steps) { skipped++; continue }
+        if (existingIds.has(item.id)) {
+          configStorage.update(item.id, item)
+        } else {
+          const raw = localStorage.getItem('queb-setup-configurations')
+          const all: SetupConfiguration[] = raw ? JSON.parse(raw) : []
+          all.unshift(item)
+          localStorage.setItem('queb-setup-configurations', JSON.stringify(all.slice(0, 200)))
+        }
+        imported++
+      }
+      setConfigs(configStorage.getAll())
+      if (imported > 0) toast.success(`Imported ${imported} configuration${imported !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`)
+      else toast.error('No valid configurations found in the file')
+    } catch (err) {
+      toast.error('Import failed', { description: err instanceof Error ? err.message : 'Invalid file' })
+    }
+  }
+
+  const toggleExportSelect = (id: string) => {
+    setSelectedForExport((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1028,6 +1096,36 @@ export default function ConfigurationsPage() {
           )}
         </div>
 
+        {/* Export/Import toolbar */}
+        {builderMode === 'closed' && configs.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleImport} className="h-8 gap-1.5 text-xs">
+              <Upload className="h-3.5 w-3.5" /> Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportAll} className="h-8 gap-1.5 text-xs">
+              <Download className="h-3.5 w-3.5" /> Export All
+            </Button>
+            {!selectMode ? (
+              <Button variant="ghost" size="sm" onClick={() => setSelectMode(true)} className="h-8 gap-1.5 text-xs text-muted-foreground">
+                Export Selected...
+              </Button>
+            ) : (
+              <>
+                <div className="h-5 w-px bg-border" />
+                <span className="text-xs text-muted-foreground">
+                  {selectedForExport.size} selected
+                </span>
+                <Button variant="outline" size="sm" onClick={handleExportSelected} disabled={selectedForExport.size === 0} className="h-8 gap-1.5 text-xs">
+                  <Download className="h-3.5 w-3.5" /> Export {selectedForExport.size > 0 ? selectedForExport.size : ''}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setSelectMode(false); setSelectedForExport(new Set()) }} className="h-8 text-xs text-muted-foreground">
+                  Cancel
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         {builderMode !== 'closed' && (
           <div className="mb-8">
             <ConfigBuilder
@@ -1048,6 +1146,9 @@ export default function ConfigurationsPage() {
               Define steps, pull in fields from the library, choose outputs, and create a reusable generation workflow.
             </p>
             <div className="mt-6 flex items-center gap-3">
+              <Button variant="outline" onClick={handleImport} className="gap-2">
+                <Upload className="h-4 w-4" /> Import
+              </Button>
               <Button variant="outline" onClick={() => setWizardOpen(true)} className="gap-2">
                 <Wand2 className="h-4 w-4" /> AI Wizard
               </Button>
@@ -1066,6 +1167,14 @@ export default function ConfigurationsPage() {
               return (
                 <div key={config.id} className="group rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/30">
                   <div className="flex items-start justify-between gap-4">
+                    {selectMode && (
+                      <button
+                        onClick={() => toggleExportSelect(config.id)}
+                        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${selectedForExport.has(config.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/30 hover:border-primary/50'}`}
+                      >
+                        {selectedForExport.has(config.id) && <Check className="h-3 w-3" />}
+                      </button>
+                    )}
                     <div className="min-w-0 flex-1">
                       <h3 className="text-base font-semibold text-foreground">{config.name}</h3>
                       {config.description && (

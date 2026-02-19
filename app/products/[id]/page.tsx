@@ -12,6 +12,8 @@ import type {
   Annotation,
   DissectionData,
   DeeperData,
+  AssistantData,
+  AssistantSuggestion,
 } from '@/lib/product-types'
 import { LoginScreen } from '@/components/login-screen'
 import { ProductAnnotations } from '@/components/product-annotation'
@@ -21,6 +23,13 @@ import { ChecklistSectionDetail } from '@/components/checklist-section-detail'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
 import {
   BookOpen,
   LogOut,
@@ -37,6 +46,13 @@ import {
   Pencil,
   X,
   Check,
+  Sparkles,
+  Target,
+  Lightbulb,
+  AlertTriangle,
+  FileText,
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react'
 
 type SelectedNode =
@@ -107,6 +123,12 @@ export default function ProductEditorPage() {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
 
+  // Smart Assistant state
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantLoading, setAssistantLoading] = useState(false)
+  const [assistantData, setAssistantData] = useState<AssistantData | null>(null)
+  const [sectionAssistantLoading, setSectionAssistantLoading] = useState<string | null>(null)
+
   useEffect(() => {
     if (!productId) return
     const p = productStorage.getById(productId)
@@ -114,6 +136,7 @@ export default function ProductEditorPage() {
       setProduct(p)
       setDissectionMap(p.dissections || {})
       setDeeperMap(p.deeperQuestions || {})
+      if (p.assistantData) setAssistantData(p.assistantData)
       const otDef = getOutputType(p.outputType)
       setOutputTypeDef(otDef || null)
       const useSectionNav = SECTION_NAV_TYPES.has(p.outputType)
@@ -159,6 +182,7 @@ export default function ProductEditorPage() {
       ...product,
       dissections: dissectionMap,
       deeperQuestions: deeperMap,
+      assistantData: assistantData || undefined,
     })
     if (updated) {
       setProduct(updated)
@@ -170,7 +194,7 @@ export default function ProductEditorPage() {
       setSaveStatus('idle')
       toast.error('Failed to save')
     }
-  }, [product, dissectionMap, deeperMap])
+  }, [product, dissectionMap, deeperMap, assistantData])
 
   // Element editing
   const updateElementField = useCallback(
@@ -403,6 +427,117 @@ export default function ProductEditorPage() {
     setEditValue('')
   }
 
+  const buildSectionsPayload = useCallback(() => {
+    if (!product || !outputTypeDef) return []
+    const primaryKey = getPrimaryField(outputTypeDef).key
+    return product.sections.map((s, sIdx) => {
+      const visibleEls = s.elements.filter((el) => !el.hidden)
+      const sectionAnnCount = visibleEls.reduce(
+        (sum, _, eIdx) => sum + (product.annotations[`${sIdx}-${eIdx}`]?.length || 0), 0
+      ) + (product.annotations[`section-${sIdx}`]?.length || 0)
+      return {
+        name: s.name,
+        description: s.description,
+        elementCount: visibleEls.length,
+        annotationCount: sectionAnnCount,
+        sampleElements: visibleEls.map(
+          (el) => el.fields[primaryKey] || Object.values(el.fields)[0] || ''
+        ),
+      }
+    })
+  }, [product, outputTypeDef])
+
+  const handleAssistant = useCallback(async () => {
+    if (!product || !outputTypeDef) return
+    setAssistantOpen(true)
+    setAssistantLoading(true)
+    try {
+      const sectionsPayload = buildSectionsPayload()
+      const contextEntries = getContextEntries(product)
+      const contextSummary = contextEntries.map((e) => `${e.label}: ${e.value}`).join(', ')
+
+      const res = await fetch('/api/product-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product.name,
+          productDescription: product.description,
+          outputType: outputTypeDef.name,
+          contextSummary,
+          sections: sectionsPayload,
+          annotationCount: Object.values(product.annotations).reduce((sum, arr) => sum + arr.length, 0),
+          elementCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => !el.hidden).length, 0),
+          hiddenCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => el.hidden).length, 0),
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Request failed')
+      }
+      const data = await res.json()
+      const persisted: AssistantData = { ...data, analyzedAt: new Date().toISOString() }
+      setAssistantData(persisted)
+      setHasUnsavedChanges(true)
+      setSaveStatus('idle')
+    } catch (err) {
+      toast.error('Assistant failed', { description: err instanceof Error ? err.message : 'Please try again' })
+    } finally {
+      setAssistantLoading(false)
+    }
+  }, [product, outputTypeDef, buildSectionsPayload])
+
+  const handleSectionAssistant = useCallback(async (sectionName: string) => {
+    if (!product || !outputTypeDef) return
+    setSectionAssistantLoading(sectionName)
+    try {
+      const sectionsPayload = buildSectionsPayload()
+      const contextEntries = getContextEntries(product)
+      const contextSummary = contextEntries.map((e) => `${e.label}: ${e.value}`).join(', ')
+
+      const res = await fetch('/api/product-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product.name,
+          productDescription: product.description,
+          outputType: outputTypeDef.name,
+          contextSummary,
+          sections: sectionsPayload,
+          annotationCount: Object.values(product.annotations).reduce((sum, arr) => sum + arr.length, 0),
+          elementCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => !el.hidden).length, 0),
+          hiddenCount: product.sections.reduce((sum, s) => sum + s.elements.filter((el) => el.hidden).length, 0),
+          focusSection: sectionName,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Request failed')
+      }
+      const data = await res.json()
+      const newSuggestions = (data.suggestions || []) as AssistantSuggestion[]
+
+      setAssistantData((prev) => {
+        const existingSuggestions = prev?.suggestions.filter(
+          (s) => s.targetSection !== sectionName
+        ) || []
+        const merged: AssistantData = {
+          suggestions: [...existingSuggestions, ...newSuggestions],
+          overallAssessment: prev?.overallAssessment || data.overallAssessment || '',
+          completenessScore: prev?.completenessScore ?? data.completenessScore ?? 0,
+          analyzedAt: new Date().toISOString(),
+        }
+        return merged
+      })
+      setHasUnsavedChanges(true)
+      setSaveStatus('idle')
+      toast.success(`Analysis for "${sectionName}" complete`)
+    } catch (err) {
+      toast.error('Section analysis failed', { description: err instanceof Error ? err.message : 'Please try again' })
+    } finally {
+      setSectionAssistantLoading(null)
+    }
+  }, [product, outputTypeDef, buildSectionsPayload])
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -494,6 +629,10 @@ export default function ProductEditorPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleAssistant} disabled={assistantLoading} className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5">
+            {assistantLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Smart Assistant
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport} disabled={exportLoading} className="gap-1.5">
             {exportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             Export
@@ -544,6 +683,7 @@ export default function ProductEditorPage() {
               const annotationsInSection = section.elements.reduce((sum, _, eIdx) => sum + (product.annotations[`${sIndex}-${eIdx}`]?.length || 0), 0)
               const sectionAnnotations = product.annotations[`section-${sIndex}`]?.length || 0
               const totalAnnotations = annotationsInSection + sectionAnnotations
+              const sectionSuggestionCount = assistantData?.suggestions.filter((s) => s.targetSection === section.name).length || 0
               const useSectionNav = SECTION_NAV_TYPES.has(product.outputType)
 
               if (useSectionNav) {
@@ -567,6 +707,11 @@ export default function ProductEditorPage() {
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center gap-1 pr-1">
+                        {sectionSuggestionCount > 0 && (
+                          <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600" title={`${sectionSuggestionCount} suggestions`}>
+                            <Sparkles className="inline h-2.5 w-2.5" /> {sectionSuggestionCount}
+                          </span>
+                        )}
                         {totalAnnotations > 0 && (
                           <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{totalAnnotations}</span>
                         )}
@@ -584,6 +729,11 @@ export default function ProductEditorPage() {
                   <div className="flex items-center justify-between px-2 py-3">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-primary">{section.name}</span>
                     <div className="flex items-center gap-1">
+                      {sectionSuggestionCount > 0 && (
+                        <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600" title={`${sectionSuggestionCount} suggestions`}>
+                          <Sparkles className="inline h-2.5 w-2.5" /> {sectionSuggestionCount}
+                        </span>
+                      )}
                       {totalAnnotations > 0 && (
                         <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{totalAnnotations}</span>
                       )}
@@ -673,7 +823,75 @@ export default function ProductEditorPage() {
                 </p>
               </div>
             ) : selectedNode.type === 'section' ? (
-              <div className="mx-auto w-full px-6 py-4 pb-12">
+              <div className="mx-auto w-full space-y-4 px-6 py-4 pb-12">
+                {/* Analyze section button */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSectionAssistant(selectedSection.name)}
+                    disabled={sectionAssistantLoading === selectedSection.name}
+                    className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
+                  >
+                    {sectionAssistantLoading === selectedSection.name ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
+                    ) : (
+                      <><Sparkles className="h-3 w-3" /> Analyze this section</>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Inline assistant suggestions for this section */}
+                {(() => {
+                  const sectionSuggestions = assistantData?.suggestions.filter(
+                    (s) => s.targetSection === selectedSection.name
+                  ) || []
+                  if (sectionSuggestions.length === 0) return null
+                  const priorityColors: Record<string, string> = {
+                    high: 'border-red-500/20 bg-red-500/5',
+                    medium: 'border-amber-500/20 bg-amber-500/5',
+                    low: 'border-green-500/20 bg-green-500/5',
+                  }
+                  const priorityBadge: Record<string, string> = {
+                    high: 'bg-red-500/10 text-red-600',
+                    medium: 'bg-amber-500/10 text-amber-600',
+                    low: 'bg-green-500/10 text-green-600',
+                  }
+                  const catIcons: Record<string, React.ReactNode> = {
+                    annotation: <MessageSquareText className="h-3 w-3" />,
+                    content: <FileText className="h-3 w-3" />,
+                    structure: <Layers className="h-3 w-3" />,
+                    audience: <Target className="h-3 w-3" />,
+                    enrichment: <Sparkles className="h-3 w-3" />,
+                  }
+                  return (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-semibold text-primary">
+                          Smart Assistant — {sectionSuggestions.length} suggestion{sectionSuggestions.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {sectionSuggestions.map((s, i) => (
+                          <div key={i} className={cn('rounded-md border p-3', priorityColors[s.priority] || 'border-border bg-card')}>
+                            <div className="mb-1 flex items-center gap-2">
+                              <span className="flex h-5 w-5 items-center justify-center rounded text-primary">
+                                {catIcons[s.category] || <Lightbulb className="h-3 w-3" />}
+                              </span>
+                              <span className="text-xs font-semibold text-foreground">{s.title}</span>
+                              <span className={cn('ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', priorityBadge[s.priority] || '')}>
+                                {s.priority}
+                              </span>
+                            </div>
+                            <p className="pl-7 text-[11px] leading-relaxed text-muted-foreground">{s.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 <ChecklistSectionDetail
                   section={selectedSection}
                   sIndex={selectedNode.sIndex}
@@ -691,13 +909,79 @@ export default function ProductEditorPage() {
               </div>
             ) : (
               <div className="mx-auto w-full space-y-5 px-6 py-4 pb-12">
-                {/* Section badge */}
+                {/* Section badge + analyze button */}
                 <div>
-                  <div className="mb-2.5 inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
-                    {selectedSection.name}
+                  <div className="mb-2.5 flex items-center gap-3">
+                    <div className="inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                      {selectedSection.name}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSectionAssistant(selectedSection.name)}
+                      disabled={sectionAssistantLoading === selectedSection.name}
+                      className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
+                    >
+                      {sectionAssistantLoading === selectedSection.name ? (
+                        <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
+                      ) : (
+                        <><Sparkles className="h-3 w-3" /> Analyze section</>
+                      )}
+                    </Button>
                   </div>
                   <p className="text-sm leading-relaxed text-muted-foreground">{selectedSection.description}</p>
                 </div>
+
+                {/* Inline assistant suggestions for this section */}
+                {(() => {
+                  const sectionSuggestions = assistantData?.suggestions.filter(
+                    (s) => s.targetSection === selectedSection.name
+                  ) || []
+                  if (sectionSuggestions.length === 0) return null
+                  const priorityColors: Record<string, string> = {
+                    high: 'border-red-500/20 bg-red-500/5',
+                    medium: 'border-amber-500/20 bg-amber-500/5',
+                    low: 'border-green-500/20 bg-green-500/5',
+                  }
+                  const priorityBadge: Record<string, string> = {
+                    high: 'bg-red-500/10 text-red-600',
+                    medium: 'bg-amber-500/10 text-amber-600',
+                    low: 'bg-green-500/10 text-green-600',
+                  }
+                  const catIcons: Record<string, React.ReactNode> = {
+                    annotation: <MessageSquareText className="h-3 w-3" />,
+                    content: <FileText className="h-3 w-3" />,
+                    structure: <Layers className="h-3 w-3" />,
+                    audience: <Target className="h-3 w-3" />,
+                    enrichment: <Sparkles className="h-3 w-3" />,
+                  }
+                  return (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-semibold text-primary">
+                          Smart Assistant — {sectionSuggestions.length} suggestion{sectionSuggestions.length !== 1 ? 's' : ''} for this section
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {sectionSuggestions.map((s, i) => (
+                          <div key={i} className={cn('rounded-md border p-3', priorityColors[s.priority] || 'border-border bg-card')}>
+                            <div className="mb-1 flex items-center gap-2">
+                              <span className="flex h-5 w-5 items-center justify-center rounded text-primary">
+                                {catIcons[s.category] || <Lightbulb className="h-3 w-3" />}
+                              </span>
+                              <span className="text-xs font-semibold text-foreground">{s.title}</span>
+                              <span className={cn('ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', priorityBadge[s.priority] || '')}>
+                                {s.priority}
+                              </span>
+                            </div>
+                            <p className="pl-7 text-[11px] leading-relaxed text-muted-foreground">{s.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Output-type-specific element rendering */}
                 {selectedNode.type === 'element' && selectedElement ? (
@@ -804,6 +1088,141 @@ export default function ProductEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Smart Assistant Sheet */}
+      <Sheet open={assistantOpen} onOpenChange={setAssistantOpen}>
+        <SheetContent side="right" className="w-[440px] sm:max-w-[440px] overflow-y-auto">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Smart Assistant
+            </SheetTitle>
+            <SheetDescription>
+              AI-powered suggestions to elevate your product beyond raw generated content.
+              {assistantData?.analyzedAt && (
+                <span className="mt-1 block text-[11px] text-muted-foreground/70">
+                  Last analyzed {new Date(assistantData.analyzedAt).toLocaleString()}
+                </span>
+              )}
+            </SheetDescription>
+          </SheetHeader>
+
+          {assistantLoading ? (
+            <div className="space-y-4 pt-4">
+              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Analyzing your product...</p>
+                  <p className="text-xs text-muted-foreground">Reviewing content, structure, and enrichment opportunities</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="space-y-2 rounded-lg border border-border p-4">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : assistantData ? (
+            <div className="space-y-6 pt-2">
+              {/* Completeness Score */}
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product Readiness</span>
+                  <span className={cn(
+                    'text-lg font-bold',
+                    assistantData.completenessScore >= 75 ? 'text-green-600' :
+                    assistantData.completenessScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                  )}>
+                    {assistantData.completenessScore}%
+                  </span>
+                </div>
+                <div className="mb-3 h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      assistantData.completenessScore >= 75 ? 'bg-green-500' :
+                      assistantData.completenessScore >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                    )}
+                    style={{ width: `${assistantData.completenessScore}%` }}
+                  />
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">{assistantData.overallAssessment}</p>
+              </div>
+
+              {/* Suggestions grouped by category */}
+              {(() => {
+                const categoryMeta: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                  annotation: { label: 'Add Annotations', icon: <MessageSquareText className="h-4 w-4" />, color: 'text-blue-600 bg-blue-500/10' },
+                  content: { label: 'Improve Content', icon: <FileText className="h-4 w-4" />, color: 'text-purple-600 bg-purple-500/10' },
+                  structure: { label: 'Restructure', icon: <Layers className="h-4 w-4" />, color: 'text-indigo-600 bg-indigo-500/10' },
+                  audience: { label: 'Audience Fit', icon: <Target className="h-4 w-4" />, color: 'text-green-600 bg-green-500/10' },
+                  distribution: { label: 'Distribution', icon: <BarChart3 className="h-4 w-4" />, color: 'text-orange-600 bg-orange-500/10' },
+                  enrichment: { label: 'AI Enrichment', icon: <Sparkles className="h-4 w-4" />, color: 'text-primary bg-primary/10' },
+                }
+                const priorityColors: Record<string, string> = {
+                  high: 'bg-red-500/10 text-red-600 border-red-500/20',
+                  medium: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+                  low: 'bg-green-500/10 text-green-600 border-green-500/20',
+                }
+                const grouped: Record<string, typeof assistantData.suggestions> = {}
+                for (const s of assistantData.suggestions) {
+                  ;(grouped[s.category] ??= []).push(s)
+                }
+                return Object.entries(grouped).map(([cat, items]) => {
+                  const meta = categoryMeta[cat] || { label: cat, icon: <Lightbulb className="h-4 w-4" />, color: 'text-muted-foreground bg-muted' }
+                  return (
+                    <div key={cat}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className={cn('flex h-7 w-7 items-center justify-center rounded-md', meta.color)}>
+                          {meta.icon}
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">{meta.label}</span>
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{items.length}</span>
+                      </div>
+                      <div className="space-y-2 pl-9">
+                        {items.map((suggestion, idx) => (
+                          <div key={idx} className="rounded-lg border border-border bg-card p-3">
+                            <div className="mb-1 flex items-start justify-between gap-2">
+                              <span className="text-sm font-medium text-foreground">{suggestion.title}</span>
+                              <span className={cn('shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase', priorityColors[suggestion.priority] || '')}>
+                                {suggestion.priority}
+                              </span>
+                            </div>
+                            <p className="text-xs leading-relaxed text-muted-foreground">{suggestion.description}</p>
+                            {suggestion.targetSection && (
+                              <p className="mt-1.5 text-[10px] font-medium text-primary">
+                                Section: {suggestion.targetSection}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+
+              {/* Refresh button */}
+              <div className="border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAssistant}
+                  disabled={assistantLoading}
+                  className="w-full gap-2"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Re-analyze product
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

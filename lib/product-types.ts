@@ -45,6 +45,22 @@ export interface DeeperData {
   thirdOrder: { question: string; reasoning: string }[]
 }
 
+export interface AssistantSuggestion {
+  category: string
+  title: string
+  description: string
+  priority: string
+  actionType: string
+  targetSection: string
+}
+
+export interface AssistantData {
+  suggestions: AssistantSuggestion[]
+  overallAssessment: string
+  completenessScore: number
+  analyzedAt: string
+}
+
 export interface Product {
   id: string
   createdAt: string
@@ -76,6 +92,9 @@ export interface Product {
   // Enrichments (currently used by 'questions' output type)
   dissections?: Record<string, DissectionData>
   deeperQuestions?: Record<string, DeeperData>
+
+  // Smart assistant analysis
+  assistantData?: AssistantData
 
   // Annotations keyed by "sectionIndex-elementIndex"
   annotations: Record<string, Annotation[]>
