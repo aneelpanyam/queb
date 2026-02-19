@@ -31,7 +31,18 @@ import {
   Layers,
   RotateCcw,
   ScrollText,
+  Sparkles,
+  Loader2,
+  Wand2,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 // ============================================================
 // Types for the builder form
@@ -838,6 +849,12 @@ export default function ConfigurationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [builderInit, setBuilderInit] = useState<BuilderState>(emptyBuilder())
 
+  // AI Wizard state
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardPrompt, setWizardPrompt] = useState('')
+  const [wizardLoading, setWizardLoading] = useState(false)
+  const [wizardError, setWizardError] = useState<string | null>(null)
+
   useEffect(() => {
     setConfigs(configStorage.getAll())
     setAllFields(fieldStorage.getAll())
@@ -891,6 +908,72 @@ export default function ConfigurationsPage() {
     toast.success('Configuration deleted')
   }
 
+  const handleWizardGenerate = async () => {
+    if (!wizardPrompt.trim()) return
+    setWizardLoading(true)
+    setWizardError(null)
+    try {
+      const res = await fetch('/api/generate-configuration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: wizardPrompt.trim(),
+          availableFields: allFields.map((f) => ({
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            category: f.category,
+          })),
+          availableOutputTypes: allOutputTypes.map((ot) => ({
+            id: ot.id,
+            name: ot.name,
+            description: ot.description,
+            sectionLabel: ot.sectionLabel,
+            elementLabel: ot.elementLabel,
+          })),
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Request failed')
+      }
+      const { configuration } = await res.json()
+
+      const builderState: BuilderState = {
+        name: configuration.name || '',
+        description: configuration.description || '',
+        steps: (configuration.steps || []).map((step: { name: string; description: string; fieldIds: string[] }, i: number) => ({
+          id: `s-${Date.now()}-${i}`,
+          name: step.name,
+          description: step.description || '',
+          fields: (step.fieldIds || [])
+            .filter((fid: string) => allFields.some((f) => f.id === fid))
+            .map((fid: string) => ({ fieldId: fid, required: false })),
+        })),
+        outputs: (configuration.outputs || []).map((out: {
+          outputTypeId: string
+          sectionDrivers?: { name: string; description: string }[]
+          instructionDirectives?: { label: string; content: string }[]
+        }) => ({
+          outputTypeId: out.outputTypeId,
+          sectionDrivers: out.sectionDrivers?.length ? out.sectionDrivers : undefined,
+          instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
+        })),
+      }
+
+      setWizardOpen(false)
+      setWizardPrompt('')
+      setBuilderInit(builderState)
+      setEditingId(null)
+      setBuilderMode('create')
+      toast.success('Configuration generated! Review and save below.')
+    } catch (err) {
+      setWizardError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setWizardLoading(false)
+    }
+  }
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -934,9 +1017,14 @@ export default function ConfigurationsPage() {
             </p>
           </div>
           {builderMode === 'closed' && (
-            <Button onClick={openCreate} className="gap-2">
-              <Plus className="h-4 w-4" /> New Configuration
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setWizardOpen(true)} className="gap-2">
+                <Wand2 className="h-4 w-4" /> AI Wizard
+              </Button>
+              <Button onClick={openCreate} className="gap-2">
+                <Plus className="h-4 w-4" /> New Configuration
+              </Button>
+            </div>
           )}
         </div>
 
@@ -959,9 +1047,14 @@ export default function ConfigurationsPage() {
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
               Define steps, pull in fields from the library, choose outputs, and create a reusable generation workflow.
             </p>
-            <Button onClick={openCreate} className="mt-6 gap-2">
-              <Plus className="h-4 w-4" /> Create Your First Configuration
-            </Button>
+            <div className="mt-6 flex items-center gap-3">
+              <Button variant="outline" onClick={() => setWizardOpen(true)} className="gap-2">
+                <Wand2 className="h-4 w-4" /> AI Wizard
+              </Button>
+              <Button onClick={openCreate} className="gap-2">
+                <Plus className="h-4 w-4" /> Create Manually
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -1013,6 +1106,85 @@ export default function ConfigurationsPage() {
             })}
           </div>
         )}
+        {/* AI Wizard Dialog */}
+        <Dialog open={wizardOpen} onOpenChange={(open) => { if (!wizardLoading) { setWizardOpen(open); if (!open) setWizardError(null) } }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5 text-primary" />
+                AI Configuration Wizard
+              </DialogTitle>
+              <DialogDescription>
+                Describe what you want to generate in plain English. The AI will design a complete configuration with steps, fields, output types, section drivers, and instruction directives.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  What would you like to create?
+                </label>
+                <Textarea
+                  value={wizardPrompt}
+                  onChange={(e) => setWizardPrompt(e.target.value)}
+                  placeholder={'e.g. "Know your role: Pain points of CISO"\n\nor\n\n"An email course teaching SaaS founders how to reduce churn, organized by lifecycle stage"'}
+                  rows={5}
+                  className="resize-none"
+                  disabled={wizardLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && wizardPrompt.trim() && !wizardLoading) {
+                      handleWizardGenerate()
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Be specific about the topic, target audience, and type of content you want.
+                </p>
+              </div>
+
+              {wizardError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {wizardError}
+                </div>
+              )}
+
+              {wizardLoading && (
+                <div className="flex items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Designing your configuration...</p>
+                    <p className="text-xs text-muted-foreground">Choosing fields, output types, drivers, and directives</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => { setWizardOpen(false); setWizardError(null) }}
+                disabled={wizardLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleWizardGenerate}
+                disabled={!wizardPrompt.trim() || wizardLoading}
+                className="gap-2"
+              >
+                {wizardLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" /> Generate Configuration
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
