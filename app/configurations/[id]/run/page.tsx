@@ -69,6 +69,24 @@ interface ApiDecisionDomain {
   decisions: Record<string, string>[]
 }
 
+interface ApiDossierSection {
+  sectionName: string
+  sectionDescription: string
+  briefings: Record<string, string>[]
+}
+
+interface ApiPlaybookPhase {
+  phaseName: string
+  phaseDescription: string
+  plays: Record<string, string>[]
+}
+
+interface ApiCheatSheetCategory {
+  categoryName: string
+  categoryDescription: string
+  entries: Record<string, string>[]
+}
+
 function toFields(obj: Record<string, string>): Record<string, string> {
   const fields: Record<string, string> = {}
   for (const [k, v] of Object.entries(obj)) {
@@ -122,6 +140,30 @@ function decisionDomainsToSections(domains: ApiDecisionDomain[]): ProductSection
     name: d.domainName,
     description: d.domainDescription,
     elements: d.decisions.map((dec) => ({ fields: toFields(dec) })),
+  }))
+}
+
+function dossierToSections(sections: ApiDossierSection[]): ProductSection[] {
+  return sections.map((s) => ({
+    name: s.sectionName,
+    description: s.sectionDescription,
+    elements: s.briefings.map((b) => ({ fields: toFields(b) })),
+  }))
+}
+
+function playbookToSections(phases: ApiPlaybookPhase[]): ProductSection[] {
+  return phases.map((p) => ({
+    name: p.phaseName,
+    description: p.phaseDescription,
+    elements: p.plays.map((pl) => ({ fields: toFields(pl) })),
+  }))
+}
+
+function cheatSheetsToSections(categories: ApiCheatSheetCategory[]): ProductSection[] {
+  return categories.map((c) => ({
+    name: c.categoryName,
+    description: c.categoryDescription,
+    elements: c.entries.map((e) => ({ fields: toFields(e) })),
   }))
 }
 
@@ -251,6 +293,36 @@ export default function RunConfigPage() {
           const data: { domains: ApiDecisionDomain[] } = await res.json()
           if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = decisionDomainsToSections(data.domains)
+        } else if (co.outputTypeId === 'dossier') {
+          const res = await fetch('/api/generate-dossier', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contextPayload),
+          })
+          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
+          const data: { sections: ApiDossierSection[] } = await res.json()
+          if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+          sections = dossierToSections(data.sections)
+        } else if (co.outputTypeId === 'playbook') {
+          const res = await fetch('/api/generate-playbook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contextPayload),
+          })
+          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
+          const data: { phases: ApiPlaybookPhase[] } = await res.json()
+          if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
+          sections = playbookToSections(data.phases)
+        } else if (co.outputTypeId === 'cheat-sheets') {
+          const res = await fetch('/api/generate-cheat-sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contextPayload),
+          })
+          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
+          const data: { categories: ApiCheatSheetCategory[] } = await res.json()
+          if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
+          sections = cheatSheetsToSections(data.categories)
         } else {
           const res = await fetch('/api/generate-output', {
             method: 'POST',

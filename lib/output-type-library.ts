@@ -9,6 +9,9 @@ import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
 import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
 import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
 import { DECISION_DOMAINS } from '@/lib/decision-domains'
+import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
+import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
+import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 
 export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
@@ -233,6 +236,99 @@ GUIDELINES:
     defaultSectionDrivers: DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
     isBuiltIn: true,
   },
+  {
+    id: 'dossier',
+    name: 'Dossier',
+    description: 'Comprehensive intelligence briefings organized by research area with findings, implications, and evidence',
+    icon: 'FileSearch',
+    prompt: `You are a senior intelligence analyst and strategic research expert.
+
+TASK:
+Generate a comprehensive dossier organized by intelligence area.
+
+GUIDELINES:
+- Create thorough briefings for each intelligence area relevant to the context
+- Each briefing must include a clear title, summary, key findings, and strategic implications
+- Ground all analysis in evidence and observable signals, not speculation
+- Surface both risks and opportunities with equal rigor
+- Tailor the depth and focus to the specific context provided`,
+    sectionLabel: 'Intelligence Area',
+    elementLabel: 'Briefing',
+    fields: [
+      { key: 'title', label: 'Briefing Title', type: 'short-text', primary: true },
+      { key: 'summary', label: 'Executive Summary', type: 'long-text', color: 'blue', icon: 'FileText' },
+      { key: 'keyFindings', label: 'Key Findings', type: 'long-text', color: 'violet', icon: 'Search' },
+      { key: 'strategicImplications', label: 'Strategic Implications', type: 'long-text', color: 'amber', icon: 'Target' },
+      { key: 'evidence', label: 'Evidence & Sources', type: 'long-text', color: 'emerald', icon: 'BookOpen' },
+      { key: 'riskAssessment', label: 'Risk Assessment', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
+      { key: 'opportunities', label: 'Opportunities', type: 'long-text', color: 'green', icon: 'TrendingUp' },
+    ],
+    supportsDeepDive: true,
+    defaultSectionDrivers: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),
+    isBuiltIn: true,
+  },
+  {
+    id: 'playbook',
+    name: 'Playbook',
+    description: 'Step-by-step operational execution guides organized by phase with instructions, decision criteria, and tips',
+    icon: 'BookMarked',
+    prompt: `You are a senior operations strategist and execution expert.
+
+TASK:
+Generate a comprehensive playbook organized by execution phase.
+
+GUIDELINES:
+- Create 3-5 actionable plays per phase relevant to the context
+- Each play must include clear objectives, step-by-step instructions, and expected outcomes
+- Include decision criteria for key branching points
+- Surface common pitfalls and practical tips from experienced practitioners
+- Tailor everything to the specific context, constraints, and resources provided`,
+    sectionLabel: 'Phase',
+    elementLabel: 'Play',
+    fields: [
+      { key: 'title', label: 'Play Title', type: 'short-text', primary: true },
+      { key: 'objective', label: 'Objective', type: 'long-text', color: 'blue', icon: 'Target' },
+      { key: 'instructions', label: 'Step-by-Step Instructions', type: 'long-text', color: 'none', icon: 'ListOrdered' },
+      { key: 'decisionCriteria', label: 'Decision Criteria', type: 'long-text', color: 'violet', icon: 'GitBranch' },
+      { key: 'expectedOutcome', label: 'Expected Outcome', type: 'long-text', color: 'emerald', icon: 'CheckCircle' },
+      { key: 'commonPitfalls', label: 'Common Pitfalls', type: 'long-text', color: 'red', icon: 'AlertOctagon' },
+      { key: 'tips', label: 'Pro Tips', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
+      { key: 'timeEstimate', label: 'Time Estimate', type: 'short-text', color: 'blue', icon: 'Clock' },
+    ],
+    supportsDeepDive: true,
+    defaultSectionDrivers: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
+    isBuiltIn: true,
+  },
+  {
+    id: 'cheat-sheets',
+    name: 'Cheat Sheet',
+    description: 'Concise quick-reference cards organized by category with definitions, examples, and shortcuts',
+    icon: 'Zap',
+    prompt: `You are an expert educator and knowledge distiller.
+
+TASK:
+Generate a concise, scannable cheat sheet organized by reference category.
+
+GUIDELINES:
+- Create 4-8 entries per category, optimized for at-a-glance use
+- Each entry must be dense and practical — no fluff or filler
+- Include concrete examples and common mistakes for each entry
+- Prioritize the most important, most-referenced information
+- Tailor terminology and examples to the specific context provided`,
+    sectionLabel: 'Category',
+    elementLabel: 'Entry',
+    fields: [
+      { key: 'term', label: 'Term / Concept', type: 'short-text', primary: true },
+      { key: 'definition', label: 'Definition', type: 'long-text', color: 'blue', icon: 'BookOpen' },
+      { key: 'example', label: 'Example / Usage', type: 'long-text', color: 'emerald', icon: 'Code' },
+      { key: 'relatedConcepts', label: 'Related Concepts', type: 'short-text', color: 'violet', icon: 'Link' },
+      { key: 'commonMistakes', label: 'Common Mistakes', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
+      { key: 'quickTip', label: 'Quick Tip', type: 'short-text', color: 'amber', icon: 'Lightbulb' },
+    ],
+    supportsDeepDive: true,
+    defaultSectionDrivers: CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
+    isBuiltIn: true,
+  },
 ]
 
 // ============================================================
@@ -403,6 +499,50 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Hard choices', content: 'Surface decisions that are genuinely difficult — where reasonable people could disagree, where trade-offs are real, and where the "right" answer depends on priorities and constraints.' },
     { label: 'Tailoring', content: 'Tailor decisions to the specific role, their authority level, and organizational context.' },
   ],
+  dossier: [
+    { label: 'Role', content: 'You are a senior intelligence analyst and strategic research expert who produces rigorous, evidence-based briefings.' },
+    { label: 'Task', content: 'Generate 3-5 intelligence briefings for this research area.' },
+    { label: 'Relevance filter', content: 'Only generate briefings if this intelligence area is genuinely relevant to the given context. If not relevant, return an empty briefings array.' },
+    { label: 'Specificity', content: 'Every briefing must be specific to the described context — not a generic industry overview.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make the intelligence sharper and more actionable.' },
+    { label: 'Executive summary', content: 'The "summary" field must provide a concise executive summary — the key takeaway a busy decision-maker needs in 2-3 sentences.' },
+    { label: 'Key findings', content: 'The "keyFindings" field must present specific, concrete findings backed by observable signals, data points, or patterns — not vague generalizations.' },
+    { label: 'Strategic implications', content: 'The "strategicImplications" field must explain what these findings mean for the reader — how should they change their thinking, strategy, or actions?' },
+    { label: 'Evidence', content: 'The "evidence" field must cite the types of evidence, data sources, reports, or observable signals that support the findings. Be specific about what to look for.' },
+    { label: 'Risk assessment', content: 'Each briefing should include riskAssessment: what threats or vulnerabilities does this area reveal? What could go wrong and what is the likelihood?' },
+    { label: 'Opportunities', content: 'Each briefing should include opportunities: what openings, advantages, or leverage points does this intelligence reveal?' },
+    { label: 'Analytical rigor', content: 'Maintain analytical rigor — distinguish between confirmed facts, strong indicators, and speculative assessments. Flag confidence levels where appropriate.' },
+    { label: 'Tailoring', content: 'Tailor the intelligence to the specific context, industry, and decision-making needs provided.' },
+  ],
+  playbook: [
+    { label: 'Role', content: 'You are a senior operations strategist and execution expert who creates practical, field-tested playbooks.' },
+    { label: 'Task', content: 'Generate 3-5 actionable plays for this execution phase.' },
+    { label: 'Relevance filter', content: 'Only generate plays if this phase is genuinely relevant to the given context. If not relevant, return an empty plays array.' },
+    { label: 'Specificity', content: 'Every play must be specific to the described context — not generic process advice.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make plays more practical and grounded.' },
+    { label: 'Objective', content: 'The "objective" field must clearly state what this play accomplishes — the specific outcome or deliverable expected upon completion.' },
+    { label: 'Instructions', content: 'The "instructions" field must provide concrete, step-by-step guidance that someone could follow without additional research. Number the steps. Be specific about tools, methods, and sequences.' },
+    { label: 'Decision criteria', content: 'The "decisionCriteria" field must describe the key decision points within this play — when to proceed, when to pivot, and what signals to watch for. Use "If X, then Y" format where applicable.' },
+    { label: 'Expected outcome', content: 'The "expectedOutcome" field must describe what success looks like — the tangible deliverable, state, or result when this play is executed well.' },
+    { label: 'Common pitfalls', content: 'Each play should include commonPitfalls: the most frequent mistakes, shortcuts that backfire, and traps that derail execution.' },
+    { label: 'Pro tips', content: 'Each play should include tips: practical advice from experienced practitioners — insider knowledge that accelerates execution or improves quality.' },
+    { label: 'Time estimate', content: 'Each play should include timeEstimate: a realistic time range for completion (e.g., "2-4 hours", "1-2 weeks") accounting for the given context.' },
+    { label: 'Tailoring', content: 'Tailor plays to the specific context, team size, resources, and constraints provided.' },
+  ],
+  'cheat-sheets': [
+    { label: 'Role', content: 'You are an expert educator and knowledge distiller who creates scannable, high-density reference materials.' },
+    { label: 'Task', content: 'Generate 4-8 quick-reference entries for this category.' },
+    { label: 'Relevance filter', content: 'Only generate entries if this category is genuinely relevant to the given context. If not relevant, return an empty entries array.' },
+    { label: 'Density', content: 'Every entry must be concise and information-dense — optimize for scannability, not completeness. This is a cheat sheet, not a textbook.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make entries specific and immediately useful.' },
+    { label: 'Definition', content: 'The "definition" field must provide a clear, jargon-free explanation in 1-3 sentences. Lead with the most important information.' },
+    { label: 'Example', content: 'The "example" field must include a concrete, practical example showing the concept in action within the given context. Show, don\'t just tell.' },
+    { label: 'Related concepts', content: 'The "relatedConcepts" field should list 2-4 closely related terms or concepts — helping the reader build a mental map of the domain.' },
+    { label: 'Common mistakes', content: 'Each entry should include commonMistakes: the most frequent misunderstandings, misapplications, or errors people make with this concept.' },
+    { label: 'Quick tip', content: 'Each entry should include quickTip: a single, memorable piece of practical advice — the one thing an expert would tell a colleague in passing.' },
+    { label: 'Prioritization', content: 'Prioritize entries by how frequently they are referenced in practice — the most-used terms and concepts should come first.' },
+    { label: 'Tailoring', content: 'Tailor all entries to the specific context, industry terminology, and audience level provided.' },
+  ],
 }
 
 /** Returns default instruction directives for an output type, from definition or built-in fallback */
@@ -423,6 +563,9 @@ const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
     { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
   ],
   'decision-books': DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
+  dossier: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),
+  playbook: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
+  'cheat-sheets': CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
 }
 
 /** Returns default section drivers for an output type, from definition or built-in fallback */

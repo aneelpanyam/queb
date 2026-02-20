@@ -334,6 +334,132 @@ export const DEEP_DIVE_FRAMEWORKS: Record<string, DeepDiveFramework[]> = {
       bestFor: 'in-depth competitive comparison across the entire customer lifecycle',
     },
   ],
+
+  dossier: [
+    {
+      id: 'pestel',
+      name: 'PESTEL Analysis',
+      shortDescription: 'Political, Economic, Social, Technological, Environmental, Legal factors',
+      steps: [
+        'POLITICAL: What government policies, regulations, political stability, or geopolitical factors affect this subject? What political risks or opportunities exist?',
+        'ECONOMIC: What economic conditions, market trends, currency factors, or fiscal policies impact this subject? How do macroeconomic forces shape their position?',
+        'SOCIAL: What demographic trends, cultural shifts, consumer behavior patterns, or social attitudes are relevant? How is the social landscape evolving?',
+        'TECHNOLOGICAL: What technological changes, innovations, disruptions, or digital trends affect this subject? Where is technology creating opportunity or threat?',
+        'ENVIRONMENTAL: What environmental regulations, sustainability pressures, climate risks, or resource constraints apply? How is the environmental landscape shifting?',
+        'LEGAL: What legal frameworks, compliance requirements, intellectual property issues, or litigation risks are relevant? What legal changes are on the horizon?',
+      ],
+      bestFor: 'broad environmental scanning and macro-level intelligence gathering',
+    },
+    {
+      id: 'porters-five-forces',
+      name: "Porter's Five Forces",
+      shortDescription: 'Analyze competitive intensity through five structural forces',
+      steps: [
+        'COMPETITIVE RIVALRY: How intense is competition in this space? How many competitors exist, and how do they differentiate?',
+        'THREAT OF NEW ENTRANTS: How easy is it for new players to enter? What barriers to entry exist — capital, regulation, brand loyalty, technology?',
+        'BARGAINING POWER OF SUPPLIERS: How much leverage do suppliers have? Are there few suppliers or many? Can they raise prices or reduce quality?',
+        'BARGAINING POWER OF BUYERS: How much leverage do customers have? Can they easily switch, negotiate, or go elsewhere?',
+        'THREAT OF SUBSTITUTES: What alternative solutions exist? How likely are customers to switch to a fundamentally different approach?',
+      ],
+      bestFor: 'understanding competitive dynamics and industry structure',
+    },
+    {
+      id: 'intelligence-cycle',
+      name: 'Intelligence Cycle',
+      shortDescription: 'Direction → Collection → Processing → Analysis → Dissemination',
+      steps: [
+        'DIRECTION: What is the key intelligence question? What decisions hinge on this information? What gaps in knowledge are most critical?',
+        'COLLECTION: What sources of information are available — public filings, industry reports, insider signals, social media, patent databases? What can be observed directly?',
+        'PROCESSING: How reliable is the collected information? What biases or gaps exist? How should raw data be organized and cross-referenced?',
+        'ANALYSIS: What patterns emerge? What do the data points collectively indicate? What are the competing hypotheses and which has the strongest evidence?',
+        'DISSEMINATION: What are the actionable takeaways? Who needs this intelligence and in what format? What confidence level should be assigned?',
+      ],
+      bestFor: 'systematic intelligence gathering where evidence quality and analytical rigor matter',
+    },
+  ],
+
+  playbook: [
+    {
+      id: 'pdca-playbook',
+      name: 'PDCA Cycle',
+      shortDescription: 'Plan → Do → Check → Act for continuous improvement',
+      steps: [
+        'PLAN: What is the specific objective of this play? What resources are needed, what could go wrong, and what does the execution plan look like step-by-step?',
+        'DO: Execute the plan — what are the critical actions, in what order? What should be documented during execution for later review?',
+        'CHECK: How will you measure whether this play succeeded? What metrics, observations, or feedback should be collected? How does the outcome compare to the plan?',
+        'ACT: Based on the results, what should be standardized, adjusted, or abandoned? What lessons feed into the next iteration?',
+      ],
+      bestFor: 'operational plays that benefit from iterative improvement and systematic learning',
+    },
+    {
+      id: 'after-action-review',
+      name: 'After-Action Review',
+      shortDescription: 'What was planned → What happened → Why → What next',
+      steps: [
+        'INTENDED OUTCOME: What was this play supposed to achieve? What were the specific goals, timeline, and success criteria?',
+        'ACTUAL OUTCOME: What actually happened? What went according to plan and what diverged? Be specific about the gap between intent and reality.',
+        'ROOT CAUSE ANALYSIS: Why did the outcome differ from the plan? What systemic, environmental, or execution factors contributed? Distinguish between controllable and uncontrollable factors.',
+        'SUSTAIN & IMPROVE: What worked well that should be repeated? What needs to change? What specific actions will prevent the same issues next time?',
+        'KNOWLEDGE CAPTURE: What insights should be documented and shared? Who else would benefit from these lessons?',
+      ],
+      bestFor: 'post-execution learning and improving playbook effectiveness over time',
+    },
+    {
+      id: 'sipoc',
+      name: 'SIPOC Analysis',
+      shortDescription: 'Suppliers → Inputs → Process → Outputs → Customers',
+      steps: [
+        'SUPPLIERS: Who or what provides the inputs needed for this play? What dependencies exist and how reliable are they?',
+        'INPUTS: What materials, information, approvals, or resources are required before this play can begin? What quality standards must they meet?',
+        'PROCESS: What are the key steps in executing this play? Map the critical path and identify bottlenecks or decision points.',
+        'OUTPUTS: What does this play produce — deliverables, decisions, artifacts, or state changes? What quality criteria must the outputs meet?',
+        'CUSTOMERS: Who receives the outputs? What are their expectations, and how will you know they are satisfied with the result?',
+      ],
+      bestFor: 'understanding the end-to-end flow of a play and identifying dependencies and handoffs',
+    },
+  ],
+
+  'cheat-sheets': [
+    {
+      id: 'feynman-technique',
+      name: 'Feynman Technique',
+      shortDescription: 'Explain simply → Identify gaps → Refine → Simplify further',
+      steps: [
+        'EXPLAIN SIMPLY: Can you explain this concept in plain language that a non-expert would understand? Write it out as if teaching a colleague.',
+        'IDENTIFY GAPS: Where does the explanation break down? What parts are you hand-waving over or using jargon to cover complexity?',
+        'REFINE: Go back to the source material for the parts you struggled with. Rebuild your understanding from first principles.',
+        'SIMPLIFY FURTHER: Rewrite the explanation even more concisely. Use analogies, concrete examples, and the simplest possible language.',
+      ],
+      bestFor: 'deepening understanding of concepts and ensuring the cheat sheet entry is genuinely clear',
+    },
+    {
+      id: 'blooms-taxonomy',
+      name: "Bloom's Taxonomy",
+      shortDescription: 'Remember → Understand → Apply → Analyze → Evaluate → Create',
+      steps: [
+        'REMEMBER: What are the key facts, terms, and definitions the reader must recall? What is the minimum viable knowledge?',
+        'UNDERSTAND: Can the reader explain the concept in their own words? What analogies or comparisons help build intuition?',
+        'APPLY: How does the reader use this concept in practice? What are the most common real-world applications?',
+        'ANALYZE: How does this concept break down into components? How does it relate to and differ from similar concepts?',
+        'EVALUATE: How does the reader judge when to use this concept vs. alternatives? What criteria guide the choice?',
+        'CREATE: How can the reader combine this concept with others to solve novel problems or create new approaches?',
+      ],
+      bestFor: 'ensuring cheat sheet entries support learning at multiple cognitive levels',
+    },
+    {
+      id: 'concept-mapping',
+      name: 'Concept Mapping',
+      shortDescription: 'Central concept → Relationships → Hierarchy → Cross-links',
+      steps: [
+        'CENTRAL CONCEPT: What is the core idea? Define it precisely and identify what makes it distinct from related concepts.',
+        'RELATIONSHIPS: What other concepts is this directly connected to? Map the primary relationships — "is a type of", "depends on", "leads to", "contrasts with".',
+        'HIERARCHY: Where does this concept sit in the larger knowledge structure? What are its parent categories and child concepts?',
+        'CROSS-LINKS: What unexpected connections exist between this concept and concepts in other domains? These cross-links often yield the most valuable insights.',
+        'PRACTICAL ANCHORS: What concrete examples, tools, or situations anchor this concept in the reader\'s daily work?',
+      ],
+      bestFor: 'building the "related concepts" connections and ensuring the cheat sheet forms a coherent knowledge map',
+    },
+  ],
 }
 
 export function getFrameworksForOutputType(outputType: string): DeepDiveFramework[] {
