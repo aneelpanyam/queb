@@ -962,6 +962,7 @@ export default function ProductEditorPage() {
                     onSaveEdit={saveEdit}
                     onCancelEdit={cancelEdit}
                     onEditValueChange={setEditValue}
+                    resolvedFields={product.resolvedFields}
                   />
                 ) : (
                   <h2 className="text-[16px] font-bold leading-tight tracking-tight text-foreground">{displayPrimary}</h2>

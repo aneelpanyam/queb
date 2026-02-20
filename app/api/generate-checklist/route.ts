@@ -13,6 +13,9 @@ const singleDimensionSchema = z.object({
       item: z.string().describe('A specific, actionable checklist item'),
       description: z.string().describe('Why this item matters and how to complete it properly'),
       priority: z.string().describe('High, Medium, or Low'),
+      commonMistakes: z.string().describe('What people typically get wrong on this item. Empty string if not applicable.'),
+      tips: z.string().describe('Practical advice from experienced practitioners. Empty string if not applicable.'),
+      verificationMethod: z.string().describe('What constitutes done — artifact or test proving completion. Empty string if not applicable.'),
     })
   ),
 })

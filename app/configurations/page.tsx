@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration, ConfigStep, ConfigStepField, ConfigOutput } from '@/lib/setup-config-types'
 import { fieldStorage, type FieldDefinition, computeDependencies, getTransitiveDependencies, sortFieldsByDependency } from '@/lib/field-library'
-import { outputTypeStorage, type OutputTypeDefinition, getDefaultSectionDrivers, getDefaultInstructionDirectives } from '@/lib/output-type-library'
+import { outputTypeStorage, type OutputTypeDefinition, type OutputTypeField, type FieldColor, getDefaultSectionDrivers, getDefaultInstructionDirectives } from '@/lib/output-type-library'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,7 @@ import {
   Wand2,
   Download,
   Upload,
+  ListChecks,
 } from 'lucide-react'
 import {
   Dialog,
@@ -63,6 +64,26 @@ interface BuilderState {
   steps: ConfigStep[]
   outputs: ConfigOutput[]
 }
+
+const FIELD_COLOR_OPTIONS: { value: FieldColor | ''; label: string }[] = [
+  { value: '', label: '—' },
+  { value: 'amber', label: 'Amber' },
+  { value: 'blue', label: 'Blue' },
+  { value: 'red', label: 'Red' },
+  { value: 'green', label: 'Green' },
+  { value: 'emerald', label: 'Emerald' },
+  { value: 'violet', label: 'Violet' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'none', label: 'None' },
+]
+
+const FIELD_ICON_OPTIONS = [
+  '', 'Target', 'ArrowUpRight', 'AlertTriangle', 'Shield', 'Zap', 'Clock', 'Mail',
+  'Sparkles', 'ThumbsUp', 'ThumbsDown', 'MessageSquare', 'GitBranch', 'Info',
+  'CheckCheck', 'ListChecks', 'BarChart3', 'AlertOctagon', 'Lightbulb', 'ClipboardCheck',
+  'Bookmark', 'Repeat', 'CalendarClock', 'Shuffle', 'FileText', 'ShieldQuestion',
+  'Trophy', 'DollarSign', 'Users', 'Compass', 'FileOutput', 'Scale', 'Swords',
+]
 
 const emptyBuilder = (): BuilderState => ({
   name: '',
@@ -302,6 +323,64 @@ function ConfigBuilder({
       ...p,
       outputs: p.outputs.map((o) =>
         o.outputTypeId === otId ? { ...o, instructionDirectives: undefined } : o
+      ),
+    }))
+  }
+
+  // Element field override management
+  const addFieldOverride = (otId: string) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, fieldOverrides: [...(o.fieldOverrides || []), { key: '', label: '', type: 'long-text' as const }] }
+          : o
+      ),
+    }))
+  }
+
+  const removeFieldOverride = (otId: string, idx: number) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const fields = [...(o.fieldOverrides || [])]
+        fields.splice(idx, 1)
+        return { ...o, fieldOverrides: fields.length > 0 ? fields : undefined }
+      }),
+    }))
+  }
+
+  const updateFieldOverride = (otId: string, idx: number, updates: Partial<OutputTypeField>) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) => {
+        if (o.outputTypeId !== otId) return o
+        const fields = [...(o.fieldOverrides || [])]
+        fields[idx] = { ...fields[idx], ...updates }
+        return { ...o, fieldOverrides: fields }
+      }),
+    }))
+  }
+
+  const resetFieldOverrides = (otId: string) => {
+    const otDef = allOutputTypes.find((ot) => ot.id === otId)
+    if (!otDef) return
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId
+          ? { ...o, fieldOverrides: otDef.fields.map((f) => ({ ...f })) }
+          : o
+      ),
+    }))
+  }
+
+  const clearFieldOverrides = (otId: string) => {
+    setState((p) => ({
+      ...p,
+      outputs: p.outputs.map((o) =>
+        o.outputTypeId === otId ? { ...o, fieldOverrides: undefined } : o
       ),
     }))
   }
@@ -603,6 +682,9 @@ function ConfigBuilder({
                     {hasCustomDirectives && (
                       <span className="ml-1.5 text-[10px] text-amber-600">{directives.length} directives</span>
                     )}
+                    {co.fieldOverrides && (
+                      <span className="ml-1.5 text-[10px] text-emerald-600">{co.fieldOverrides.length} fields</span>
+                    )}
                   </div>
                   <button onClick={() => removeOutput(co.outputTypeId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
                     <X className="h-3 w-3" />
@@ -799,6 +881,163 @@ function ConfigBuilder({
                         </div>
                       )}
                     </div>
+
+                    {/* Element fields */}
+                    {(() => {
+                      const fieldOverrides = co.fieldOverrides
+                      const hasCustomFields = fieldOverrides !== undefined
+                      const currentFields = fieldOverrides || []
+                      return (
+                        <div>
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <ListChecks className="h-3 w-3 text-primary/60" />
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                                Element Fields
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                — detail sections shown for each {otDef.elementLabel.toLowerCase()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {hasCustomFields && (
+                                <button
+                                  onClick={() => clearFieldOverrides(co.outputTypeId)}
+                                  className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  title="Use defaults (don't customize)"
+                                >
+                                  <X className="h-2.5 w-2.5" /> Use defaults
+                                </button>
+                              )}
+                              {hasCustomFields && (
+                                <button
+                                  onClick={() => resetFieldOverrides(co.outputTypeId)}
+                                  className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  title="Reset to output type defaults"
+                                >
+                                  <RotateCcw className="h-2.5 w-2.5" /> Reset
+                                </button>
+                              )}
+                              {hasCustomFields && (
+                                <button
+                                  onClick={() => addFieldOverride(co.outputTypeId)}
+                                  className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                                >
+                                  <Plus className="h-2.5 w-2.5" /> Add
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {hasCustomFields ? (
+                            currentFields.length === 0 ? (
+                              <div className="rounded-md border border-dashed border-border bg-card px-3 py-4 text-center">
+                                <p className="text-[11px] text-muted-foreground">
+                                  No element fields defined.
+                                </p>
+                                <button
+                                  onClick={() => resetFieldOverrides(co.outputTypeId)}
+                                  className="mt-1.5 text-[11px] font-medium text-primary hover:underline"
+                                >
+                                  Load {otDef.fields.length} defaults
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {currentFields.map((field, idx) => (
+                                  <div key={idx} className="group/field rounded-md border border-border bg-card px-2 py-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-emerald-500/10 text-[9px] font-bold text-emerald-700">
+                                        {idx + 1}
+                                      </span>
+                                      <input
+                                        value={field.key}
+                                        onChange={(e) => updateFieldOverride(co.outputTypeId, idx, { key: e.target.value.replace(/\s/g, '') })}
+                                        placeholder="key"
+                                        className="w-20 border-none bg-transparent px-0 text-[11px] font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                                      />
+                                      <input
+                                        value={field.label}
+                                        onChange={(e) => updateFieldOverride(co.outputTypeId, idx, { label: e.target.value })}
+                                        placeholder="Label"
+                                        className="min-w-0 flex-1 border-none bg-transparent px-0 text-[11px] font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                                      />
+                                      <select
+                                        value={field.type}
+                                        onChange={(e) => updateFieldOverride(co.outputTypeId, idx, { type: e.target.value as 'short-text' | 'long-text' })}
+                                        className="h-5 rounded border border-border bg-background px-1 text-[9px]"
+                                      >
+                                        <option value="short-text">Short</option>
+                                        <option value="long-text">Long</option>
+                                      </select>
+                                      <label className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                                        <input
+                                          type="radio"
+                                          name={`cfg-primary-${co.outputTypeId}-${idx}`}
+                                          checked={!!field.primary}
+                                          onChange={() => {
+                                            setState((p) => ({
+                                              ...p,
+                                              outputs: p.outputs.map((o) => {
+                                                if (o.outputTypeId !== co.outputTypeId) return o
+                                                return {
+                                                  ...o,
+                                                  fieldOverrides: (o.fieldOverrides || []).map((f, i) => ({
+                                                    ...f,
+                                                    primary: i === idx ? true : undefined,
+                                                  })),
+                                                }
+                                              }),
+                                            }))
+                                          }}
+                                        />
+                                        1st
+                                      </label>
+                                      <button
+                                        onClick={() => removeFieldOverride(co.outputTypeId, idx)}
+                                        className="rounded p-0.5 text-muted-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover/field:opacity-100"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                    {!field.primary && (
+                                      <div className="ml-6 mt-0.5 flex items-center gap-2">
+                                        <select
+                                          value={field.color || ''}
+                                          onChange={(e) => updateFieldOverride(co.outputTypeId, idx, { color: (e.target.value || undefined) as FieldColor | undefined })}
+                                          className="h-5 rounded border border-border bg-background px-1 text-[9px]"
+                                        >
+                                          {FIELD_COLOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
+                                        <select
+                                          value={field.icon || ''}
+                                          onChange={(e) => updateFieldOverride(co.outputTypeId, idx, { icon: e.target.value || undefined })}
+                                          className="h-5 rounded border border-border bg-background px-1 text-[9px]"
+                                        >
+                                          {FIELD_ICON_OPTIONS.map((i) => <option key={i} value={i}>{i || '— Icon —'}</option>)}
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          ) : (
+                            <div className="rounded-md border border-dashed border-border bg-card px-3 py-3 text-center">
+                              <p className="text-[11px] text-muted-foreground">
+                                Using {otDef.fields.length} default fields from {otDef.name}.
+                              </p>
+                              <button
+                                onClick={() => resetFieldOverrides(co.outputTypeId)}
+                                className="mt-1.5 flex items-center gap-0.5 mx-auto text-[11px] font-medium text-primary hover:underline"
+                              >
+                                <PencilSmall className="h-2.5 w-2.5" /> Customize fields
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
@@ -882,6 +1121,7 @@ interface AIOutput {
   outputTypeId: string
   sectionDrivers?: { name: string; description: string }[]
   instructionDirectives?: { label: string; content: string }[]
+  fields?: { key: string; label: string; type: 'short-text' | 'long-text'; primary?: boolean }[]
 }
 
 function ConfigurationsPageInner() {
@@ -965,6 +1205,12 @@ function ConfigurationsPageInner() {
           outputTypeId: out.outputTypeId,
           sectionDrivers: out.sectionDrivers?.length ? out.sectionDrivers : undefined,
           instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
+          fieldOverrides: out.fields?.length ? out.fields.map((f) => ({
+            key: f.key,
+            label: f.label,
+            type: f.type,
+            primary: f.primary || undefined,
+          })) : undefined,
         })),
       },
       createdFieldCount,
@@ -1073,6 +1319,7 @@ function ConfigurationsPageInner() {
             description: ot.description,
             sectionLabel: ot.sectionLabel,
             elementLabel: ot.elementLabel,
+            defaultFields: ot.fields.map((f) => ({ key: f.key, label: f.label, type: f.type })),
           })),
         }),
       })

@@ -13,6 +13,9 @@ const singleUseCaseSchema = z.object({
       prompt: z.string().describe('A complete, ready-to-use AI prompt template. Include placeholders like [specific detail] where the user should customize.'),
       context: z.string().describe('When to use this prompt — the specific situation or trigger'),
       expectedOutput: z.string().describe('What kind of output the user should expect from this prompt'),
+      variations: z.string().describe('2-3 alternative versions for different scenarios. Empty string if not applicable.'),
+      tips: z.string().describe('Practical advice for getting better results. Empty string if not applicable.'),
+      exampleOutput: z.string().describe('A short sample of what good output looks like. Empty string if not applicable.'),
     })
   ),
 })

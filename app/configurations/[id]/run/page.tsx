@@ -36,46 +36,52 @@ import {
 interface ApiPerspective {
   perspectiveName: string
   perspectiveDescription: string
-  questions: { question: string; relevance: string; infoPrompt: string }[]
+  questions: Record<string, string>[]
 }
 
 interface ApiChecklistDimension {
   dimensionName: string
   dimensionDescription: string
-  items: { item: string; description: string; priority: string }[]
+  items: Record<string, string>[]
 }
 
 interface ApiEmailModule {
   moduleName: string
   moduleDescription: string
-  emails: { subject: string; body: string; callToAction: string }[]
+  emails: Record<string, string>[]
 }
 
 interface ApiPromptCategory {
   categoryName: string
   categoryDescription: string
-  prompts: { prompt: string; context: string; expectedOutput: string }[]
+  prompts: Record<string, string>[]
 }
 
 interface ApiBattleCardSection {
   sectionName: string
   sectionDescription: string
-  cards: { title: string; strengths: string; weaknesses: string; talkingPoints: string }[]
+  cards: Record<string, string>[]
 }
 
 interface ApiDecisionDomain {
   domainName: string
   domainDescription: string
-  decisions: { decision: string; context: string; options: string; criteria: string }[]
+  decisions: Record<string, string>[]
+}
+
+function toFields(obj: Record<string, string>): Record<string, string> {
+  const fields: Record<string, string> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v) fields[k] = v
+  }
+  return fields
 }
 
 function perspectivesToSections(perspectives: ApiPerspective[]): ProductSection[] {
   return perspectives.map((p) => ({
     name: p.perspectiveName,
     description: p.perspectiveDescription,
-    elements: p.questions.map((q) => ({
-      fields: { question: q.question, relevance: q.relevance, infoPrompt: q.infoPrompt },
-    })),
+    elements: p.questions.map((q) => ({ fields: toFields(q) })),
   }))
 }
 
@@ -83,9 +89,7 @@ function checklistToSections(dimensions: ApiChecklistDimension[]): ProductSectio
   return dimensions.map((d) => ({
     name: d.dimensionName,
     description: d.dimensionDescription,
-    elements: d.items.map((i) => ({
-      fields: { item: i.item, description: i.description, priority: i.priority },
-    })),
+    elements: d.items.map((i) => ({ fields: toFields(i) })),
   }))
 }
 
@@ -93,9 +97,7 @@ function emailCourseToSections(modules: ApiEmailModule[]): ProductSection[] {
   return modules.map((m) => ({
     name: m.moduleName,
     description: m.moduleDescription,
-    elements: m.emails.map((e) => ({
-      fields: { subject: e.subject, body: e.body, callToAction: e.callToAction },
-    })),
+    elements: m.emails.map((e) => ({ fields: toFields(e) })),
   }))
 }
 
@@ -103,9 +105,7 @@ function promptsToSections(categories: ApiPromptCategory[]): ProductSection[] {
   return categories.map((c) => ({
     name: c.categoryName,
     description: c.categoryDescription,
-    elements: c.prompts.map((p) => ({
-      fields: { prompt: p.prompt, context: p.context, expectedOutput: p.expectedOutput },
-    })),
+    elements: c.prompts.map((p) => ({ fields: toFields(p) })),
   }))
 }
 
@@ -113,9 +113,7 @@ function battleCardsToSections(sections: ApiBattleCardSection[]): ProductSection
   return sections.map((s) => ({
     name: s.sectionName,
     description: s.sectionDescription,
-    elements: s.cards.map((c) => ({
-      fields: { title: c.title, strengths: c.strengths, weaknesses: c.weaknesses, talkingPoints: c.talkingPoints },
-    })),
+    elements: s.cards.map((c) => ({ fields: toFields(c) })),
   }))
 }
 
@@ -123,9 +121,7 @@ function decisionDomainsToSections(domains: ApiDecisionDomain[]): ProductSection
   return domains.map((d) => ({
     name: d.domainName,
     description: d.domainDescription,
-    elements: d.decisions.map((dec) => ({
-      fields: { decision: dec.decision, context: dec.context, options: dec.options, criteria: dec.criteria },
-    })),
+    elements: d.decisions.map((dec) => ({ fields: toFields(dec) })),
   }))
 }
 
@@ -190,6 +186,7 @@ export default function RunConfigPage() {
 
         const drivers = co.sectionDrivers?.length ? co.sectionDrivers : undefined
         const directives = co.instructionDirectives?.length ? co.instructionDirectives : undefined
+        const resolvedFields = co.fieldOverrides ?? otDef.fields
         const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives }
 
         let sections: ProductSection[]
@@ -263,7 +260,7 @@ export default function RunConfigPage() {
               context: flat,
               sectionLabel: otDef.sectionLabel,
               elementLabel: otDef.elementLabel,
-              fields: otDef.fields,
+              fields: resolvedFields,
               sectionDrivers: drivers,
               instructionDirectives: directives,
             }),
@@ -285,6 +282,7 @@ export default function RunConfigPage() {
           configurationId: config.id,
           outputType: co.outputTypeId,
           contextFields: flat,
+          resolvedFields,
           ...legacy,
           sections,
           dissections: {},

@@ -103,6 +103,9 @@ export interface Product {
   situation: string
   additionalContext: { label: string; value: string }[]
 
+  // Snapshot of the element field schema used at generation time
+  resolvedFields?: import('@/lib/output-type-library').OutputTypeField[]
+
   // Generic content
   sections: ProductSection[]
 

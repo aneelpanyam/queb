@@ -14,6 +14,9 @@ const singleDomainSchema = z.object({
       context: z.string().describe('Why this decision matters now — what is at stake, who is affected, and what happens if it is delayed'),
       options: z.string().describe('The realistic alternatives (2-3 minimum), including the status quo, with honest trade-offs for each'),
       criteria: z.string().describe('The factors that should guide this choice — cost, speed, risk, alignment, reversibility, stakeholder impact, etc.'),
+      risks: z.string().describe('What goes wrong if you choose poorly — worst-case scenarios and failure modes. Empty string if not applicable.'),
+      stakeholders: z.string().describe('Who is affected, who needs to be consulted, who has veto power. Empty string if not applicable.'),
+      recommendation: z.string().describe('A synthesized recommended path given the options and criteria. Empty string if not applicable.'),
     })
   ),
 })

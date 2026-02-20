@@ -38,6 +38,8 @@ export interface ConfigOutput {
   sectionDrivers?: SectionDriver[]
   /** Custom instruction directives — individual rules/guidelines the AI follows when generating. Uses full defaults when omitted. */
   instructionDirectives?: InstructionDirective[]
+  /** Custom element fields — overrides the output type's default field schema when set */
+  fieldOverrides?: import('@/lib/output-type-library').OutputTypeField[]
 }
 
 export interface SetupConfiguration {

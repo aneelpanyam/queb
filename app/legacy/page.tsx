@@ -581,12 +581,12 @@ function LegacyPageInner() {
         description: p.perspectiveDescription,
         elements: p.questions.map((q, qIdx) => {
           const key = `${pIdx}-${qIdx}`
+          const fields: Record<string, string> = {}
+          for (const [fk, fv] of Object.entries(q)) {
+            if (fv) fields[fk] = fv
+          }
           return {
-            fields: {
-              question: q.question,
-              relevance: q.relevance,
-              infoPrompt: q.infoPrompt,
-            },
+            fields,
             dissection: dissectionsRef.current[key] || undefined,
             deeperQuestions: deeperRef.current[key] || undefined,
           }

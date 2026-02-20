@@ -13,6 +13,9 @@ const singleSectionSchema = z.object({
       strengths: z.string().describe('Their key strengths and advantages'),
       weaknesses: z.string().describe('Their weaknesses, gaps, and vulnerabilities'),
       talkingPoints: z.string().describe('Your talking points, differentiators, and objection handlers'),
+      objectionHandling: z.string().describe('Anticipated objections with concrete responses — "When they say X, you say Y". Empty string if not applicable.'),
+      winStrategy: z.string().describe('The game plan to win against this competitor. Empty string if not applicable.'),
+      pricingIntel: z.string().describe('Their pricing model, relative price position, and discounting patterns. Empty string if not applicable.'),
     })
   ),
 })

@@ -11,11 +11,15 @@ import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
 import { DECISION_DOMAINS } from '@/lib/decision-domains'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 
+export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
+
 export interface OutputTypeField {
   key: string
   label: string
   type: 'short-text' | 'long-text'
   primary?: boolean
+  color?: FieldColor
+  icon?: string
 }
 
 export interface OutputTypeDefinition {
@@ -52,15 +56,18 @@ Generate thoughtful, probing questions organized by business perspective.
 GUIDELINES:
 - Generate 3-5 questions per relevant perspective
 - Every question must be specific to the described context, not generic
-- Each question must come with a relevance note and an actionable info prompt
+- Each question must include all requested element fields
 - Questions should provoke deep thinking and help uncover blind spots
 - Tailor questions to the specific context provided`,
     sectionLabel: 'Perspective',
     elementLabel: 'Question',
     fields: [
       { key: 'question', label: 'Question', type: 'long-text', primary: true },
-      { key: 'relevance', label: 'Why This Matters', type: 'long-text' },
-      { key: 'infoPrompt', label: 'How to Find the Answer', type: 'long-text' },
+      { key: 'relevance', label: 'Why This Matters', type: 'long-text', color: 'amber', icon: 'Target' },
+      { key: 'infoPrompt', label: 'How to Find the Answer', type: 'long-text', color: 'blue', icon: 'ArrowUpRight' },
+      { key: 'actionSteps', label: 'What to Do With the Answer', type: 'long-text', color: 'emerald', icon: 'ListChecks' },
+      { key: 'redFlags', label: 'Red Flags to Watch For', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
+      { key: 'keyMetrics', label: 'Key Metrics to Track', type: 'short-text', color: 'violet', icon: 'BarChart3' },
     ],
     supportsDeepDive: true,
     supportsDeeperQuestions: true,
@@ -87,8 +94,11 @@ GUIDELINES:
     elementLabel: 'Item',
     fields: [
       { key: 'item', label: 'Checklist Item', type: 'short-text', primary: true },
-      { key: 'description', label: 'Description', type: 'long-text' },
-      { key: 'priority', label: 'Priority', type: 'short-text' },
+      { key: 'description', label: 'Description', type: 'long-text', color: 'blue', icon: 'Shield' },
+      { key: 'priority', label: 'Priority', type: 'short-text', color: 'amber', icon: 'Zap' },
+      { key: 'commonMistakes', label: 'Common Mistakes', type: 'long-text', color: 'red', icon: 'AlertOctagon' },
+      { key: 'tips', label: 'Pro Tips', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
+      { key: 'verificationMethod', label: 'How to Verify', type: 'short-text', color: 'emerald', icon: 'ClipboardCheck' },
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
@@ -114,8 +124,11 @@ GUIDELINES:
     elementLabel: 'Email',
     fields: [
       { key: 'subject', label: 'Subject Line', type: 'short-text', primary: true },
-      { key: 'body', label: 'Email Body', type: 'long-text' },
-      { key: 'callToAction', label: 'Call to Action', type: 'short-text' },
+      { key: 'body', label: 'Email Body', type: 'long-text', color: 'none', icon: 'Mail' },
+      { key: 'callToAction', label: 'Call to Action', type: 'short-text', color: 'primary', icon: 'ArrowUpRight' },
+      { key: 'keyTakeaway', label: 'Key Takeaway', type: 'short-text', color: 'violet', icon: 'Bookmark' },
+      { key: 'subjectLineVariants', label: 'Subject Line Alternatives', type: 'long-text', color: 'amber', icon: 'Repeat' },
+      { key: 'sendTiming', label: 'Recommended Send Timing', type: 'short-text', color: 'blue', icon: 'CalendarClock' },
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
@@ -141,8 +154,11 @@ GUIDELINES:
     elementLabel: 'Prompt',
     fields: [
       { key: 'prompt', label: 'Prompt', type: 'long-text', primary: true },
-      { key: 'context', label: 'When to Use', type: 'long-text' },
-      { key: 'expectedOutput', label: 'Expected Output', type: 'long-text' },
+      { key: 'context', label: 'When to Use', type: 'long-text', color: 'amber', icon: 'Target' },
+      { key: 'expectedOutput', label: 'Expected Output', type: 'long-text', color: 'emerald', icon: 'CheckCheck' },
+      { key: 'variations', label: 'Prompt Variations', type: 'long-text', color: 'violet', icon: 'Shuffle' },
+      { key: 'tips', label: 'Tips for Better Results', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
+      { key: 'exampleOutput', label: 'Example Output Snippet', type: 'long-text', color: 'emerald', icon: 'FileText' },
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
@@ -168,9 +184,12 @@ GUIDELINES:
     elementLabel: 'Card',
     fields: [
       { key: 'title', label: 'Card Title', type: 'short-text', primary: true },
-      { key: 'strengths', label: 'Their Strengths', type: 'long-text' },
-      { key: 'weaknesses', label: 'Their Weaknesses', type: 'long-text' },
-      { key: 'talkingPoints', label: 'Your Talking Points', type: 'long-text' },
+      { key: 'strengths', label: 'Their Strengths', type: 'long-text', color: 'red', icon: 'ThumbsUp' },
+      { key: 'weaknesses', label: 'Their Weaknesses', type: 'long-text', color: 'green', icon: 'ThumbsDown' },
+      { key: 'talkingPoints', label: 'Your Talking Points', type: 'long-text', color: 'primary', icon: 'MessageSquare' },
+      { key: 'objectionHandling', label: 'Objection Handling', type: 'long-text', color: 'amber', icon: 'ShieldQuestion' },
+      { key: 'winStrategy', label: 'How to Win', type: 'long-text', color: 'primary', icon: 'Trophy' },
+      { key: 'pricingIntel', label: 'Pricing & Packaging Intel', type: 'long-text', color: 'emerald', icon: 'DollarSign' },
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: [
@@ -202,9 +221,12 @@ GUIDELINES:
     elementLabel: 'Decision',
     fields: [
       { key: 'decision', label: 'The Decision', type: 'long-text', primary: true },
-      { key: 'context', label: 'Why This Decision Matters', type: 'long-text' },
-      { key: 'options', label: 'Key Options & Trade-offs', type: 'long-text' },
-      { key: 'criteria', label: 'Decision Criteria', type: 'long-text' },
+      { key: 'context', label: 'Why This Decision Matters', type: 'long-text', color: 'amber', icon: 'Info' },
+      { key: 'options', label: 'Key Options & Trade-offs', type: 'long-text', color: 'violet', icon: 'GitBranch' },
+      { key: 'criteria', label: 'Decision Criteria', type: 'long-text', color: 'emerald', icon: 'Target' },
+      { key: 'risks', label: 'Risks & Failure Modes', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
+      { key: 'stakeholders', label: 'Key Stakeholders & Impact', type: 'long-text', color: 'blue', icon: 'Users' },
+      { key: 'recommendation', label: 'Recommended Path', type: 'long-text', color: 'primary', icon: 'Compass' },
     ],
     supportsDeepDive: true,
     supportsDeeperQuestions: true,
@@ -307,6 +329,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Context integration', content: 'Actively incorporate all context provided to make questions sharper and more actionable.' },
     { label: 'Relevance notes', content: 'Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.' },
     { label: 'Actionable info prompts', content: 'Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").' },
+    { label: 'Action steps', content: 'Each question should include actionSteps: once the answer is known, what concrete actions should be taken. Bridge the gap between insight and action.' },
+    { label: 'Red flags', content: 'Each question should include redFlags: warning signs or problematic answers to watch for. What danger signals indicate a serious risk?' },
+    { label: 'Key metrics', content: 'Each question should include keyMetrics: specific KPIs, benchmarks, or numbers the user should reference when answering.' },
     { label: 'Deep thinking', content: 'Questions should provoke deep thinking and help uncover blind spots.' },
     { label: 'Tailoring', content: 'Tailor questions to the specific context fields provided.' },
   ],
@@ -318,6 +343,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Concreteness', content: 'Each item must be concrete and verifiable — not vague guidance.' },
     { label: 'Priority levels', content: 'Assign priority: High (must-do, blocking), Medium (should-do, important), Low (nice-to-have, optimization).' },
     { label: 'Descriptions', content: 'The description should explain WHY this matters and HOW to execute it well.' },
+    { label: 'Common mistakes', content: 'Each item should include commonMistakes: what people typically get wrong on this item, shortcuts that backfire, or pitfalls to avoid.' },
+    { label: 'Pro tips', content: 'Each item should include tips: practical advice from experienced practitioners on how to do this faster, better, or more reliably.' },
+    { label: 'Verification', content: 'Each item should include verificationMethod: what constitutes "done" — what artifact, test, or approval proves completion.' },
     { label: 'Tailoring', content: 'Tailor everything to the specific context provided.' },
   ],
   'email-course': [
@@ -328,6 +356,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Email body length', content: 'Email bodies should be 150-300 words: educational, conversational, and packed with actionable insight.' },
     { label: 'Examples', content: 'Include specific examples, frameworks, or tips relevant to the provided context.' },
     { label: 'Call to action', content: 'Each email must end with a clear, specific call to action.' },
+    { label: 'Key takeaway', content: 'Each email should include keyTakeaway: the single most important lesson — a TL;DR the reader can remember.' },
+    { label: 'Subject alternatives', content: 'Each email should include subjectLineVariants: 2-3 alternative subject lines with different angles (curiosity, urgency, benefit-driven).' },
+    { label: 'Send timing', content: 'Each email should include sendTiming: when in the sequence this email should go out (e.g., "Day 3" or "2 days after previous").' },
     { label: 'Tone', content: 'Write as an expert peer, not a lecturer.' },
     { label: 'Minimum output', content: 'If this module is not very relevant to the context, still include at least 1 email.' },
   ],
@@ -339,6 +370,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Domain knowledge', content: 'Prompts should leverage domain knowledge and terminology relevant to the provided context.' },
     { label: 'Context field', content: 'The "context" field should describe the specific trigger or situation when this prompt is most useful.' },
     { label: 'Expected output', content: 'The "expectedOutput" should set realistic expectations for what the AI will produce.' },
+    { label: 'Variations', content: 'Each prompt should include variations: 2-3 alternative versions for different scenarios (quick vs. deep, formal vs. casual).' },
+    { label: 'Tips', content: 'Each prompt should include tips: practical advice for getting better results (e.g., "Add your company name for specificity").' },
+    { label: 'Example output', content: 'Each prompt should include exampleOutput: a short sample of what good output looks like to set expectations.' },
     { label: 'Complexity range', content: 'Vary the complexity — include both quick tactical prompts and deeper strategic ones.' },
     { label: 'Minimum output', content: 'If this use case is not very relevant, still include at least 1 prompt.' },
   ],
@@ -349,7 +383,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Honesty', content: 'Be honest about competitor strengths — credibility requires acknowledging where they excel.' },
     { label: 'Weaknesses', content: 'Identify real weaknesses backed by common customer complaints, architectural limitations, or market gaps — not straw-man arguments.' },
     { label: 'Talking points', content: 'Talking points must be specific, conversational, and usable in a live sales call — not marketing copy.' },
-    { label: 'Objection handling', content: 'Include at least one objection handler per card — anticipate what the prospect might say and provide a concrete response.' },
+    { label: 'Objection handling', content: 'Each card must include objectionHandling: anticipated prospect objections with concrete responses. Format as "When they say X, you say Y."' },
+    { label: 'Win strategy', content: 'Each card should include winStrategy: given their strengths and weaknesses, what is the game plan to win this deal?' },
+    { label: 'Pricing intel', content: 'Each card should include pricingIntel: their pricing model, where they are cheaper or pricier, known discounting patterns.' },
     { label: 'Tailoring', content: 'Tailor all intelligence to the specific context provided.' },
   ],
   'decision-books': [
@@ -361,6 +397,9 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Stakes', content: 'The "context" field must explain what is at stake — why this decision matters now, what happens if it is delayed or made poorly, and who is affected.' },
     { label: 'Options & trade-offs', content: 'The "options" field must present realistic alternatives (at least 2-3), including the status quo, with honest trade-offs for each. Avoid false dichotomies.' },
     { label: 'Decision criteria', content: 'The "criteria" field must specify what factors should guide the choice — cost, speed, risk tolerance, strategic alignment, stakeholder impact, reversibility, etc. Be specific to this decision.' },
+    { label: 'Risks', content: 'Each decision should include risks: what goes wrong if you choose poorly — worst-case scenarios and failure modes to anticipate.' },
+    { label: 'Stakeholders', content: 'Each decision should include stakeholders: who is affected, who needs to be consulted, and who has veto power.' },
+    { label: 'Recommendation', content: 'Each decision should include recommendation: a synthesized recommended path given the options and criteria, as a reasoned starting point.' },
     { label: 'Hard choices', content: 'Surface decisions that are genuinely difficult — where reasonable people could disagree, where trade-offs are real, and where the "right" answer depends on priorities and constraints.' },
     { label: 'Tailoring', content: 'Tailor decisions to the specific role, their authority level, and organizational context.' },
   ],

@@ -25,6 +25,12 @@ const singlePerspectiveSchema = z.object({
         .describe(
           'A practical guidance prompt that tells the user exactly what data, documents, people, or analysis they should consult to answer this question well. Be specific about sources, metrics, and methods.'
         ),
+      actionSteps: z.string()
+        .describe('What concrete actions to take once the answer is known. Empty string if not applicable.'),
+      redFlags: z.string()
+        .describe('Warning signs or problematic answers to watch for. Empty string if not applicable.'),
+      keyMetrics: z.string()
+        .describe('Specific KPIs, benchmarks, or numbers to reference. Empty string if not applicable.'),
     })
   ),
 })

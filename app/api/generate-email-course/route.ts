@@ -13,6 +13,9 @@ const singleStageSchema = z.object({
       subject: z.string().describe('A compelling email subject line'),
       body: z.string().describe('The full email body — educational, engaging, and actionable. Use paragraphs.'),
       callToAction: z.string().describe('A specific action the reader should take after reading'),
+      keyTakeaway: z.string().describe('The single most important lesson — the TL;DR. Empty string if not applicable.'),
+      subjectLineVariants: z.string().describe('2-3 alternative subject lines with different angles. Empty string if not applicable.'),
+      sendTiming: z.string().describe('When to send this email in the sequence. Empty string if not applicable.'),
     })
   ),
 })

@@ -42,6 +42,14 @@ const configSchema = z.object({
           content: z.string().describe('The instruction content for the AI'),
         })
       ),
+      fields: z.array(
+        z.object({
+          key: z.string().describe('camelCase field key (e.g. "relevance", "actionSteps")'),
+          label: z.string().describe('Human-readable label shown in the UI (e.g. "Why This Matters")'),
+          type: z.enum(['short-text', 'long-text']).describe('short-text for brief values, long-text for paragraphs'),
+          primary: z.boolean().describe('True for the main/title field (exactly one per output), false for all others'),
+        })
+      ).describe('Element fields — what detail sections each generated item will have. The first should be primary.'),
     })
   ),
 })
@@ -51,7 +59,7 @@ export async function POST(req: Request) {
     const { description, availableFields, availableOutputTypes } = (await req.json()) as {
       description: string
       availableFields: { id: string; name: string; description: string; category: string }[]
-      availableOutputTypes: { id: string; name: string; description: string; sectionLabel?: string; elementLabel?: string }[]
+      availableOutputTypes: { id: string; name: string; description: string; sectionLabel?: string; elementLabel?: string; defaultFields?: { key: string; label: string; type: string }[] }[]
     }
 
     if (!description?.trim()) {
@@ -63,7 +71,13 @@ export async function POST(req: Request) {
       .join('\n')
 
     const outputTypesList = availableOutputTypes
-      .map((ot) => `  - "${ot.id}" (${ot.name}): ${ot.description}${ot.sectionLabel ? ` — sections called "${ot.sectionLabel}s"` : ''}`)
+      .map((ot) => {
+        let line = `  - "${ot.id}" (${ot.name}): ${ot.description}${ot.sectionLabel ? ` — sections called "${ot.sectionLabel}s"` : ''}`
+        if (ot.defaultFields?.length) {
+          line += `\n    Default fields: ${ot.defaultFields.map((f) => `${f.key} (${f.label})`).join(', ')}`
+        }
+        return line
+      })
       .join('\n')
 
     const prompt = `You are an expert product configuration architect for an AI content generation platform.
@@ -124,6 +138,14 @@ Instruction directives (4-8 entries):
   - A "Role" directive: who the AI should act as (domain expert persona)
   - A "Task" directive: what to generate and to what standard
   - Directives for tone, specificity, depth, format, constraints, etc.
+  - Directives describing what each element field should contain
+
+Element fields (3-7 per output):
+- Define what detail sections each generated item will have. Each field becomes a visible card in the product detail view.
+- The first field should be the primary/title field (set primary: true).
+- Subsequent fields are the supporting detail sections the user sees (e.g. "Why This Matters", "Action Steps", "Key Metrics").
+- Use the output type's default fields as a starting point, but customize them for the user's specific topic. Add, remove, or rename fields to best serve this use case.
+- Use "long-text" for paragraph content and "short-text" for brief values or labels.
 
 Configuration name: make it catchy and descriptive.
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
-import { outputTypeStorage, getDefaultSectionDrivers, getDefaultInstructionDirectives, type OutputTypeDefinition, type OutputTypeField } from '@/lib/output-type-library'
+import { outputTypeStorage, getDefaultSectionDrivers, getDefaultInstructionDirectives, type OutputTypeDefinition, type OutputTypeField, type FieldColor } from '@/lib/output-type-library'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -136,6 +136,26 @@ function FieldForm({
 
 type OtFormData = Omit<OutputTypeDefinition, 'createdAt' | 'updatedAt'>
 
+const FIELD_COLOR_OPTIONS: { value: FieldColor | ''; label: string }[] = [
+  { value: '', label: '—' },
+  { value: 'amber', label: 'Amber' },
+  { value: 'blue', label: 'Blue' },
+  { value: 'red', label: 'Red' },
+  { value: 'green', label: 'Green' },
+  { value: 'emerald', label: 'Emerald' },
+  { value: 'violet', label: 'Violet' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'none', label: 'None' },
+]
+
+const FIELD_ICON_OPTIONS = [
+  '', 'Target', 'ArrowUpRight', 'AlertTriangle', 'Shield', 'Zap', 'Clock', 'Mail',
+  'Sparkles', 'ThumbsUp', 'ThumbsDown', 'MessageSquare', 'GitBranch', 'Info',
+  'CheckCheck', 'ListChecks', 'BarChart3', 'AlertOctagon', 'Lightbulb', 'ClipboardCheck',
+  'Bookmark', 'Repeat', 'CalendarClock', 'Shuffle', 'FileText', 'ShieldQuestion',
+  'Trophy', 'DollarSign', 'Users', 'Compass', 'FileOutput', 'Scale', 'Swords',
+]
+
 const EMPTY_OT: OtFormData = {
   id: '',
   name: '',
@@ -228,22 +248,35 @@ function OutputTypeForm({
           </div>
           <div className="space-y-1.5">
             {form.fields.map((sf, idx) => (
-              <div key={idx} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2 py-1.5">
-                <Input value={sf.key} onChange={(e) => updateSchemaField(idx, { key: e.target.value.replace(/\s/g, '') })} placeholder="key" className="h-7 w-24 text-xs" />
-                <Input value={sf.label} onChange={(e) => updateSchemaField(idx, { label: e.target.value })} placeholder="Label" className="h-7 flex-1 text-xs" />
-                <select value={sf.type} onChange={(e) => updateSchemaField(idx, { type: e.target.value as OutputTypeField['type'] })} className="h-7 rounded border border-border bg-background px-2 text-xs">
-                  <option value="short-text">Short</option>
-                  <option value="long-text">Long</option>
-                </select>
-                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <input type="radio" name={`primary-${idx}`} checked={!!sf.primary} onChange={() => {
-                    set('fields', form.fields.map((f, i) => ({ ...f, primary: i === idx ? true : undefined })))
-                  }} />
-                  Primary
-                </label>
-                <button onClick={() => removeSchemaField(idx)} className="p-0.5 text-muted-foreground hover:text-destructive" disabled={form.fields.length <= 1}>
-                  <X className="h-3 w-3" />
-                </button>
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2 py-1.5">
+                  <Input value={sf.key} onChange={(e) => updateSchemaField(idx, { key: e.target.value.replace(/\s/g, '') })} placeholder="key" className="h-7 w-24 text-xs" />
+                  <Input value={sf.label} onChange={(e) => updateSchemaField(idx, { label: e.target.value })} placeholder="Label" className="h-7 flex-1 text-xs" />
+                  <select value={sf.type} onChange={(e) => updateSchemaField(idx, { type: e.target.value as OutputTypeField['type'] })} className="h-7 rounded border border-border bg-background px-2 text-xs">
+                    <option value="short-text">Short</option>
+                    <option value="long-text">Long</option>
+                  </select>
+                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <input type="radio" name={`primary-${idx}`} checked={!!sf.primary} onChange={() => {
+                      set('fields', form.fields.map((f, i) => ({ ...f, primary: i === idx ? true : undefined })))
+                    }} />
+                    Primary
+                  </label>
+                  <button onClick={() => removeSchemaField(idx)} className="p-0.5 text-muted-foreground hover:text-destructive" disabled={form.fields.length <= 1}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                {!sf.primary && (
+                  <div className="ml-2 flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">Display:</span>
+                    <select value={sf.color || ''} onChange={(e) => updateSchemaField(idx, { color: (e.target.value || undefined) as FieldColor | undefined })} className="h-6 rounded border border-border bg-background px-1.5 text-[10px]">
+                      {FIELD_COLOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    <select value={sf.icon || ''} onChange={(e) => updateSchemaField(idx, { icon: e.target.value || undefined })} className="h-6 rounded border border-border bg-background px-1.5 text-[10px]">
+                      {FIELD_ICON_OPTIONS.map((i) => <option key={i} value={i}>{i || '— Icon —'}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
             ))}
           </div>
