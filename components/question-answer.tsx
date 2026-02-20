@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import Markdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
+import remarkGfm from 'remark-gfm'
 import type { AnswerData } from '@/lib/product-types'
 import { ExternalLink, Globe, ChevronDown, ChevronUp, Copy, CheckCheck } from 'lucide-react'
 
@@ -40,6 +42,7 @@ export function QuestionAnswer({ data }: QuestionAnswerProps) {
         </div>
         <div className="max-w-none text-[14px] leading-[1.75] text-foreground">
           <Markdown
+            remarkPlugins={[remarkBreaks, remarkGfm]}
             components={{
               h1: ({ children }) => <h1 className="mb-3 mt-5 text-lg font-bold text-foreground first:mt-0">{children}</h1>,
               h2: ({ children }) => <h2 className="mb-2.5 mt-5 text-[15px] font-bold text-foreground first:mt-0">{children}</h2>,

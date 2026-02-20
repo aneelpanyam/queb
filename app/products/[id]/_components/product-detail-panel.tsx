@@ -7,6 +7,7 @@ import { ProductAnnotations } from '@/components/product-annotation'
 import { QuestionDissection } from '@/components/question-dissection'
 import { QuestionAnswer } from '@/components/question-answer'
 import { ElementDetail } from '@/components/element-detail'
+import { MarkdownProse } from '@/components/markdown-prose'
 import { ChecklistSectionDetail } from '@/components/checklist-section-detail'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -166,13 +167,13 @@ export function ProductDetailPanel({
                 sectionResolvedFields={selectedSection?.resolvedFields}
               />
             ) : (
-              <h2 className="text-[16px] font-bold leading-tight tracking-tight text-foreground">{displayPrimary}</h2>
+              <MarkdownProse className="text-[16px] font-bold leading-tight tracking-tight">{displayPrimary || ''}</MarkdownProse>
             )}
 
             {displayReasoning && (
               <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
                 <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Context & Reasoning</div>
-                <p className="text-[14.5px] leading-relaxed text-foreground">{displayReasoning}</p>
+                <MarkdownProse className="text-[14.5px]">{displayReasoning || ''}</MarkdownProse>
               </div>
             )}
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { OutputTypeDefinition, OutputTypeField } from '@/lib/output-type-library'
 import type { ProductSection } from '@/lib/product-types'
+import { MarkdownProse } from '@/components/markdown-prose'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import {
@@ -120,10 +121,17 @@ function EditableField({
   }
   return (
     <div onClick={() => onStartEdit(editKey, value)} className={cn('group cursor-text', className)} title="Click to edit">
-      <p className={cn('text-[14px] leading-relaxed text-foreground transition-colors group-hover:text-primary/80', valueClassName)}>
-        {value}
-        <Pencil className="ml-2 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      </p>
+      {multiline ? (
+        <div className="transition-colors group-hover:text-primary/80">
+          <MarkdownProse className={valueClassName}>{value}</MarkdownProse>
+          <Pencil className="ml-2 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
+      ) : (
+        <p className={cn('text-[14px] leading-relaxed text-foreground transition-colors group-hover:text-primary/80', valueClassName)}>
+          {value}
+          <Pencil className="ml-2 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </p>
+      )}
     </div>
   )
 }
@@ -152,12 +160,12 @@ function EditablePrimary({
     )
   }
   return (
-    <h2 onClick={() => onStartEdit(editKey, value)}
-      className={cn('group cursor-text text-[16px] font-bold leading-tight tracking-tight text-foreground transition-colors hover:text-primary', className)}
+    <div onClick={() => onStartEdit(editKey, value)}
+      className={cn('group cursor-text transition-colors hover:text-primary', className)}
       title="Click to edit">
-      {value}
+      <MarkdownProse className="text-[16px] font-bold leading-tight tracking-tight">{value}</MarkdownProse>
       <Pencil className="ml-2 inline h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </h2>
+    </div>
   )
 }
 
@@ -200,10 +208,10 @@ function CopyablePrimary({
         {copied ? <><CheckCheck className="mr-1.5 inline h-3 w-3 text-green-500" /> Copied</> : <><Copy className="mr-1.5 inline h-3 w-3" /> Copy</>}
       </button>
       <div onClick={() => onStartEdit(editKey, value)} className="group cursor-text" title="Click to edit">
-        <p className="whitespace-pre-wrap text-[13.5px] leading-[1.7] font-mono text-foreground transition-colors group-hover:text-primary/80">
-          {value}
+        <div className="transition-colors group-hover:text-primary/80">
+          <MarkdownProse className="text-[13.5px] leading-[1.7] font-mono">{value}</MarkdownProse>
           <Pencil className="ml-2 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-        </p>
+        </div>
       </div>
     </div>
   )
@@ -249,7 +257,6 @@ function FieldCard({
         sIndex={sIndex}
         eIndex={eIndex}
         {...editProps(props)}
-        valueClassName={fieldDef.type === 'long-text' ? 'whitespace-pre-wrap' : undefined}
         multiline={fieldDef.type === 'long-text'}
       />
     </div>

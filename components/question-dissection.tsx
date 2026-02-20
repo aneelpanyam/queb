@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Markdown from 'react-markdown'
+import { MarkdownProse } from '@/components/markdown-prose'
 import {
   BookOpen,
   CheckCircle2,
@@ -42,30 +42,6 @@ const typeColors: Record<string, string> = {
   Community: 'bg-indigo-500/10 text-indigo-400',
 }
 
-function Prose({ children }: { children: string }) {
-  return (
-    <Markdown
-      components={{
-        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-        strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-        em: ({ children }) => <em className="italic">{children}</em>,
-        ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1 last:mb-0">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">{children}</ol>,
-        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        a: ({ href, children }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
-            {children}
-          </a>
-        ),
-        code: ({ children }) => (
-          <code className="rounded bg-muted px-1 py-0.5 text-[0.9em] font-mono">{children}</code>
-        ),
-      }}
-    >
-      {children}
-    </Markdown>
-  )
-}
 
 export function QuestionDissection({ data }: QuestionDissectionProps) {
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set())
@@ -121,7 +97,7 @@ export function QuestionDissection({ data }: QuestionDissectionProps) {
                   {step.title}
                 </p>
                 <div className="text-xs text-muted-foreground leading-relaxed mt-1">
-                  <Prose>{step.description}</Prose>
+                  <MarkdownProse>{step.description}</MarkdownProse>
                 </div>
               </div>
             </div>
@@ -182,7 +158,7 @@ export function QuestionDissection({ data }: QuestionDissectionProps) {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                    <Prose>{item.description}</Prose>
+                    <MarkdownProse>{item.description}</MarkdownProse>
                   </div>
                 </div>
               </button>
@@ -223,7 +199,7 @@ export function QuestionDissection({ data }: QuestionDissectionProps) {
                   {resource.title}
                 </p>
                 <div className="text-xs text-muted-foreground leading-relaxed">
-                  <Prose>{resource.description}</Prose>
+                  <MarkdownProse>{resource.description}</MarkdownProse>
                 </div>
               </a>
             )
@@ -237,7 +213,7 @@ export function QuestionDissection({ data }: QuestionDissectionProps) {
           Key Insight
         </p>
         <div className="text-sm leading-relaxed text-foreground">
-          <Prose>{data.keyInsight}</Prose>
+          <MarkdownProse>{data.keyInsight}</MarkdownProse>
         </div>
       </div>
     </div>

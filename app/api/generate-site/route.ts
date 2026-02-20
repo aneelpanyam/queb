@@ -1,3 +1,12 @@
+import { marked } from 'marked'
+
+marked.setOptions({ async: false, gfm: true, breaks: true })
+
+function md(str: string): string {
+  const result = marked.parse(str) as string
+  return result
+}
+
 interface FieldDef {
   key: string
   label: string
@@ -154,14 +163,14 @@ function renderQuestionElement(el: ElementData): string {
     html += `
       <div class="meta-card amber">
         <div class="meta-label">Why This Matters</div>
-        <p>${esc(relevance)}</p>
+        <div class="md-content">${md(relevance)}</div>
       </div>`
   }
   if (infoPrompt) {
     html += `
       <div class="meta-card blue">
         <div class="meta-label">How to Find the Answer</div>
-        <p>${esc(infoPrompt)}</p>
+        <div class="md-content">${md(infoPrompt)}</div>
       </div>`
   }
 
@@ -186,7 +195,7 @@ function renderChecklistElement(el: ElementData): string {
     html += `
       <div class="meta-card ${pClass}">
         <div class="meta-label">What to Know</div>
-        <p>${esc(description)}</p>
+        <div class="md-content">${md(description)}</div>
       </div>`
   }
 
@@ -208,7 +217,7 @@ function renderEmailCourseElement(el: ElementData): string {
   if (body) {
     html += `
       <div class="meta-card plain">
-        <p class="preserve-ws">${nl2br(body)}</p>
+        <div class="md-content">${md(body)}</div>
       </div>`
   }
   if (cta) {
@@ -239,14 +248,14 @@ function renderPromptElement(el: ElementData, elId: string): string {
     html += `
       <div class="meta-card amber">
         <div class="meta-label">When to Use</div>
-        <p>${esc(context)}</p>
+        <div class="md-content">${md(context)}</div>
       </div>`
   }
   if (expectedOutput) {
     html += `
       <div class="meta-card emerald">
         <div class="meta-label">Expected Output</div>
-        <p>${esc(expectedOutput)}</p>
+        <div class="md-content">${md(expectedOutput)}</div>
       </div>`
   }
 
@@ -272,14 +281,14 @@ function renderBattleCardElement(el: ElementData): string {
       html += `
         <div class="meta-card red">
           <div class="meta-label">Their Strengths</div>
-          <p class="preserve-ws">${nl2br(strengths)}</p>
+          <div class="md-content">${md(strengths)}</div>
         </div>`
     }
     if (weaknesses) {
       html += `
         <div class="meta-card green">
           <div class="meta-label">Their Weaknesses</div>
-          <p class="preserve-ws">${nl2br(weaknesses)}</p>
+          <div class="md-content">${md(weaknesses)}</div>
         </div>`
     }
     html += `</div>`
@@ -289,7 +298,7 @@ function renderBattleCardElement(el: ElementData): string {
     html += `
       <div class="meta-card accent">
         <div class="meta-label">Your Talking Points</div>
-        <p class="preserve-ws tp-text">${nl2br(talkingPoints)}</p>
+        <div class="md-content">${md(talkingPoints)}</div>
       </div>`
   }
 
@@ -311,7 +320,7 @@ function renderGenericElement(el: ElementData, def: OutputTypeDef, sectionFields
     html += `
       <div class="meta-card plain">
         <div class="meta-label">${esc(field.label)}</div>
-        <p>${esc(value)}</p>
+        ${field.type === 'long-text' ? `<div class="md-content">${md(value)}</div>` : `<p>${esc(value)}</p>`}
       </div>`
   }
 
@@ -519,6 +528,22 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .bc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 .tp-text{font-weight:500}
 .preserve-ws{white-space:pre-wrap}
+
+/* Markdown content */
+.md-content{font-size:14.5px;line-height:1.7;color:#27313a}
+.md-content p{margin-bottom:8px}.md-content p:last-child{margin-bottom:0}
+.md-content strong{font-weight:600;color:#27313a}
+.md-content em{font-style:italic}
+.md-content ul{margin:8px 0 8px 20px;list-style-type:disc}
+.md-content ol{margin:8px 0 8px 20px;list-style-type:decimal}
+.md-content li{margin-bottom:4px;line-height:1.6}
+.md-content a{color:var(--accent);text-decoration:underline}
+.md-content a:hover{opacity:.8}
+.md-content code{background:#f0f2f5;padding:2px 5px;border-radius:4px;font-size:0.9em;font-family:monospace}
+.md-content blockquote{margin:12px 0;padding-left:16px;border-left:3px solid #d0d5dd;color:#6b7684;font-style:italic}
+.md-content hr{margin:16px 0;border:none;border-top:1px solid #e2e6ea}
+.md-content h1,.md-content h2,.md-content h3{font-weight:700;color:#27313a;margin:16px 0 8px}
+.md-content h1{font-size:18px}.md-content h2{font-size:16px}.md-content h3{font-size:15px}
 
 /* Deep dive sections */
 .section-block{margin-top:40px;padding-top:8px}

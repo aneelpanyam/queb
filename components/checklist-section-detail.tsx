@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import type { ProductSection } from '@/lib/product-types'
 import type { DissectionData } from '@/lib/product-types'
 import { QuestionDissection } from '@/components/question-dissection'
+import { MarkdownProse } from '@/components/markdown-prose'
 import { ProductAnnotations } from '@/components/product-annotation'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -203,11 +204,11 @@ export function ChecklistSectionDetail({
                     </div>
                   </div>
                 ) : (
-                  <p onClick={() => startEdit(itemEditKey, el.fields.item || '')}
-                    className="group cursor-text text-sm font-semibold leading-snug text-foreground hover:text-primary" title="Click to edit">
-                    {el.fields.item || '(empty)'}
+                  <div onClick={() => startEdit(itemEditKey, el.fields.item || '')}
+                    className="group cursor-text hover:text-primary" title="Click to edit">
+                    <MarkdownProse className="text-sm font-semibold leading-snug">{el.fields.item || '(empty)'}</MarkdownProse>
                     <Pencil className="ml-1.5 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </p>
+                  </div>
                 )}
               </div>
 
@@ -241,11 +242,11 @@ export function ChecklistSectionDetail({
                         </div>
                       </div>
                     ) : (
-                      <p onClick={() => startEdit(descEditKey, el.fields.description)}
-                        className="group cursor-text text-[13px] leading-relaxed text-foreground hover:text-primary/80" title="Click to edit">
-                        {el.fields.description}
+                      <div onClick={() => startEdit(descEditKey, el.fields.description)}
+                        className="group cursor-text hover:text-primary/80" title="Click to edit">
+                        <MarkdownProse className="text-[13px]">{el.fields.description}</MarkdownProse>
                         <Pencil className="ml-1.5 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                      </p>
+                      </div>
                     )}
                   </div>
                 )}

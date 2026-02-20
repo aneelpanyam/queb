@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Layers, Loader2, Microscope } from 'lucide-react'
 import { QuestionDissection } from '@/components/question-dissection'
+import { MarkdownProse } from '@/components/markdown-prose'
 import type { SelectedNode } from '@/components/questions-tree-nav'
 
 interface DeeperQuestion {
@@ -190,9 +191,9 @@ export function QuestionDetailPanel({
           </div>
 
           {/* Question / title */}
-          <h2 className="text-[16px] font-bold leading-tight tracking-tight text-foreground">
-            {displayQuestion}
-          </h2>
+          <MarkdownProse className="text-[16px] font-bold leading-tight tracking-tight">
+            {displayQuestion || ''}
+          </MarkdownProse>
         </div>
 
         {/* Why This Matters card */}
@@ -201,9 +202,9 @@ export function QuestionDetailPanel({
             <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
               Why This Matters
             </div>
-            <p className="text-[14.5px] leading-relaxed text-foreground">
+            <MarkdownProse className="text-[14.5px]">
               {question.relevance}
-            </p>
+            </MarkdownProse>
           </div>
         )}
 
@@ -213,9 +214,9 @@ export function QuestionDetailPanel({
             <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
               How to Find the Answer
             </div>
-            <p className="text-[14.5px] leading-relaxed text-foreground">
+            <MarkdownProse className="text-[14.5px]">
               {question.infoPrompt}
-            </p>
+            </MarkdownProse>
           </div>
         )}
 
@@ -225,9 +226,9 @@ export function QuestionDetailPanel({
             <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">
               Context & Reasoning
             </div>
-            <p className="text-[14.5px] leading-relaxed text-foreground">
-              {displayReasoning}
-            </p>
+            <MarkdownProse className="text-[14.5px]">
+              {displayReasoning || ''}
+            </MarkdownProse>
           </div>
         )}
 
