@@ -12,6 +12,7 @@ import {
   assembleIdeaDescription,
   type Idea,
   type IdeaFramework,
+  type ImplementationHint,
 } from '@/lib/idea-types'
 
 export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
@@ -31,6 +32,9 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
 
   // Config generation
   const [generatingConfigId, setGeneratingConfigId] = useState<string | null>(null)
+
+  // Output type recommendations
+  const [recommendingId, setRecommendingId] = useState<string | null>(null)
 
   const handleCreateIdea = () => {
     if (!newTitle.trim()) {
@@ -123,6 +127,46 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     }
   }
 
+  const handleGetRecommendations = async (idea: Idea) => {
+    setRecommendingId(idea.id)
+    try {
+      const outputTypes = outputTypeStorage.getAll()
+      const outputTypeNames: Record<string, string> = {}
+      for (const ot of outputTypes) outputTypeNames[ot.id] = ot.name
+
+      const ideaDescription = assembleIdeaDescription(idea, outputTypeNames)
+
+      const data = await aiFetch('/api/recommend-output-types', {
+        ideaDescription,
+        outputTypes: outputTypes.map((ot) => ({
+          id: ot.id,
+          name: ot.name,
+          description: ot.description,
+          sectionLabel: ot.sectionLabel,
+          elementLabel: ot.elementLabel,
+          supportsDeepDive: ot.supportsDeepDive,
+        })),
+      }, { action: 'Recommend Output Types' })
+
+      const hint: ImplementationHint = {
+        summary: data.summary || '',
+        recommendations: data.recommendations || [],
+        generatedAt: new Date().toISOString(),
+      }
+
+      ideaStorage.update(idea.id, {
+        implementationHint: hint,
+        suggestedOutputTypes: hint.recommendations.map((r: { outputTypeId: string }) => r.outputTypeId),
+      })
+      reload()
+      toast.success('Recommendations ready')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to get recommendations')
+    } finally {
+      setRecommendingId(null)
+    }
+  }
+
   return {
     showNewDialog, setShowNewDialog,
     newTitle, setNewTitle,
@@ -136,5 +180,7 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     handleAIGenerate,
     generatingConfigId,
     handleCreateConfiguration,
+    recommendingId,
+    handleGetRecommendations,
   }
 }

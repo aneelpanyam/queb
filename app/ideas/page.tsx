@@ -181,6 +181,8 @@ export default function IdeasPage() {
                           onDelete={() => ideasHook.handleDelete(idea.id)}
                           onCreateConfig={() => gen.handleCreateConfiguration(idea)}
                           generatingConfig={gen.generatingConfigId === idea.id}
+                          onRecommend={() => gen.handleGetRecommendations(idea)}
+                          recommending={gen.recommendingId === idea.id}
                         />
                       ))}
                     </div>

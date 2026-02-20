@@ -18,6 +18,18 @@ export interface Idea {
   notes: string
   rating?: 1 | 2 | 3 | 4 | 5
   configurationId?: string
+  implementationHint?: ImplementationHint
+}
+
+export interface ImplementationHintRecommendation {
+  outputTypeId: string
+  rationale: string
+}
+
+export interface ImplementationHint {
+  summary: string
+  recommendations: ImplementationHintRecommendation[]
+  generatedAt: string
 }
 
 export interface FrameworkFieldDef {

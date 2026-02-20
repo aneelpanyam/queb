@@ -18,6 +18,8 @@ import {
   Calendar,
   ArrowRight,
   Loader2,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react'
 import { relativeTime, FrameworkIcon, StarRating } from '../_lib/ideas-utils'
 
@@ -29,6 +31,8 @@ interface IdeaCardProps {
   onDelete: () => void
   onCreateConfig: () => void
   generatingConfig: boolean
+  onRecommend: () => void
+  recommending: boolean
 }
 
 export function IdeaCard({
@@ -39,6 +43,8 @@ export function IdeaCard({
   onDelete,
   onCreateConfig,
   generatingConfig,
+  onRecommend,
+  recommending,
 }: IdeaCardProps) {
   const router = useRouter()
   const fw = getFrameworkDef(idea.framework)
@@ -120,6 +126,19 @@ export function IdeaCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          {!idea.implementationHint && idea.status !== 'built' && idea.status !== 'archived' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRecommend}
+              disabled={recommending}
+              className="h-8 gap-1.5 text-xs"
+              title="Get AI recommendations for which product types to create"
+            >
+              {recommending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {recommending ? 'Thinking...' : 'Recommend'}
+            </Button>
+          )}
           {idea.status === 'ready' && (
             <Button
               variant="outline"
@@ -185,7 +204,22 @@ export function IdeaCard({
           ))}
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Suggested Product Types</label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="block text-xs font-medium text-muted-foreground">Suggested Product Types</label>
+              {idea.status !== 'built' && idea.status !== 'archived' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRecommend}
+                  disabled={recommending}
+                  className="h-6 gap-1 px-2 text-[10px] text-muted-foreground"
+                  title={idea.implementationHint ? 'Regenerate AI recommendations' : 'Get AI recommendations'}
+                >
+                  {recommending ? <Loader2 className="h-3 w-3 animate-spin" /> : idea.implementationHint ? <RefreshCw className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                  {recommending ? 'Thinking...' : idea.implementationHint ? 'Re-recommend' : 'AI Recommend'}
+                </Button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {outputTypes.map((ot) => (
                 <button
@@ -198,6 +232,28 @@ export function IdeaCard({
               ))}
             </div>
           </div>
+
+          {idea.implementationHint && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+              <p className="text-xs font-medium text-primary">AI Recommendation</p>
+              <p className="text-sm text-foreground/90">{idea.implementationHint.summary}</p>
+              {idea.implementationHint.recommendations.length > 0 && (
+                <ul className="space-y-1">
+                  {idea.implementationHint.recommendations.map((rec) => {
+                    const ot = outputTypes.find((o) => o.id === rec.outputTypeId)
+                    return (
+                      <li key={rec.outputTypeId} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="mt-0.5 shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                          {ot?.name || rec.outputTypeId}
+                        </span>
+                        <span>{rec.rationale}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Tags (comma-separated)</label>
