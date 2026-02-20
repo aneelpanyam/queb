@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/use-auth'
 import { productStorage } from '@/lib/product-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import { getOutputType, getPrimaryField, type OutputTypeDefinition } from '@/lib/output-types'
+import { buildDirectoryProduct } from '@/lib/export-import'
 import type {
   Product,
   Annotation,
@@ -57,6 +58,7 @@ import {
   BarChart3,
   RefreshCw,
   Globe,
+  FileJson,
 } from 'lucide-react'
 
 type SelectedNode =
@@ -403,6 +405,7 @@ export default function ProductEditorPage() {
           return {
             name: section.name,
             description: section.description,
+            resolvedFields: section.resolvedFields,
             elements: section.elements
               .filter((el) => !el.hidden)
               .map((el) => {
@@ -428,7 +431,7 @@ export default function ProductEditorPage() {
             name: outputTypeDef.name,
             sectionLabel: outputTypeDef.sectionLabel,
             elementLabel: outputTypeDef.elementLabel,
-            fields: outputTypeDef.fields,
+            fields: product.resolvedFields ?? outputTypeDef.fields,
             supportsDeepDive: outputTypeDef.supportsDeepDive,
             supportsDeeperQuestions: outputTypeDef.supportsDeeperQuestions,
           },
@@ -455,6 +458,23 @@ export default function ProductEditorPage() {
     } finally {
       setExportLoading(false)
     }
+  }, [product, outputTypeDef, dissectionMap, deeperMap, answerMap])
+
+  // Export JSON (directory format)
+  const handleExportJson = useCallback(() => {
+    if (!product || !outputTypeDef) return
+    const directoryProduct = buildDirectoryProduct(product, outputTypeDef, dissectionMap, deeperMap, answerMap)
+    const json = JSON.stringify(directoryProduct, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${product.name.toLowerCase().replace(/\s+/g, '-')}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success('Product JSON exported!')
   }, [product, outputTypeDef, dissectionMap, deeperMap, answerMap])
 
   // Inline edit helpers
@@ -699,9 +719,13 @@ export default function ProductEditorPage() {
             {assistantLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             Smart Assistant
           </Button>
+          <Button variant="outline" size="sm" onClick={handleExportJson} className="gap-1.5">
+            <FileJson className="h-3.5 w-3.5" />
+            Export JSON
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport} disabled={exportLoading} className="gap-1.5">
             {exportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            Export
+            Export HTML
           </Button>
           <Button size="sm" onClick={handleSave} disabled={!hasUnsavedChanges && saveStatus !== 'idle'} className="gap-1.5">
             {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveStatus === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}

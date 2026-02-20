@@ -36,6 +36,7 @@ interface SectionData {
   name: string
   description: string
   elements: ElementData[]
+  resolvedFields?: FieldDef[]
 }
 
 interface ContextEntry {
@@ -296,10 +297,11 @@ function renderBattleCardElement(el: ElementData): string {
   return html
 }
 
-function renderGenericElement(el: ElementData, def: OutputTypeDef): string {
-  const primaryField = def.fields.find((f) => f.primary) || def.fields[0]
+function renderGenericElement(el: ElementData, def: OutputTypeDef, sectionFields?: FieldDef[]): string {
+  const fields = sectionFields ?? def.fields
+  const primaryField = fields.find((f) => f.primary) || fields[0]
   const primaryVal = el.fields[primaryField.key] || ''
-  const nonPrimary = def.fields.filter((f) => !f.primary)
+  const nonPrimary = fields.filter((f) => !f.primary)
 
   let html = `<h2 class="el-title">${esc(primaryVal)}</h2>`
 
@@ -339,6 +341,7 @@ function buildSiteHtml(data: {
     sectionName: string
     sectionDesc: string
     data: ElementData
+    sectionFields?: FieldDef[]
   }[] = []
 
   let idx = 0
@@ -349,6 +352,7 @@ function buildSiteHtml(data: {
         sectionName: s.name,
         sectionDesc: s.description,
         data: el,
+        sectionFields: s.resolvedFields,
       })
       idx++
     }
@@ -362,7 +366,8 @@ function buildSiteHtml(data: {
       sidebarHtml.push(`<div class="nav-group">${esc(el.sectionName)}</div>`)
       prevSection = el.sectionName
     }
-    const primaryVal = el.data.fields[primaryField.key] || Object.values(el.data.fields)[0] || ''
+    const elPrimary = el.sectionFields?.find((f) => f.primary) || el.sectionFields?.[0] || primaryField
+    const primaryVal = el.data.fields[elPrimary.key] || Object.values(el.data.fields)[0] || ''
     const short = primaryVal.length > 65 ? primaryVal.slice(0, 62) + '...' : primaryVal
     sidebarHtml.push(
       `<button class="nav-btn" data-id="${el.id}" onclick="showEl('${el.id}')">${esc(short)}</button>`,
@@ -409,7 +414,7 @@ function buildSiteHtml(data: {
         innerHtml = renderBattleCardElement(el.data)
         break
       default:
-        innerHtml = renderGenericElement(el.data, outputTypeDef)
+        innerHtml = renderGenericElement(el.data, outputTypeDef, el.sectionFields)
         break
     }
 
