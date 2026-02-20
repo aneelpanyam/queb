@@ -88,6 +88,12 @@ interface ApiCheatSheetCategory {
   entries: Record<string, string>[]
 }
 
+interface ApiAgentOpportunity {
+  opportunityName: string
+  opportunityDescription: string
+  agents: Record<string, string>[]
+}
+
 function toFields(obj: Record<string, string>): Record<string, string> {
   const fields: Record<string, string> = {}
   for (const [k, v] of Object.entries(obj)) {
@@ -165,6 +171,14 @@ function cheatSheetsToSections(categories: ApiCheatSheetCategory[]): ProductSect
     name: c.categoryName,
     description: c.categoryDescription,
     elements: c.entries.map((e) => ({ fields: toFields(e) })),
+  }))
+}
+
+function agentBookToSections(opportunities: ApiAgentOpportunity[]): ProductSection[] {
+  return opportunities.map((o) => ({
+    name: o.opportunityName,
+    description: o.opportunityDescription,
+    elements: o.agents.map((a) => ({ fields: toFields(a) })),
   }))
 }
 
@@ -251,6 +265,7 @@ export default function RunConfigPage() {
           dossier: '/api/generate-dossier',
           playbook: '/api/generate-playbook',
           'cheat-sheets': '/api/generate-cheat-sheets',
+          'agent-book': '/api/generate-agent-book',
         }
 
         const route = routeMap[co.outputTypeId]
@@ -290,6 +305,9 @@ export default function RunConfigPage() {
           } else if (co.outputTypeId === 'playbook') {
             if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
             sections = playbookToSections(data.phases)
+          } else if (co.outputTypeId === 'agent-book') {
+            if (!data.opportunities?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = agentBookToSections(data.opportunities)
           } else {
             if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
             sections = cheatSheetsToSections(data.categories)

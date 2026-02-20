@@ -12,6 +12,7 @@ import { DECISION_DOMAINS } from '@/lib/decision-domains'
 import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
 import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
 import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
+import { AGENT_OPPORTUNITY_AREAS } from '@/lib/agent-opportunity-areas'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 
 export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
@@ -329,6 +330,38 @@ GUIDELINES:
     defaultSectionDrivers: CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
     isBuiltIn: true,
   },
+  {
+    id: 'agent-book',
+    name: 'Agent Book',
+    description: 'AI agent ideas organized by workflow opportunity — what to build, how it works, and how to get started',
+    icon: 'Bot',
+    prompt: `You are an AI agent strategist who identifies high-impact opportunities to deploy AI agents across workflows.
+
+TASK:
+Generate a catalog of AI agent ideas organized by workflow opportunity area.
+
+GUIDELINES:
+- Generate 3-5 agent ideas per relevant opportunity area
+- Every agent must be specific to the described context, not generic
+- Each agent must include a clear name, description, architecture, and implementation guidance
+- Agents should range from quick-win automations to ambitious multi-step orchestrations
+- Tailor agents to the specific role, industry, and workflow context provided`,
+    sectionLabel: 'Opportunity Area',
+    elementLabel: 'Agent',
+    fields: [
+      { key: 'agentName', label: 'Agent Name', type: 'short-text', primary: true },
+      { key: 'description', label: 'What It Does', type: 'long-text', color: 'blue', icon: 'FileText' },
+      { key: 'howItWorks', label: 'How It Works', type: 'long-text', color: 'none', icon: 'Workflow' },
+      { key: 'keyCapabilities', label: 'Key Capabilities', type: 'long-text', color: 'violet', icon: 'Sparkles' },
+      { key: 'dataAndTools', label: 'Data & Tools Needed', type: 'long-text', color: 'amber', icon: 'Wrench' },
+      { key: 'complexity', label: 'Implementation Complexity', type: 'short-text', color: 'red', icon: 'Gauge' },
+      { key: 'expectedImpact', label: 'Expected Impact', type: 'long-text', color: 'emerald', icon: 'TrendingUp' },
+      { key: 'quickStart', label: 'Quick-Start Hint', type: 'long-text', color: 'primary', icon: 'Rocket' },
+    ],
+    supportsDeepDive: true,
+    defaultSectionDrivers: AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
+    isBuiltIn: true,
+  },
 ]
 
 // ============================================================
@@ -337,7 +370,7 @@ GUIDELINES:
 // existing users get the updated defaults.
 // ============================================================
 
-const SEED_VERSION = 2
+const SEED_VERSION = 3
 const VERSION_KEY = STORAGE_KEY + '-version'
 
 function ensureSeeded(): OutputTypeDefinition[] {
@@ -560,6 +593,22 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Prioritization', content: 'Prioritize entries by how frequently they are referenced in practice — the most-used terms and concepts should come first.' },
     { label: 'Tailoring', content: 'Tailor all entries to the specific context, industry terminology, and audience level provided.' },
   ],
+  'agent-book': [
+    { label: 'Role', content: 'You are an AI agent strategist who identifies high-impact opportunities to deploy AI agents across workflows.' },
+    { label: 'Task', content: 'Generate 3-5 AI agent ideas for this opportunity area.' },
+    { label: 'Relevance filter', content: 'Only generate agents if this opportunity area is genuinely relevant to the given context. If not relevant, return an empty agents array.' },
+    { label: 'Specificity', content: 'Every agent must be specific to the described context — not a generic AI tool suggestion.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make agent recommendations sharper and more grounded in the real workflow.' },
+    { label: 'Agent naming', content: 'Agent names should be memorable and descriptive (e.g., "Lead Research Autopilot", "Deal Risk Scanner") — not generic labels like "Email Agent".' },
+    { label: 'How it works', content: 'The "howItWorks" field must describe the agent architecture: what triggers it, what data it consumes, what steps it takes, what tools it calls, and what output it produces.' },
+    { label: 'Key capabilities', content: 'The "keyCapabilities" field must list the specific tasks this agent automates or augments, and what manual work it replaces.' },
+    { label: 'Data & tools', content: 'The "dataAndTools" field must be specific about integrations, APIs, data sources, and platforms the agent needs — not vague references to "your CRM".' },
+    { label: 'Complexity rating', content: 'The "complexity" field must rate as Low (off-the-shelf or simple API chain), Medium (custom logic, some integration work), or High (significant engineering, custom models, or complex orchestration) — with a brief justification.' },
+    { label: 'Expected impact', content: 'The "expectedImpact" field should quantify the benefit where possible — hours saved per week, error reduction percentage, revenue impact, or speed improvement.' },
+    { label: 'Quick start', content: 'The "quickStart" field must be a concrete, actionable first step — not "think about it" but "sign up for X and connect Y".' },
+    { label: 'Complexity range', content: 'Vary the complexity across agents — include both quick-win automations and more ambitious multi-step orchestrations.' },
+    { label: 'Tailoring', content: 'Tailor all agent recommendations to the specific role, industry, workflow, and constraints provided.' },
+  ],
 }
 
 /** Returns default instruction directives for an output type, from definition or built-in fallback */
@@ -583,6 +632,7 @@ const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
   dossier: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),
   playbook: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
   'cheat-sheets': CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
+  'agent-book': AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
 }
 
 /** Returns default section drivers for an output type, from definition or built-in fallback */
