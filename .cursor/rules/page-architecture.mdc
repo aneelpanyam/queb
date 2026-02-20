@@ -1,0 +1,140 @@
+---
+description: Modular page architecture — hooks, components, and wiring patterns for the four main feature pages
+globs: app/configurations/**,app/products/[id]/**,app/legacy/**,app/ideas/**
+alwaysApply: false
+---
+
+# Page Architecture
+
+Every feature page follows a **three-layer pattern**: thin orchestrator page, domain hooks, and presentational components — co-located under underscore-prefixed directories.
+
+```
+app/<feature>/
+  page.tsx              ← Orchestrator: wires hooks, renders components, handles auth guards
+  _hooks/               ← State + logic (no JSX)
+  _components/          ← Presentational (receives data + callbacks via props)
+  _lib/                 ← Pure functions, types, constants (optional)
+```
+
+Underscore prefixes (`_hooks/`, `_components/`, `_lib/`) prevent Next.js from treating them as routes.
+
+## Layer Responsibilities
+
+| Layer | Owns | Must NOT do |
+|-------|------|-------------|
+| `_lib/` | Types, pure helpers, constants | Hold state, call APIs |
+| `_hooks/` | `useState`, `useEffect`, storage calls, API calls | Render JSX |
+| `_components/` | JSX, layout, event handler props | Call storage/APIs directly, declare domain state |
+| `page.tsx` | Hook wiring, auth guards, layout shell | Contain business logic or significant JSX trees |
+
+## Hook Composition
+
+Hooks that need data from other hooks receive it **as arguments**, not by calling the other hook internally:
+
+```typescript
+// In page.tsx
+const editor = useProductEditor(productId)
+const enrichments = useProductEnrichments(product, editor.dissectionMap, ...)
+const assistant = useProductAssistant(product, outputTypeDef, markUnsaved)
+```
+
+The page is the **only coupling point** between hooks. Trace any data flow by reading `page.tsx`.
+
+## File Map
+
+### Configurations (`app/configurations/`)
+
+| File | Responsibility |
+|------|---------------|
+| `_lib/config-builder-utils.ts` | `BuilderState` type, `emptyBuilder()`, `configToBuilder()`, color/icon constants |
+| `_hooks/use-configurations.ts` | Config list CRUD, field/output-type lists, builder open/close/save |
+| `_hooks/use-config-builder.ts` | Internal builder state: steps, outputs, drivers, directives, field overrides |
+| `_hooks/use-ai-wizard.ts` | AI wizard dialog state, prompt, `handleWizardGenerate`, `processAIConfiguration` |
+| `_hooks/use-config-export-import.ts` | Select mode, export all/selected, import |
+| `_components/config-builder.tsx` | Full builder form (uses `useConfigBuilder` internally) |
+| `_components/step-editor.tsx` | Single step: name, description, field picker |
+| `_components/output-editor.tsx` | Single output — wraps section-drivers, directives, element-fields editors |
+| `_components/section-drivers-editor.tsx` | Add/remove/edit section drivers |
+| `_components/instruction-directives-editor.tsx` | Add/remove/edit instruction directives |
+| `_components/element-fields-editor.tsx` | Add/remove/edit element field overrides |
+| `_components/configurations-list.tsx` | List of saved configs with run/edit/duplicate/delete actions |
+| `_components/ai-wizard-dialog.tsx` | AI wizard dialog |
+| `_components/export-import-toolbar.tsx` | Import/export buttons + select mode controls |
+
+### Product Editor (`app/products/[id]/`)
+
+| File | Responsibility |
+|------|---------------|
+| `_lib/product-editor-utils.ts` | `SelectedNode` type, key helpers, context extraction, field formatting |
+| `_hooks/use-product-editor.ts` | Product load/save, section/element/annotation CRUD, selected node, enrichment maps |
+| `_hooks/use-product-enrichments.ts` | Dissection, deeper questions, answers — loading flags, API calls, visibility |
+| `_hooks/use-product-assistant.ts` | Smart Assistant: open/close, scope, analysis runner, data |
+| `_hooks/use-inline-editing.ts` | Field-level inline editing state (editing field key, edit value, save/cancel) |
+| `_components/product-editor-header.tsx` | Top bar: product name, badges, save/export/assistant buttons |
+| `_components/product-editor-sidebar.tsx` | Left sidebar: context entries, section/element tree, visibility toggles |
+| `_components/product-detail-panel.tsx` | Main content: element detail, enrichments, annotations |
+| `_components/product-assistant-sheet.tsx` | Slide-over sheet: scope nav, analyze button, grouped suggestions |
+
+### Legacy (`app/legacy/`)
+
+| File | Responsibility |
+|------|---------------|
+| `_hooks/use-legacy-auth.ts` | Custom session check + logout (separate from app-wide `useAuth`) |
+| `_hooks/use-legacy-wizard.ts` | 5-step wizard state, SWR mutations for services/roles/activities/questions |
+| `_hooks/use-legacy-sessions.ts` | Session CRUD (save, load, delete), dissection/deeper update handlers |
+| `_components/legacy-header.tsx` | Header with wizard/history view toggle |
+| `_components/legacy-wizard-steps.tsx` | Steps 1–4: org profile, role selector, activity selector, situation form |
+| `_components/legacy-results-view.tsx` | Step 5: questions view + save/regenerate/start-over actions |
+
+### Ideas (`app/ideas/`)
+
+| File | Responsibility |
+|------|---------------|
+| `_lib/ideas-utils.tsx` | `GroupBy`/`SortBy` types, `relativeTime()`, `FrameworkIcon`, `StarRating` |
+| `_hooks/use-ideas.ts` | Ideas list CRUD, expanded state, export/import |
+| `_hooks/use-idea-generation.ts` | New idea dialog + AI generate dialog + config generation |
+| `_hooks/use-idea-filters.ts` | Search, status/framework filter, group by, sort by, computed results |
+| `_components/idea-card.tsx` | Single idea: summary row + expandable editor |
+| `_components/idea-generation-dialog.tsx` | Exports `NewIdeaDialog` + `AIGenerateDialog` |
+| `_components/ideas-toolbar.tsx` | Search/filter/group/sort bar + export/import buttons |
+
+## How-To Recipes
+
+### Add a new field to an existing hook
+
+1. Add the `useState` declaration in the hook
+2. Add it to the hook's return object
+3. Thread it through `page.tsx` as a prop to the relevant component
+4. Use it in the component
+
+### Add a new API call (e.g. a new enrichment)
+
+1. Add the API route in `app/api/<name>/route.ts`
+2. Add state + handler in the appropriate `_hooks/` file (loading flag, result state, async handler)
+3. Return new state/handlers from the hook
+4. Wire them in `page.tsx` and pass to the component that triggers/displays the result
+
+### Add a new component to a page
+
+1. Create `_components/<name>.tsx` — accept all data via props, no direct storage access
+2. Import it in `page.tsx`
+3. Pass the needed hook return values as props
+
+### Add a new hook to a page
+
+1. Create `_hooks/use-<name>.ts`
+2. Accept dependencies from other hooks as function parameters (not by calling them internally)
+3. Call it in `page.tsx` after the hooks it depends on
+4. Pass its return values as props to components that need them
+
+### Move state between hooks
+
+If a piece of state is used by multiple hooks, lift it to the hook that loads/owns the data, and pass it to dependent hooks as a parameter. The product editor demonstrates this: `dissectionMap` lives in `useProductEditor` but is mutated by `useProductEnrichments` via setter functions passed as arguments.
+
+## Conventions
+
+- **Naming**: Hooks are `use-<domain>.ts`, components are `<feature>-<role>.tsx`, utils are `<feature>-utils.ts`
+- **No JSX in `.ts` files** — if a utils file contains JSX helpers (like `FrameworkIcon`), use `.tsx`
+- **Props over context** — all data flows through props; no React Context is used within these pages
+- **Toast notifications** — hooks call `toast.success()`/`toast.error()` directly; components don't toast
+- **Storage calls live in hooks** — components never import from `lib/*-storage.ts` directly

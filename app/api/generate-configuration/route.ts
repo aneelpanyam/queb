@@ -13,6 +13,13 @@ const newFieldSchema = z.object({
   category: z.string().describe('Category grouping (e.g. "Core", "Context", "Audience", "Topic-Specific")'),
 })
 
+const elementFieldSchema = z.object({
+  key: z.string().describe('camelCase field key (e.g. "relevance", "actionSteps")'),
+  label: z.string().describe('Human-readable label shown in the UI (e.g. "Why This Matters")'),
+  type: z.enum(['short-text', 'long-text']).describe('short-text for brief values, long-text for paragraphs'),
+  primary: z.boolean().describe('True for the main/title field (exactly one per output), false for all others'),
+})
+
 const configSchema = z.object({
   name: z.string().describe('Short, catchy configuration name'),
   description: z.string().describe('One-sentence summary of what this configuration produces'),
@@ -35,6 +42,10 @@ const configSchema = z.object({
         z.object({
           name: z.string().describe('Section driver name'),
           description: z.string().describe('What this driver focuses on'),
+          fields: z.array(elementFieldSchema).describe(
+            'Per-driver element fields tailored to this driver\'s focus. Overrides the output-level fields for this section. ' +
+            'Customize field labels and keys to match what makes sense for this specific driver/angle.'
+          ),
         })
       ),
       instructionDirectives: z.array(
@@ -43,14 +54,8 @@ const configSchema = z.object({
           content: z.string().describe('The instruction content for the AI'),
         })
       ),
-      fields: z.array(
-        z.object({
-          key: z.string().describe('camelCase field key (e.g. "relevance", "actionSteps")'),
-          label: z.string().describe('Human-readable label shown in the UI (e.g. "Why This Matters")'),
-          type: z.enum(['short-text', 'long-text']).describe('short-text for brief values, long-text for paragraphs'),
-          primary: z.boolean().describe('True for the main/title field (exactly one per output), false for all others'),
-        })
-      ).describe('Element fields — what detail sections each generated item will have. The first should be primary.'),
+      fields: z.array(elementFieldSchema)
+        .describe('Default element fields for the output. Used as fallback when a section driver does not define its own fields.'),
     })
   ),
 })
@@ -133,6 +138,12 @@ STEP 3: ORGANIZE INTO STEPS & OUTPUTS
 
 Section drivers (4-8 entries):
 - Design custom drivers specific to the user's topic. Each driver represents a meaningful angle/category for the content.
+- IMPORTANT: Each driver must include its own "fields" array (3-7 fields) tailored to that driver's specific focus.
+  - Think about what detail fields make sense given this driver's angle. Different drivers often need different fields.
+  - For example, a "Budget & ROI" driver might need fields like "Cost Implications", "ROI Metrics", "Budget Justification",
+    while a "Team Dynamics" driver might need "Stakeholders Affected", "Collaboration Challenges", "Communication Strategy".
+  - The first field in each driver should be the primary/title field (set primary: true).
+  - Reuse the same key across drivers when the concept is truly the same, but don't force-fit — use distinct keys when the angle demands different detail sections.
 
 Instruction directives (4-8 entries):
 - Tell the AI exactly how to generate content for this topic. Typically include:
@@ -141,11 +152,10 @@ Instruction directives (4-8 entries):
   - Directives for tone, specificity, depth, format, constraints, etc.
   - Directives describing what each element field should contain
 
-Element fields (3-7 per output):
-- Define what detail sections each generated item will have. Each field becomes a visible card in the product detail view.
+Default element fields (3-7 per output):
+- Define fallback detail sections used when a driver doesn't specify its own fields.
 - The first field should be the primary/title field (set primary: true).
-- Subsequent fields are the supporting detail sections the user sees (e.g. "Why This Matters", "Action Steps", "Key Metrics").
-- Use the output type's default fields as a starting point, but customize them for the user's specific topic. Add, remove, or rename fields to best serve this use case.
+- Use the output type's default fields as a starting point, but customize them for the user's specific topic.
 - Use "long-text" for paragraph content and "short-text" for brief values or labels.
 
 Configuration name: make it catchy and descriptive.

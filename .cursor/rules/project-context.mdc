@@ -31,15 +31,29 @@ app/
   products/
     page.tsx                        → product list (filter, group, export/import)
     new/page.tsx                    → create product via configuration wizard
-    [id]/page.tsx                   → product detail/edit (1300+ lines, main workspace)
+    [id]/page.tsx                   → product editor orchestrator (~250 lines)
+    [id]/_hooks/                    → use-product-editor, use-product-enrichments, use-product-assistant, use-inline-editing
+    [id]/_components/               → product-editor-header, product-editor-sidebar, product-detail-panel, product-assistant-sheet
+    [id]/_lib/                      → product-editor-utils (types, helpers)
   configurations/
-    page.tsx                        → configuration builder (1300+ lines)
+    page.tsx                        → configurations orchestrator (~230 lines)
     [id]/run/page.tsx               → run a configuration (wizard flow)
+    _hooks/                         → use-configurations, use-config-builder, use-ai-wizard, use-config-export-import
+    _components/                    → config-builder, step-editor, output-editor, configurations-list, ai-wizard-dialog, etc.
+    _lib/                           → config-builder-utils (BuilderState type, converters)
+  ideas/
+    page.tsx                        → ideas orchestrator (~220 lines)
+    _hooks/                         → use-ideas, use-idea-generation, use-idea-filters
+    _components/                    → idea-card, idea-generation-dialog, ideas-toolbar
+    _lib/                           → ideas-utils (types, helpers)
+  legacy/
+    page.tsx                        → legacy orchestrator (~230 lines)
+    _hooks/                         → use-legacy-auth, use-legacy-wizard, use-legacy-sessions
+    _components/                    → legacy-header, legacy-wizard-steps, legacy-results-view
   library/page.tsx                  → manage fields and output types
   info/page.tsx                     → about/info page
   info/lean-canvas/page.tsx         → lean canvas
-  legacy/page.tsx                   → legacy interface
-  api/                              → 17 API routes (see API section)
+  api/                              → 17+ API routes (see API section)
 components/
   ui/                               → 60+ shadcn/ui primitives (don't modify unless needed)
   smart-field.tsx                   → AI-powered field with suggestions dropdown
@@ -184,6 +198,8 @@ All API routes live in `app/api/`. They follow this pattern:
 7. **Component patterns** — use shadcn/ui primitives, `cn()` for class merging, Sonner for toasts, React Hook Form + Zod for forms.
 
 8. **No middleware** — auth is checked client-side via `useAuth()` hook polling `/api/auth` every 60s.
+
+9. **Modular page architecture** — the four main feature pages (configurations, product editor, ideas, legacy) follow a three-layer pattern: thin orchestrator `page.tsx` (~200–250 lines), co-located `_hooks/` (state + logic), and `_components/` (presentational). Hooks receive dependencies from other hooks as function parameters; the page is the only coupling point. See `.cursor/rules/page-architecture.mdc` for full file map and change recipes.
 
 ## localStorage Keys
 

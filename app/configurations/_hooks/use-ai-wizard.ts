@@ -72,17 +72,23 @@ export function useAIWizard(
         name: configuration.name || '',
         description: configuration.description || '',
         steps,
-        outputs: (configuration.outputs || []).map((out: AIOutput) => ({
-          outputTypeId: out.outputTypeId,
-          sectionDrivers: out.sectionDrivers?.length ? out.sectionDrivers : undefined,
-          instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
-          fieldOverrides: out.fields?.length ? out.fields.map((f) => ({
-            key: f.key,
-            label: f.label,
-            type: f.type,
-            primary: f.primary || undefined,
-          })) : undefined,
-        })),
+        outputs: (configuration.outputs || []).map((out: AIOutput) => {
+          const mapFields = (fields?: { key: string; label: string; type: 'short-text' | 'long-text'; primary?: boolean }[]) =>
+            fields?.length ? fields.map((f) => ({ key: f.key, label: f.label, type: f.type, primary: f.primary || undefined })) : undefined
+
+          return {
+            outputTypeId: out.outputTypeId,
+            sectionDrivers: out.sectionDrivers?.length
+              ? out.sectionDrivers.map((d) => ({
+                  name: d.name,
+                  description: d.description,
+                  fields: mapFields(d.fields),
+                }))
+              : undefined,
+            instructionDirectives: out.instructionDirectives?.length ? out.instructionDirectives : undefined,
+            fieldOverrides: mapFields(out.fields),
+          }
+        }),
       },
       createdFieldCount,
     }

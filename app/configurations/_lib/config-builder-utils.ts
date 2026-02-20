@@ -62,9 +62,16 @@ export interface AIStep {
   newFields?: AINewField[]
 }
 
+export interface AIDriverField {
+  key: string
+  label: string
+  type: 'short-text' | 'long-text'
+  primary?: boolean
+}
+
 export interface AIOutput {
   outputTypeId: string
-  sectionDrivers?: { name: string; description: string }[]
+  sectionDrivers?: { name: string; description: string; fields?: AIDriverField[] }[]
   instructionDirectives?: { label: string; content: string }[]
-  fields?: { key: string; label: string; type: 'short-text' | 'long-text'; primary?: boolean }[]
+  fields?: AIDriverField[]
 }
