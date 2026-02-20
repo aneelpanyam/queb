@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
-import { valuesToLegacyContext } from '@/lib/setup-config-types'
+import { valuesToLegacyContext, getFieldKey } from '@/lib/setup-config-types'
 import { fieldStorage, type FieldDefinition, sortFieldsByDependency } from '@/lib/field-library'
 import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
 import { productStorage } from '@/lib/product-storage'
@@ -430,16 +430,16 @@ export default function RunConfigPage() {
   const currentStep = config.steps[stepIndex]
   const promptOverrides: Record<string, string> = {}
   for (const csf of currentStep?.fields || []) {
-    if (csf.promptOverride) promptOverrides[csf.fieldId] = csf.promptOverride
+    if (csf.promptOverride) promptOverrides[getFieldKey(csf)] = csf.promptOverride
   }
-  const sortedIds = sortFieldsByDependency(
-    (currentStep?.fields || []).map((f) => f.fieldId),
+  const sortedKeys = sortFieldsByDependency(
+    (currentStep?.fields || []).map((f) => getFieldKey(f)),
     promptOverrides,
   )
-  const stepFields = sortedIds
-    .map((id) => {
-      const csf = currentStep.fields.find((f) => f.fieldId === id)
-      const def = allFields.find((f) => f.id === id)
+  const stepFields = sortedKeys
+    .map((key) => {
+      const csf = currentStep.fields.find((f) => getFieldKey(f) === key)
+      const def = csf ? allFields.find((f) => f.id === csf.fieldId) : undefined
       return csf && def ? { def, csf } : null
     })
     .filter(Boolean) as { def: FieldDefinition; csf: (typeof currentStep.fields)[number] }[]
@@ -447,7 +447,7 @@ export default function RunConfigPage() {
   const requiredFilled = stepFields
     .filter(({ csf }) => csf.required)
     .every(({ csf }) => {
-      const v = values[csf.fieldId]
+      const v = values[getFieldKey(csf)]
       return Array.isArray(v) ? v.length > 0 : !!v?.toString().trim()
     })
 
@@ -551,6 +551,8 @@ export default function RunConfigPage() {
 
           <div className="space-y-5">
             {stepFields.map(({ def, csf }) => {
+              const key = getFieldKey(csf)
+              const effectiveMode = csf.customSelectionMode || def.selectionMode
               const textInputRefs = csf.inputMappings
                 ? Object.entries(csf.inputMappings)
                     .filter(([, m]) => m.type === 'text')
@@ -558,7 +560,7 @@ export default function RunConfigPage() {
                 : []
 
               return (
-                <div key={def.id}>
+                <div key={key}>
                   {/* Text inputs for unmapped prompt references */}
                   {textInputRefs.map((ref) => (
                     <div key={ref} className="mb-3">
@@ -573,11 +575,14 @@ export default function RunConfigPage() {
                   ))}
                   <SmartField
                     field={def}
-                    value={values[def.id] || (def.selectionMode === 'multi' ? [] : '')}
+                    value={values[key] || (effectiveMode === 'multi' ? [] : '')}
                     allValues={values}
                     promptOverride={csf.promptOverride}
                     inputMappings={csf.inputMappings}
-                    onChange={(v) => handleFieldChange(def.id, v)}
+                    onChange={(v) => handleFieldChange(key, v)}
+                    fieldKey={csf.customName ? key : undefined}
+                    customLabel={csf.customLabel}
+                    customSelectionMode={csf.customSelectionMode}
                   />
                 </div>
               )

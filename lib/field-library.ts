@@ -153,6 +153,16 @@ const SEED_FIELDS: Omit<FieldDefinition, 'createdAt' | 'updatedAt'>[] = [
     category: 'Context',
     isBuiltIn: true,
   },
+  {
+    id: 'empty-field',
+    name: 'Empty Field',
+    description: 'A blank template field. Customize its name, label, and prompt in the configuration.',
+    prompt: '',
+    selectionMode: 'single',
+    allowCustomValues: true,
+    category: 'Template',
+    isBuiltIn: true,
+  },
 ]
 
 // ============================================================
@@ -182,12 +192,14 @@ export interface ComputedDeps {
 }
 
 /**
- * Splits prompt placeholder references into those that match a library field
- * and those that don't.
+ * Splits prompt placeholder references into those that match a known field
+ * and those that don't. Pass extraKnownIds to include config-level custom
+ * field names (from empty-field instances) in the resolved set.
  */
 export function computeDependencies(
   fieldOrPrompt: FieldDefinition | string,
   promptOverride?: string,
+  extraKnownIds?: Set<string>,
 ): ComputedDeps {
   const prompt =
     typeof fieldOrPrompt === 'string'
@@ -196,6 +208,9 @@ export function computeDependencies(
   const refs = extractDependencies(prompt)
   const allFields = getAll()
   const knownIds = new Set(allFields.map((f) => f.id))
+  if (extraKnownIds) {
+    for (const id of extraKnownIds) knownIds.add(id)
+  }
   const resolved: string[] = []
   const unresolved: string[] = []
   for (const ref of refs) {
@@ -258,12 +273,9 @@ export function sortFieldsByDependency(
 
   for (const id of fieldIds) {
     const field = getAll().find((f) => f.id === id)
-    if (!field) {
-      adjMap.set(id, [])
-      continue
-    }
-    const { resolved } = computeDependencies(field, promptOverrides?.[id])
-    adjMap.set(id, resolved.filter((d) => idSet.has(d)))
+    const prompt = promptOverrides?.[id] || field?.prompt || ''
+    const deps = extractDependencies(prompt)
+    adjMap.set(id, deps.filter((d) => idSet.has(d)))
   }
 
   const sorted: string[] = []

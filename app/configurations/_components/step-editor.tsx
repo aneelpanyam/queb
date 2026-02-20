@@ -1,9 +1,9 @@
 'use client'
 
 import type { ConfigStep, ConfigStepField } from '@/lib/setup-config-types'
+import { getFieldKey } from '@/lib/setup-config-types'
 import type { FieldDefinition } from '@/lib/field-library'
 import { computeDependencies, sortFieldsByDependency } from '@/lib/field-library'
-import type { BuilderState } from '../_lib/config-builder-utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,9 +26,20 @@ interface StepEditorProps {
   onMoveStep: (stepId: string, dir: -1 | 1) => void
   onRemoveStep: (stepId: string) => void
   onAddField: (stepId: string, fieldId: string) => void
-  onRemoveField: (stepId: string, fieldId: string) => void
-  onUpdateField: (stepId: string, fieldId: string, updates: Partial<ConfigStepField>) => void
+  onRemoveField: (stepId: string, key: string) => void
+  onUpdateField: (stepId: string, key: string, updates: Partial<ConfigStepField>) => void
   onToggleFieldPicker: () => void
+}
+
+/** Collect all effective keys across all config steps for dependency resolution */
+function configCustomNames(allSteps: ConfigStep[]): Set<string> {
+  const names = new Set<string>()
+  for (const s of allSteps) {
+    for (const f of s.fields) {
+      names.add(getFieldKey(f))
+    }
+  }
+  return names
 }
 
 export function StepEditor({
@@ -38,6 +49,8 @@ export function StepEditor({
   onToggleExpand, onUpdateStep, onMoveStep, onRemoveStep,
   onAddField, onRemoveField, onUpdateField, onToggleFieldPicker,
 }: StepEditorProps) {
+  const extraKnownIds = configCustomNames(allSteps)
+
   return (
     <div className="rounded-lg border border-border">
       <div className="flex items-center gap-2 px-3 py-2">
@@ -72,30 +85,36 @@ export function StepEditor({
           <div className="space-y-1.5">
             {(() => {
               const overrides: Record<string, string> = {}
-              for (const f of step.fields) { if (f.promptOverride) overrides[f.fieldId] = f.promptOverride }
-              return sortFieldsByDependency(step.fields.map((f) => f.fieldId), overrides)
-            })().map((sortedId) => {
-              const csf = step.fields.find((f) => f.fieldId === sortedId)
+              for (const f of step.fields) { if (f.promptOverride) overrides[getFieldKey(f)] = f.promptOverride }
+              return sortFieldsByDependency(step.fields.map((f) => getFieldKey(f)), overrides)
+            })().map((sortedKey) => {
+              const csf = step.fields.find((f) => getFieldKey(f) === sortedKey)
               if (!csf) return null
               const fieldDef = allFields.find((f) => f.id === csf.fieldId)
               if (!fieldDef) return null
-              const deps = computeDependencies(fieldDef, csf.promptOverride)
-              const allConfigFieldIds = allSteps.flatMap((s) => s.fields.map((f) => f.fieldId))
-              const missingFromConfig = deps.resolved.filter((d) => !allConfigFieldIds.includes(d))
+              const isCustom = csf.fieldId === 'empty-field'
+              const deps = computeDependencies(
+                isCustom ? (csf.promptOverride || '') : fieldDef,
+                isCustom ? undefined : csf.promptOverride,
+                extraKnownIds,
+              )
+              const allConfigFieldKeys = allSteps.flatMap((s) => s.fields.map((f) => getFieldKey(f)))
+              const missingFromConfig = deps.resolved.filter((d) => !allConfigFieldKeys.includes(d))
 
-              const fieldStepIdx = allSteps.findIndex((s) => s.fields.some((f) => f.fieldId === csf.fieldId))
+              const fieldStepIdx = allSteps.findIndex((s) => s.fields.some((f) => getFieldKey(f) === sortedKey))
               const orderWarnings = deps.resolved.filter((depId) => {
-                const depStepIdx = allSteps.findIndex((s) => s.fields.some((f) => f.fieldId === depId))
+                const depStepIdx = allSteps.findIndex((s) => s.fields.some((f) => getFieldKey(f) === depId))
                 return depStepIdx > fieldStepIdx
               })
 
               return (
                 <FieldCard
-                  key={csf.fieldId}
+                  key={sortedKey}
                   csf={csf}
                   fieldDef={fieldDef}
                   deps={deps}
                   allFields={allFields}
+                  allSteps={allSteps}
                   missingFromConfig={missingFromConfig}
                   orderWarnings={orderWarnings}
                   stepId={step.id}
@@ -116,7 +135,8 @@ export function StepEditor({
                   <div key={cat}>
                     <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{cat}</div>
                     {catFields.map((f) => {
-                      const inUse = allFieldIdsInConfig.includes(f.id)
+                      const isEmptyField = f.id === 'empty-field'
+                      const inUse = !isEmptyField && allFieldIdsInConfig.includes(f.id)
                       return (
                         <button
                           key={f.id}
@@ -144,48 +164,101 @@ export function StepEditor({
 }
 
 function FieldCard({
-  csf, fieldDef, deps, allFields, missingFromConfig, orderWarnings, stepId,
+  csf, fieldDef, deps, allFields, allSteps, missingFromConfig, orderWarnings, stepId,
   onUpdateField, onRemoveField,
 }: {
   csf: ConfigStepField
   fieldDef: FieldDefinition
   deps: { resolved: string[]; unresolved: string[] }
   allFields: FieldDefinition[]
+  allSteps: ConfigStep[]
   missingFromConfig: string[]
   orderWarnings: string[]
   stepId: string
-  onUpdateField: (stepId: string, fieldId: string, updates: Partial<ConfigStepField>) => void
-  onRemoveField: (stepId: string, fieldId: string) => void
+  onUpdateField: (stepId: string, key: string, updates: Partial<ConfigStepField>) => void
+  onRemoveField: (stepId: string, key: string) => void
 }) {
+  const key = getFieldKey(csf)
+  const isCustom = csf.fieldId === 'empty-field'
+  const displayName = csf.customLabel || fieldDef.name
+  const displayId = csf.customName || fieldDef.id
+  const selectionMode = csf.customSelectionMode || fieldDef.selectionMode
+
+  const depNameForId = (depId: string) => {
+    const libField = allFields.find((f) => f.id === depId)
+    if (libField) return libField.name
+    for (const s of allSteps) {
+      for (const f of s.fields) {
+        if (f.customName === depId) return f.customLabel || depId
+      }
+    }
+    return depId
+  }
+
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2">
+    <div className={`rounded-md border bg-card px-3 py-2 ${isCustom ? 'border-primary/30' : 'border-border'}`}>
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-foreground">{fieldDef.name}</span>
-            <code className="text-[10px] text-muted-foreground">{fieldDef.id}</code>
-            <span className="text-[10px] text-muted-foreground">{fieldDef.selectionMode}</span>
+            <span className="text-xs font-semibold text-foreground">{displayName}</span>
+            <code className="text-[10px] text-muted-foreground">{displayId}</code>
+            <span className="text-[10px] text-muted-foreground">{selectionMode}</span>
+            {isCustom && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">Custom</span>}
           </div>
         </div>
         <label className="flex items-center gap-1 text-[10px]">
           <input
             type="checkbox"
             checked={csf.required}
-            onChange={(e) => onUpdateField(stepId, csf.fieldId, { required: e.target.checked })}
+            onChange={(e) => onUpdateField(stepId, key, { required: e.target.checked })}
             className="rounded"
           />
           Required
         </label>
-        <button onClick={() => onRemoveField(stepId, csf.fieldId)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+        <button onClick={() => onRemoveField(stepId, key)} className="rounded p-1 text-muted-foreground hover:text-destructive">
           <X className="h-3 w-3" />
         </button>
       </div>
+
+      {isCustom && (
+        <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+          <div>
+            <label className="mb-0.5 block text-[9px] font-medium text-muted-foreground">Name (ID)</label>
+            <Input
+              value={csf.customName || ''}
+              onChange={(e) => onUpdateField(stepId, key, { customName: e.target.value })}
+              className="h-6 text-[11px]"
+              placeholder="camelCaseId"
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[9px] font-medium text-muted-foreground">Label</label>
+            <Input
+              value={csf.customLabel || ''}
+              onChange={(e) => onUpdateField(stepId, key, { customLabel: e.target.value })}
+              className="h-6 text-[11px]"
+              placeholder="Display Label"
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[9px] font-medium text-muted-foreground">Mode</label>
+            <select
+              value={csf.customSelectionMode || 'single'}
+              onChange={(e) => onUpdateField(stepId, key, { customSelectionMode: e.target.value as 'single' | 'multi' })}
+              className="h-6 w-full rounded border border-border bg-background px-1 text-[11px]"
+            >
+              <option value="single">single</option>
+              <option value="multi">multi</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {deps.resolved.length > 0 && (
         <div className="mt-1 flex flex-wrap items-center gap-1">
           <span className="text-[10px] text-muted-foreground">Requires:</span>
           {deps.resolved.map((depId) => {
-            const depName = allFields.find((f) => f.id === depId)?.name || depId
+            const depName = depNameForId(depId)
             const isMissing = missingFromConfig.includes(depId)
             const hasOrderIssue = orderWarnings.includes(depId)
             return (
@@ -225,11 +298,11 @@ function FieldCard({
                   const current = csf.inputMappings || {}
                   if (isText) {
                     const { [ref]: _, ...rest } = current
-                    onUpdateField(stepId, csf.fieldId, {
+                    onUpdateField(stepId, key, {
                       inputMappings: Object.keys(rest).length > 0 ? rest : undefined,
                     })
                   } else {
-                    onUpdateField(stepId, csf.fieldId, {
+                    onUpdateField(stepId, key, {
                       inputMappings: { ...current, [ref]: { type: 'text' } },
                     })
                   }
@@ -251,24 +324,26 @@ function FieldCard({
         <div className="mt-1.5">
           <textarea
             value={csf.promptOverride}
-            onChange={(e) => onUpdateField(stepId, csf.fieldId, { promptOverride: e.target.value })}
+            onChange={(e) => onUpdateField(stepId, key, { promptOverride: e.target.value })}
             rows={2}
             className="w-full rounded border border-border bg-muted/30 px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="Custom prompt override..."
           />
-          <button
-            type="button"
-            onClick={() => onUpdateField(stepId, csf.fieldId, { promptOverride: undefined })}
-            className="mt-0.5 text-[10px] text-muted-foreground hover:text-destructive"
-          >
-            Remove override
-          </button>
+          {!isCustom && (
+            <button
+              type="button"
+              onClick={() => onUpdateField(stepId, key, { promptOverride: undefined })}
+              className="mt-0.5 text-[10px] text-muted-foreground hover:text-destructive"
+            >
+              Remove override
+            </button>
+          )}
         </div>
       )}
-      {csf.promptOverride === undefined && (
+      {csf.promptOverride === undefined && !isCustom && (
         <button
           type="button"
-          onClick={() => onUpdateField(stepId, csf.fieldId, { promptOverride: fieldDef.prompt })}
+          onClick={() => onUpdateField(stepId, key, { promptOverride: fieldDef.prompt })}
           className="mt-1 flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-primary"
         >
           <PencilSmall className="h-2.5 w-2.5" /> Customize prompt

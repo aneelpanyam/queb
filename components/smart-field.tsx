@@ -29,6 +29,12 @@ export interface SmartFieldProps {
   inputMappings?: Record<string, InputMapping>
   onChange: (value: string | string[]) => void
   disabled?: boolean
+  /** Overrides field.id for value lookup and dependency resolution (empty-field instances) */
+  fieldKey?: string
+  /** Overrides field.name for display (empty-field instances) */
+  customLabel?: string
+  /** Overrides field.selectionMode (empty-field instances) */
+  customSelectionMode?: 'single' | 'multi'
 }
 
 function stringVal(v: string | string[] | undefined): string {
@@ -44,7 +50,14 @@ export function SmartField({
   inputMappings,
   onChange,
   disabled,
+  fieldKey,
+  customLabel,
+  customSelectionMode,
 }: SmartFieldProps) {
+  const effectiveId = fieldKey ?? field.id
+  const effectiveName = customLabel ?? field.name
+  const effectiveSelectionMode = customSelectionMode ?? field.selectionMode
+  const effectiveDescription = fieldKey ? '' : field.description
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +73,11 @@ export function SmartField({
   }
 
   // Compute dependencies from the prompt template
-  const { resolved: dependsOn } = computeDependencies(field, promptOverride)
+  const isCustomField = field.id === 'empty-field'
+  const { resolved: dependsOn } = computeDependencies(
+    isCustomField ? (promptOverride || '') : field,
+    isCustomField ? undefined : promptOverride,
+  )
 
   // Text-input mappings contribute values too — fold mapped field values in
   if (inputMappings) {
@@ -119,7 +136,7 @@ export function SmartField({
   }, [resolvedPrompt])
 
   // Selection handlers
-  const isMulti = field.selectionMode === 'multi'
+  const isMulti = effectiveSelectionMode === 'multi'
   const selectedArray: string[] = Array.isArray(value) ? value : value ? [value] : []
 
   const toggleItem = (item: string) => {
@@ -161,12 +178,14 @@ export function SmartField({
       {/* Label */}
       <div className="mb-1.5">
         <label className="block text-sm font-medium text-foreground">
-          {field.name}
+          {effectiveName}
           <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
             ({isMulti ? 'multi-select' : 'single-select'})
           </span>
         </label>
-        <p className="text-[11px] leading-tight text-muted-foreground">{field.description}</p>
+        {effectiveDescription && (
+          <p className="text-[11px] leading-tight text-muted-foreground">{effectiveDescription}</p>
+        )}
       </div>
 
       {/* Selected values */}
@@ -196,7 +215,7 @@ export function SmartField({
           <Input
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
-            placeholder={field.placeholder || `Type your own ${field.name.toLowerCase()}...`}
+            placeholder={field.placeholder || `Type your own ${effectiveName.toLowerCase()}...`}
             disabled={disabled}
             className="h-8 text-sm"
             onKeyDown={(e) => {
@@ -232,7 +251,7 @@ export function SmartField({
         <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <Sparkles className="h-3.5 w-3.5 text-primary/50" />
-          <span>Generating {field.name.toLowerCase()} suggestions...</span>
+          <span>Generating {effectiveName.toLowerCase()} suggestions...</span>
         </div>
       )}
 

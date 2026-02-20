@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import type { ConfigStep, ConfigStepField, ConfigOutput, SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
+import { getFieldKey } from '@/lib/setup-config-types'
 import type { FieldDefinition } from '@/lib/field-library'
 import { getTransitiveDependencies } from '@/lib/field-library'
 import type { OutputTypeDefinition, OutputTypeField } from '@/lib/output-type-library'
@@ -18,7 +19,7 @@ export function useConfigBuilder(
   const [showOutputPicker, setShowOutputPicker] = useState(false)
   const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
 
-  const allFieldIdsInConfig = state.steps.flatMap((s) => s.fields.map((f) => f.fieldId))
+  const allFieldIdsInConfig = state.steps.flatMap((s) => s.fields.map((f) => getFieldKey(f)))
   const canSave = state.name.trim() && state.steps.length > 0 && state.outputs.length > 0
 
   const grouped = allFields.reduce<Record<string, FieldDefinition[]>>((acc, f) => {
@@ -58,19 +59,33 @@ export function useConfigBuilder(
   // --- Field management within a step ---
 
   const addFieldToStep = (stepId: string, fieldId: string) => {
-    const currentFieldIds = new Set(state.steps.flatMap((s) => s.fields.map((f) => f.fieldId)))
+    const step = state.steps.find((s) => s.id === stepId)
+    if (!step) return
+
+    if (fieldId === 'empty-field') {
+      const newField: ConfigStepField = {
+        fieldId: 'empty-field',
+        required: false,
+        customName: `field-${uid()}`,
+        customLabel: 'New Field',
+        promptOverride: '',
+      }
+      updateStep(stepId, { fields: [...step.fields, newField] })
+      setShowFieldPicker(null)
+      return
+    }
+
+    const currentFieldKeys = new Set(state.steps.flatMap((s) => s.fields.map((f) => getFieldKey(f))))
     const transitiveDeps = getTransitiveDependencies(fieldId)
-    const missingDeps = transitiveDeps.filter((d) => !currentFieldIds.has(d))
+    const missingDeps = transitiveDeps.filter((d) => !currentFieldKeys.has(d))
 
     const newFields: ConfigStepField[] = [
       ...missingDeps.map((depId) => ({ fieldId: depId, required: false } as ConfigStepField)),
       { fieldId, required: false },
     ]
 
-    const step = state.steps.find((s) => s.id === stepId)
-    if (!step) return
-    const existingIds = new Set(step.fields.map((f) => f.fieldId))
-    const toAdd = newFields.filter((f) => !existingIds.has(f.fieldId))
+    const existingKeys = new Set(step.fields.map((f) => getFieldKey(f)))
+    const toAdd = newFields.filter((f) => !existingKeys.has(getFieldKey(f)))
 
     updateStep(stepId, { fields: [...step.fields, ...toAdd] })
     setShowFieldPicker(null)
@@ -81,17 +96,17 @@ export function useConfigBuilder(
     }
   }
 
-  const removeFieldFromStep = (stepId: string, fieldId: string) => {
+  const removeFieldFromStep = (stepId: string, key: string) => {
     const step = state.steps.find((s) => s.id === stepId)
     if (!step) return
-    updateStep(stepId, { fields: step.fields.filter((f) => f.fieldId !== fieldId) })
+    updateStep(stepId, { fields: step.fields.filter((f) => getFieldKey(f) !== key) })
   }
 
-  const updateFieldInStep = (stepId: string, fieldId: string, updates: Partial<ConfigStepField>) => {
+  const updateFieldInStep = (stepId: string, key: string, updates: Partial<ConfigStepField>) => {
     const step = state.steps.find((s) => s.id === stepId)
     if (!step) return
     updateStep(stepId, {
-      fields: step.fields.map((f) => (f.fieldId === fieldId ? { ...f, ...updates } : f)),
+      fields: step.fields.map((f) => (getFieldKey(f) === key ? { ...f, ...updates } : f)),
     })
   }
 

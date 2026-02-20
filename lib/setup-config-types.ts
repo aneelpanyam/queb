@@ -12,6 +12,17 @@ export interface ConfigStepField {
   promptOverride?: string
   /** Maps unresolved prompt placeholders to either an existing field or a text input */
   inputMappings?: Record<string, InputMapping>
+  /** Unique key within the config — used for {{ref}} placeholders and value storage (empty-field instances) */
+  customName?: string
+  /** Display label shown in the UI (empty-field instances) */
+  customLabel?: string
+  /** Override the library field's selectionMode (empty-field instances) */
+  customSelectionMode?: 'single' | 'multi'
+}
+
+/** Returns the effective key for a ConfigStepField: customName if set, otherwise fieldId */
+export function getFieldKey(csf: ConfigStepField): string {
+  return csf.customName || csf.fieldId
 }
 
 export interface ConfigStep {
@@ -56,9 +67,9 @@ export interface SetupConfiguration {
   updatedAt: string
 }
 
-/** Collect every field ID used in a configuration */
+/** Collect every effective field key used in a configuration */
 export function allFieldIds(config: SetupConfiguration): string[] {
-  return config.steps.flatMap((s) => s.fields.map((f) => f.fieldId))
+  return config.steps.flatMap((s) => s.fields.map((f) => getFieldKey(f)))
 }
 
 /** Flatten filled values into the legacy flat shape for product creation */

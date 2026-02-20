@@ -47,11 +47,9 @@ function ConfigurationsPageInner() {
   const wizard = useAIWizard(
     cfgs.allFields,
     cfgs.allOutputTypes,
-    (builderState, createdFieldCount) => {
+    (builderState) => {
       cfgs.openBuilderWithState(builderState)
-      if (createdFieldCount > 0) cfgs.refreshFields()
     },
-    cfgs.refreshFields,
   )
 
   const exportImport = useConfigExportImport(
@@ -66,18 +64,10 @@ function ConfigurationsPageInner() {
     if (ideaConfigParam) {
       try {
         const configuration = JSON.parse(ideaConfigParam)
-        const { builderState, createdFieldCount } = wizard.processAIConfiguration(configuration, fields)
-
-        if (createdFieldCount > 0) {
-          cfgs.refreshFields()
-        }
+        const { builderState } = wizard.processAIConfiguration(configuration, fields)
 
         cfgs.openBuilderWithState(builderState)
-        toast.success(
-          createdFieldCount > 0
-            ? `Configuration generated from idea with ${createdFieldCount} new field${createdFieldCount !== 1 ? 's' : ''} added to library!`
-            : 'Configuration generated from idea! Review and save below.'
-        )
+        toast.success('Configuration generated from idea! Review and save below.')
         router.replace('/configurations')
       } catch {
         // Ignore malformed param

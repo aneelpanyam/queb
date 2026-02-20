@@ -93,13 +93,13 @@ A user wants to create a configuration that generates a specific product. Based 
 USER'S DESCRIPTION:
 "${description}"
 
-AVAILABLE FIELDS in the library (you may reference these by ID):
+LIBRARY FIELDS (optional shortcuts — use only when a perfect match exists):
 ${fieldsList}
 
 AVAILABLE OUTPUT TYPES (use these IDs for outputs):
 ${outputTypesList}
 
-HARD CONSTRAINT: The configuration must use AT MOST 5 fields total (library fields + ad-hoc fields combined). Choose only the highest-impact inputs. If you identify more than 5 needs, merge or drop the least essential ones.
+HARD CONSTRAINT: The configuration must use AT MOST 5 fields total (library fields + custom fields combined). Choose only the highest-impact inputs. If you identify more than 5 needs, merge or drop the least essential ones.
 
 ═══════════════════════════════════════════════
 STEP 1: IDENTIFY WHAT CONTEXT THIS IDEA NEEDS
@@ -109,25 +109,28 @@ Analyze the user's description and determine: "What specific pieces of context d
 For each candidate input, apply this test: "Would the generated content be noticeably different if this value changed?" If not, drop it.
 
 Aim for 3-5 high-impact contextual inputs. Examples:
-- "Know your role: Pain points of CISO" → industry, role scope, security maturity level (3 fields)
-- "SaaS onboarding email course" → industry, service, target audience, onboarding stage (4 fields)
-- "Sales battle cards for enterprise deals" → service, competitor, buyer persona, deal size (4 fields)
+- "Know your role: Pain points of CISO" → securityDomain, roleScope, securityMaturityLevel (3 custom fields)
+- "SaaS onboarding email course" → productType, onboardingStage, targetPersona, painPoints (4 custom fields)
+- "Sales battle cards for enterprise deals" → productOffering, competitor, buyerPersona, dealSize (4 custom fields)
 
 ═══════════════════════════════════════════════
-STEP 2: MATCH NEEDS TO LIBRARY, FILL GAPS
+STEP 2: DESIGN CONTEXT FIELDS
 ═══════════════════════════════════════════════
-For each contextual input identified above:
-1. Check if an existing library field captures it. Only use it if it's a genuine match — don't force-fit.
-2. If no library field matches, define a NEW AD-HOC FIELD in the step's "newFields" array:
-   - Unique camelCase ID (e.g., "securityMaturityLevel", "dealSize", "onboardingStage")
-   - A clear prompt that generates relevant suggestions (use {{otherFieldId}} placeholders for dependencies)
-   - Appropriate selectionMode: "single" for exclusive choices, "multi" for things like applicable frameworks
-   - A descriptive category (e.g., "Topic-Specific", "Audience", "Scope")
+For each contextual input, **design a custom field** with a tailored prompt that captures exactly what this idea needs. Custom fields with topic-specific prompts produce much better AI suggestions than generic library fields.
+
+For each custom field, define it in the step's "newFields" array:
+  - Unique camelCase ID (e.g., "securityMaturityLevel", "dealSize", "onboardingStage")
+  - A clear, specific prompt that generates highly relevant suggestions for THIS topic (use {{otherFieldId}} placeholders for dependencies)
+  - Appropriate selectionMode: "single" for exclusive choices, "multi" for things like applicable frameworks
+  - A descriptive category (e.g., "Topic-Specific", "Audience", "Scope")
+
+Library field shortcut: If a library field is a *perfect* match for one of your needs — meaning the library field's prompt would produce equally relevant suggestions as a custom one — you may reference it by ID in "fieldIds" instead of creating a custom field. But this should be the exception, not the rule.
 
 Rules:
-- Do NOT include library fields just because they exist.
-- If "industry" or "role" isn't relevant to the idea, skip them.
-- Ad-hoc fields are preferred when the idea has specific, topic-level context that generic library fields can't capture well.
+- **When in doubt, create a custom field.** Err on the side of specificity.
+- Do NOT include generic library fields like "industry" or "role" just because they exist — only use them if the idea genuinely centers on industry/role context.
+- A custom "securityMaturityLevel" with a tailored prompt will always outperform a generic "industry" field.
+- Custom field prompts can reference other custom fields or library fields via {{fieldId}} placeholders.
 
 ═══════════════════════════════════════════════
 STEP 3: ORGANIZE INTO STEPS & OUTPUTS

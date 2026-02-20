@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
+import type { FieldDefinition } from '@/lib/field-library'
 import type { OutputTypeDefinition } from '@/lib/output-type-library'
 import type { ConfigStepField } from '@/lib/setup-config-types'
 import { aiFetch } from '@/lib/ai-fetch'
@@ -9,8 +9,7 @@ import { type BuilderState, type AIStep, type AIOutput } from '../_lib/config-bu
 export function useAIWizard(
   allFields: FieldDefinition[],
   allOutputTypes: OutputTypeDefinition[],
-  onGenerated: (builderState: BuilderState, createdFieldCount: number) => void,
-  refreshFields: () => void,
+  onGenerated: (builderState: BuilderState) => void,
 ) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardPrompt, setWizardPrompt] = useState('')
@@ -20,30 +19,11 @@ export function useAIWizard(
   const processAIConfiguration = useCallback((
     configuration: { name?: string; description?: string; steps?: AIStep[]; outputs?: AIOutput[] },
     currentFields: FieldDefinition[],
-  ): { builderState: BuilderState; createdFieldCount: number } => {
+  ): { builderState: BuilderState } => {
     const knownFieldIds = new Set(currentFields.map((f) => f.id))
-    let createdFieldCount = 0
 
     const steps = (configuration.steps || []).map((step: AIStep, i: number) => {
       const stepFields: ConfigStepField[] = []
-
-      if (step.newFields?.length) {
-        for (const nf of step.newFields) {
-          if (knownFieldIds.has(nf.id)) continue
-          fieldStorage.save({
-            id: nf.id,
-            name: nf.name,
-            description: nf.description,
-            prompt: nf.prompt,
-            selectionMode: nf.selectionMode || 'single',
-            allowCustomValues: true,
-            category: nf.category || 'AI Generated',
-            isBuiltIn: false,
-          })
-          knownFieldIds.add(nf.id)
-          createdFieldCount++
-        }
-      }
 
       for (const fid of (step.fieldIds || [])) {
         if (knownFieldIds.has(fid)) {
@@ -53,9 +33,15 @@ export function useAIWizard(
 
       if (step.newFields?.length) {
         for (const nf of step.newFields) {
-          if (!stepFields.some((sf) => sf.fieldId === nf.id)) {
-            stepFields.push({ fieldId: nf.id, required: false })
-          }
+          if (stepFields.some((sf) => sf.fieldId === nf.id || sf.customName === nf.id)) continue
+          stepFields.push({
+            fieldId: 'empty-field',
+            required: false,
+            customName: nf.id,
+            customLabel: nf.name,
+            promptOverride: nf.prompt,
+            customSelectionMode: nf.selectionMode || 'single',
+          })
         }
       }
 
@@ -90,7 +76,6 @@ export function useAIWizard(
           }
         }),
       },
-      createdFieldCount,
     }
   }, [])
 
@@ -101,12 +86,14 @@ export function useAIWizard(
     try {
       const { configuration } = await aiFetch('/api/generate-configuration', {
         description: wizardPrompt.trim(),
-        availableFields: allFields.map((f) => ({
-          id: f.id,
-          name: f.name,
-          description: f.description,
-          category: f.category,
-        })),
+        availableFields: allFields
+          .filter((f) => f.id !== 'empty-field')
+          .map((f) => ({
+            id: f.id,
+            name: f.name,
+            description: f.description,
+            category: f.category,
+          })),
         availableOutputTypes: allOutputTypes.map((ot) => ({
           id: ot.id,
           name: ot.name,
@@ -117,20 +104,12 @@ export function useAIWizard(
         })),
       }, { action: 'Generate Configuration' })
 
-      const { builderState, createdFieldCount } = processAIConfiguration(configuration, allFields)
-
-      if (createdFieldCount > 0) {
-        refreshFields()
-      }
+      const { builderState } = processAIConfiguration(configuration, allFields)
 
       setWizardOpen(false)
       setWizardPrompt('')
-      onGenerated(builderState, createdFieldCount)
-      toast.success(
-        createdFieldCount > 0
-          ? `Configuration generated with ${createdFieldCount} new field${createdFieldCount !== 1 ? 's' : ''} added to library!`
-          : 'Configuration generated! Review and save below.'
-      )
+      onGenerated(builderState)
+      toast.success('Configuration generated! Review and save below.')
     } catch (err) {
       setWizardError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
