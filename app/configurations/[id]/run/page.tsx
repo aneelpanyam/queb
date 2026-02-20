@@ -57,6 +57,18 @@ interface ApiPromptCategory {
   prompts: { prompt: string; context: string; expectedOutput: string }[]
 }
 
+interface ApiBattleCardSection {
+  sectionName: string
+  sectionDescription: string
+  cards: { title: string; strengths: string; weaknesses: string; talkingPoints: string }[]
+}
+
+interface ApiDecisionDomain {
+  domainName: string
+  domainDescription: string
+  decisions: { decision: string; context: string; options: string; criteria: string }[]
+}
+
 function perspectivesToSections(perspectives: ApiPerspective[]): ProductSection[] {
   return perspectives.map((p) => ({
     name: p.perspectiveName,
@@ -93,6 +105,26 @@ function promptsToSections(categories: ApiPromptCategory[]): ProductSection[] {
     description: c.categoryDescription,
     elements: c.prompts.map((p) => ({
       fields: { prompt: p.prompt, context: p.context, expectedOutput: p.expectedOutput },
+    })),
+  }))
+}
+
+function battleCardsToSections(sections: ApiBattleCardSection[]): ProductSection[] {
+  return sections.map((s) => ({
+    name: s.sectionName,
+    description: s.sectionDescription,
+    elements: s.cards.map((c) => ({
+      fields: { title: c.title, strengths: c.strengths, weaknesses: c.weaknesses, talkingPoints: c.talkingPoints },
+    })),
+  }))
+}
+
+function decisionDomainsToSections(domains: ApiDecisionDomain[]): ProductSection[] {
+  return domains.map((d) => ({
+    name: d.domainName,
+    description: d.domainDescription,
+    elements: d.decisions.map((dec) => ({
+      fields: { decision: dec.decision, context: dec.context, options: dec.options, criteria: dec.criteria },
     })),
   }))
 }
@@ -202,12 +234,33 @@ export default function RunConfigPage() {
           const data: { categories: ApiPromptCategory[] } = await res.json()
           if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = promptsToSections(data.categories)
+        } else if (co.outputTypeId === 'battle-cards') {
+          const res = await fetch('/api/generate-battle-cards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contextPayload),
+          })
+          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
+          const data: { sections: ApiBattleCardSection[] } = await res.json()
+          if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+          sections = battleCardsToSections(data.sections)
+        } else if (co.outputTypeId === 'decision-books') {
+          const res = await fetch('/api/generate-decision-books', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contextPayload),
+          })
+          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
+          const data: { domains: ApiDecisionDomain[] } = await res.json()
+          if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
+          sections = decisionDomainsToSections(data.domains)
         } else {
           const res = await fetch('/api/generate-output', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: resolvedPrompt,
+              context: flat,
               sectionLabel: otDef.sectionLabel,
               elementLabel: otDef.elementLabel,
               fields: otDef.fields,

@@ -98,6 +98,23 @@ function getContextEntries(product: Product): { label: string; value: string }[]
   return legacy.filter((e) => e.value?.trim())
 }
 
+function getContextRecord(product: Product): Record<string, string> {
+  if (product.contextFields && Object.keys(product.contextFields).length > 0) {
+    const ctx: Record<string, string> = {}
+    Object.entries(product.contextFields).forEach(([k, v]) => {
+      if (v?.trim()) ctx[k] = v
+    })
+    return ctx
+  }
+  const ctx: Record<string, string> = {}
+  if (product.industry) ctx.industry = product.industry
+  if (product.service) ctx.service = product.service
+  if (product.role) ctx.role = product.role
+  if (product.activity) ctx.activity = product.activity
+  if (product.situation) ctx.situation = product.situation
+  return ctx
+}
+
 export default function ProductEditorPage() {
   const router = useRouter()
   const params = useParams()
@@ -310,8 +327,7 @@ export default function ProductEditorPage() {
             item: itemText,
             section: sectionName,
             outputType: product.outputType || 'questions',
-            role: product.role, activity: product.activity,
-            situation: product.situation, industry: product.industry, service: product.service,
+            context: getContextRecord(product),
           }),
         })
         if (!res.ok) throw new Error('AI generation failed')
@@ -343,8 +359,7 @@ export default function ProductEditorPage() {
           body: JSON.stringify({
             originalQuestion: question,
             perspective: sectionName,
-            role: product.role, activity: product.activity,
-            situation: product.situation, industry: product.industry, service: product.service,
+            context: getContextRecord(product),
           }),
         })
         if (!res.ok) throw new Error('AI generation failed')
@@ -367,23 +382,10 @@ export default function ProductEditorPage() {
       setAnswerLoading(true)
       setActiveAnswerKey(key)
       try {
-        const context: Record<string, string> = {}
-        if (product.contextFields) {
-          Object.entries(product.contextFields).forEach(([k, v]) => {
-            if (v?.trim()) context[k] = v
-          })
-        } else {
-          if (product.industry) context.industry = product.industry
-          if (product.service) context.service = product.service
-          if (product.role) context.role = product.role
-          if (product.activity) context.activity = product.activity
-          if (product.situation) context.situation = product.situation
-        }
-
         const res = await fetch('/api/find-answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question, context }),
+          body: JSON.stringify({ question, context: getContextRecord(product) }),
         })
         if (!res.ok) throw new Error('AI research failed')
         const data: AnswerData = await res.json()

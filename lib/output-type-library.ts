@@ -8,6 +8,7 @@ import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
 import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
 import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
 import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
+import { DECISION_DOMAINS } from '@/lib/decision-domains'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 
 export interface OutputTypeField {
@@ -45,22 +46,15 @@ const SEED_OUTPUT_TYPES: Omit<OutputTypeDefinition, 'createdAt' | 'updatedAt'>[]
     icon: 'BookOpen',
     prompt: `You are an expert thinking coach and organizational consultant.
 
-CONTEXT:
-- Industry: {{industry}}
-- Service: {{service}}
-- Role: {{role}}
-- Activity: {{activity}}
-- Situation: "{{situation}}"
-
 TASK:
 Generate thoughtful, probing questions organized by business perspective.
 
 GUIDELINES:
 - Generate 3-5 questions per relevant perspective
-- Every question must be specific to the described situation, not generic
+- Every question must be specific to the described context, not generic
 - Each question must come with a relevance note and an actionable info prompt
 - Questions should provoke deep thinking and help uncover blind spots
-- Consider the industry norms and service being delivered when framing questions`,
+- Tailor questions to the specific context provided`,
     sectionLabel: 'Perspective',
     elementLabel: 'Question',
     fields: [
@@ -80,18 +74,11 @@ GUIDELINES:
     icon: 'CheckSquare',
     prompt: `You are a process and operations expert.
 
-CONTEXT:
-- Industry: {{industry}}
-- Service: {{service}}
-- Role: {{role}}
-- Activity: {{activity}}
-- Situation: "{{situation}}"
-
 TASK:
 Generate a comprehensive, actionable checklist organized by category.
 
 GUIDELINES:
-- Create 4-6 categories relevant to this role and activity
+- Create 4-6 categories relevant to the given context
 - Each category should have 5-8 specific, actionable items
 - Include priority levels (High, Medium, Low) for each item
 - Items should be concrete and verifiable, not vague
@@ -114,13 +101,6 @@ GUIDELINES:
     icon: 'Mail',
     prompt: `You are an email marketing and education expert.
 
-CONTEXT:
-- Industry: {{industry}}
-- Service: {{service}}
-- Role: {{role}}
-- Activity: {{activity}}
-- Situation: "{{situation}}"
-
 TASK:
 Create a structured email course with modules and individual emails.
 
@@ -129,7 +109,7 @@ GUIDELINES:
 - Each module should have 3-5 emails
 - Each email needs a compelling subject line, educational body, and clear call to action
 - The course should build progressively from foundations to advanced concepts
-- Tailor content to the specific role and their daily challenges`,
+- Tailor content to the specific context and audience provided`,
     sectionLabel: 'Module',
     elementLabel: 'Email',
     fields: [
@@ -148,22 +128,15 @@ GUIDELINES:
     icon: 'Sparkles',
     prompt: `You are an AI prompt engineering expert.
 
-CONTEXT:
-- Industry: {{industry}}
-- Service: {{service}}
-- Role: {{role}}
-- Activity: {{activity}}
-- Situation: "{{situation}}"
-
 TASK:
 Create a collection of ready-to-use AI prompts organized by use-case category.
 
 GUIDELINES:
-- Create 4-6 categories of prompts relevant to this role
+- Create 4-6 categories of prompts relevant to the given context
 - Each category should have 3-5 specific prompts
 - Each prompt should be a complete, copy-paste-ready template
 - Include context about when to use each prompt and what output to expect
-- Prompts should leverage the role's specific domain knowledge and terminology`,
+- Prompts should leverage domain knowledge and terminology from the provided context`,
     sectionLabel: 'Category',
     elementLabel: 'Prompt',
     fields: [
@@ -181,13 +154,6 @@ GUIDELINES:
     description: 'Competitive intelligence cards for sales teams',
     icon: 'Swords',
     prompt: `You are a competitive intelligence and sales enablement expert.
-
-CONTEXT:
-- Industry: {{industry}}
-- Service: {{service}}
-- Role: {{role}}
-- Activity: {{activity}}
-- Situation: "{{situation}}"
 
 TASK:
 Create battle cards organized by competitor or competitive theme.
@@ -207,6 +173,42 @@ GUIDELINES:
       { key: 'talkingPoints', label: 'Your Talking Points', type: 'long-text' },
     ],
     supportsDeepDive: true,
+    defaultSectionDrivers: [
+      { name: 'Direct Competitors', description: 'Head-to-head competitors offering similar products or services to the same target market' },
+      { name: 'Indirect Competitors', description: 'Alternative solutions or substitute approaches that solve the same underlying problem differently' },
+      { name: 'Emerging Threats', description: 'New entrants, disruptors, or adjacent players expanding into this space' },
+      { name: 'DIY & Status Quo', description: 'The option to do nothing, build in-house, or continue with current manual processes' },
+      { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
+    ],
+    isBuiltIn: true,
+  },
+  {
+    id: 'decision-books',
+    name: 'Decision Book',
+    description: 'Structured decision guides organized by domain with options, trade-offs, and decision criteria',
+    icon: 'Scale',
+    prompt: `You are a senior decision strategist and organizational advisor.
+
+TASK:
+Generate key decisions organized by decision domain that must be navigated in the given context.
+
+GUIDELINES:
+- Generate 3-5 decisions per relevant domain
+- Every decision must be specific to the described context, not generic
+- Each decision must include why it matters, what the realistic options and trade-offs are, and what criteria should guide the choice
+- Decisions should surface the hard choices that often go unexamined
+- Tailor decisions to the specific context, constraints, and authority level provided`,
+    sectionLabel: 'Decision Domain',
+    elementLabel: 'Decision',
+    fields: [
+      { key: 'decision', label: 'The Decision', type: 'long-text', primary: true },
+      { key: 'context', label: 'Why This Decision Matters', type: 'long-text' },
+      { key: 'options', label: 'Key Options & Trade-offs', type: 'long-text' },
+      { key: 'criteria', label: 'Decision Criteria', type: 'long-text' },
+    ],
+    supportsDeepDive: true,
+    supportsDeeperQuestions: true,
+    defaultSectionDrivers: DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
     isBuiltIn: true,
   },
 ]
@@ -217,15 +219,24 @@ GUIDELINES:
 
 function ensureSeeded(): OutputTypeDefinition[] {
   if (typeof window === 'undefined') return []
+  const now = new Date().toISOString()
   const raw = localStorage.getItem(STORAGE_KEY)
   if (raw) {
     try {
-      return JSON.parse(raw)
+      const stored: OutputTypeDefinition[] = JSON.parse(raw)
+      const storedIds = new Set(stored.map((t) => t.id))
+      const missing = SEED_OUTPUT_TYPES.filter((s) => !storedIds.has(s.id))
+      if (missing.length > 0) {
+        const newEntries = missing.map((o) => ({ ...o, createdAt: now, updatedAt: now }))
+        const merged = [...stored, ...newEntries]
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+        return merged
+      }
+      return stored
     } catch {
       /* fall through */
     }
   }
-  const now = new Date().toISOString()
   const seeded: OutputTypeDefinition[] = SEED_OUTPUT_TYPES.map((o) => ({
     ...o,
     createdAt: now,
@@ -331,6 +342,28 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Complexity range', content: 'Vary the complexity — include both quick tactical prompts and deeper strategic ones.' },
     { label: 'Minimum output', content: 'If this use case is not very relevant, still include at least 1 prompt.' },
   ],
+  'battle-cards': [
+    { label: 'Role', content: 'You are a competitive intelligence and sales enablement expert.' },
+    { label: 'Task', content: 'Generate 3-5 battle cards for this competitive section.' },
+    { label: 'Relevance filter', content: 'Only generate cards if this competitive section is genuinely relevant to the given context. If not relevant, return an empty cards array.' },
+    { label: 'Honesty', content: 'Be honest about competitor strengths — credibility requires acknowledging where they excel.' },
+    { label: 'Weaknesses', content: 'Identify real weaknesses backed by common customer complaints, architectural limitations, or market gaps — not straw-man arguments.' },
+    { label: 'Talking points', content: 'Talking points must be specific, conversational, and usable in a live sales call — not marketing copy.' },
+    { label: 'Objection handling', content: 'Include at least one objection handler per card — anticipate what the prospect might say and provide a concrete response.' },
+    { label: 'Tailoring', content: 'Tailor all intelligence to the specific context provided.' },
+  ],
+  'decision-books': [
+    { label: 'Role', content: 'You are a senior decision strategist and organizational advisor who helps leaders navigate complex choices.' },
+    { label: 'Task', content: 'Generate 3-5 key decisions that must be made within this decision domain.' },
+    { label: 'Relevance filter', content: 'Only generate decisions if this domain is genuinely relevant to the given context. If not relevant, return an empty elements array.' },
+    { label: 'Specificity', content: 'Every decision must be specific to the described context — not a generic management question.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make decisions sharper and more grounded in the real situation.' },
+    { label: 'Stakes', content: 'The "context" field must explain what is at stake — why this decision matters now, what happens if it is delayed or made poorly, and who is affected.' },
+    { label: 'Options & trade-offs', content: 'The "options" field must present realistic alternatives (at least 2-3), including the status quo, with honest trade-offs for each. Avoid false dichotomies.' },
+    { label: 'Decision criteria', content: 'The "criteria" field must specify what factors should guide the choice — cost, speed, risk tolerance, strategic alignment, stakeholder impact, reversibility, etc. Be specific to this decision.' },
+    { label: 'Hard choices', content: 'Surface decisions that are genuinely difficult — where reasonable people could disagree, where trade-offs are real, and where the "right" answer depends on priorities and constraints.' },
+    { label: 'Tailoring', content: 'Tailor decisions to the specific role, their authority level, and organizational context.' },
+  ],
 }
 
 /** Returns default instruction directives for an output type, from definition or built-in fallback */
@@ -343,6 +376,14 @@ const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
   checklist: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
   'email-course': EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
   prompts: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
+  'battle-cards': [
+    { name: 'Direct Competitors', description: 'Head-to-head competitors offering similar products or services to the same target market' },
+    { name: 'Indirect Competitors', description: 'Alternative solutions or substitute approaches that solve the same underlying problem differently' },
+    { name: 'Emerging Threats', description: 'New entrants, disruptors, or adjacent players expanding into this space' },
+    { name: 'DIY & Status Quo', description: 'The option to do nothing, build in-house, or continue with current manual processes' },
+    { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
+  ],
+  'decision-books': DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
 }
 
 /** Returns default section drivers for an output type, from definition or built-in fallback */

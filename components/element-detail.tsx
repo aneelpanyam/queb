@@ -23,6 +23,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
+  Scale,
+  GitBranch,
+  Info,
 } from 'lucide-react'
 
 interface ElementDetailProps {
@@ -309,6 +312,52 @@ function BattleCardDetail(props: ElementDetailProps) {
   )
 }
 
+function DecisionBookDetail(props: ElementDetailProps) {
+  const { element, sIndex, eIndex } = props
+  const decision = element.fields.decision || ''
+  const context = element.fields.context || ''
+  const options = element.fields.options || ''
+  const criteria = element.fields.criteria || ''
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Scale className="h-5 w-5 shrink-0 text-primary" />
+        <EditablePrimary fieldKey="decision" value={decision} sIndex={sIndex} eIndex={eIndex} {...editProps(props)} />
+      </div>
+
+      {context && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            <Info className="h-3.5 w-3.5" /> Why This Decision Matters
+          </div>
+          <EditableField fieldKey="context" value={context} sIndex={sIndex} eIndex={eIndex} {...editProps(props)} />
+        </div>
+      )}
+
+      {options && (
+        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+            <GitBranch className="h-3.5 w-3.5" /> Key Options & Trade-offs
+          </div>
+          <EditableField fieldKey="options" value={options} sIndex={sIndex} eIndex={eIndex} {...editProps(props)}
+            valueClassName="whitespace-pre-wrap" />
+        </div>
+      )}
+
+      {criteria && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+            <Target className="h-3.5 w-3.5" /> Decision Criteria
+          </div>
+          <EditableField fieldKey="criteria" value={criteria} sIndex={sIndex} eIndex={eIndex} {...editProps(props)}
+            valueClassName="whitespace-pre-wrap" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GenericDetail(props: ElementDetailProps) {
   const { element, sIndex, eIndex, outputTypeDef } = props
   const primaryField = outputTypeDef.fields.find((f) => f.primary)
@@ -351,6 +400,7 @@ const RENDERERS: Record<string, (props: ElementDetailProps) => React.JSX.Element
   'email-course': EmailCourseDetail,
   prompts: PromptPackDetail,
   'battle-cards': BattleCardDetail,
+  'decision-books': DecisionBookDetail,
 }
 
 export function ElementDetail(props: ElementDetailProps) {

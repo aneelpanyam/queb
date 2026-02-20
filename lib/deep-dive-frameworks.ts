@@ -226,6 +226,75 @@ export const DEEP_DIVE_FRAMEWORKS: Record<string, DeepDiveFramework[]> = {
     },
   ],
 
+  'decision-books': [
+    {
+      id: 'decide',
+      name: 'DECIDE Framework',
+      shortDescription: 'Define → Evaluate → Consider → Identify → Decide → Execute',
+      steps: [
+        'DEFINE: State the decision precisely — what exactly must be chosen, by whom, and by when? What triggers this decision now?',
+        'EVALUATE: What information, data, and evidence do you need to make this decision well? What do you already know vs. need to find out?',
+        'CONSIDER: Map the alternatives — what are the realistic options, including doing nothing? What are the constraints?',
+        'IDENTIFY: For each option, what are the likely outcomes, risks, and second-order effects? Who wins, who loses?',
+        'DECIDE: Given the analysis, which option best fits the criteria? What decision rule applies — consensus, authority, data-driven?',
+        'EXECUTE: What happens after the decision? Communication plan, rollout steps, success metrics, and review cadence.',
+      ],
+      bestFor: 'structured, high-stakes decisions with multiple stakeholders and significant consequences',
+    },
+    {
+      id: 'reversibility-test',
+      name: 'Reversibility Test',
+      shortDescription: 'Classify one-way vs. two-way door, calibrate decision speed',
+      steps: [
+        'CLASSIFY: Is this a one-way door (irreversible or very costly to reverse) or a two-way door (easily reversible)? What makes it so?',
+        'CONSTRAINTS: What locks you in — contracts, sunk costs, organizational momentum, technical debt, reputational stakes?',
+        'CONSEQUENCES: If you choose wrong, what happens? Map the blast radius across time, money, relationships, and optionality.',
+        'DECISION SPEED: Given the reversibility, how much deliberation is warranted? Should you decide fast and iterate, or slow down and get it right?',
+        'ROLLBACK PLAN: If this decision proves wrong, what is the escape route? Define the trigger for revisiting and the cost of reversal.',
+      ],
+      bestFor: 'determining how much deliberation a decision needs and calibrating urgency vs. thoroughness',
+    },
+    {
+      id: 'options-criteria-matrix',
+      name: 'Options-Criteria Matrix',
+      shortDescription: 'List options → Define criteria → Weight → Score → Sensitivity check',
+      steps: [
+        'LIST OPTIONS: Enumerate all realistic alternatives, including hybrid approaches and the status quo. Push for at least 3-4 distinct options.',
+        'DEFINE CRITERIA: What dimensions matter most? Cost, speed, risk, quality, alignment, feasibility, stakeholder impact? Be specific.',
+        'WEIGHT CRITERIA: Not all criteria are equal — assign relative importance. What is non-negotiable vs. nice-to-have?',
+        'SCORE OPTIONS: Evaluate each option against each criterion. Where is the data strong vs. uncertain? Flag assumptions.',
+        'SENSITIVITY CHECK: How robust is the winner? If weights shift or assumptions break, does the ranking change? Where is the decision fragile?',
+      ],
+      bestFor: 'decisions with multiple viable alternatives that need systematic, transparent comparison',
+    },
+    {
+      id: 'second-order-thinking',
+      name: 'Second-Order Thinking',
+      shortDescription: 'Trace consequences through first, second, and third-order effects',
+      steps: [
+        'FIRST-ORDER: What are the immediate, obvious consequences of this decision? Who is directly affected and how?',
+        'SECOND-ORDER: What reactions, adaptations, and knock-on effects will the first-order consequences trigger? How will people and systems respond?',
+        'THIRD-ORDER: What cascading effects emerge from those responses? What unintended consequences or feedback loops could develop?',
+        'STAKEHOLDER RIPPLE MAP: Trace the impact across all stakeholders — who benefits, who bears cost, who changes behavior, who exits?',
+        'TIME-HORIZON ANALYSIS: How does the impact profile change over 30 days, 6 months, 2 years? Do short-term gains create long-term debt?',
+      ],
+      bestFor: 'decisions with complex downstream effects where surface-level analysis misses critical dynamics',
+    },
+    {
+      id: 'pre-mortem',
+      name: 'Pre-Mortem Analysis',
+      shortDescription: 'Imagine failure → Identify causes → Design preventions',
+      steps: [
+        'IMAGINE FAILURE: Fast-forward 12 months — this decision has failed spectacularly. Describe the failure in vivid, specific terms.',
+        'IDENTIFY CAUSES: Working backwards, what went wrong? List every plausible cause — execution gaps, wrong assumptions, external shocks, stakeholder resistance.',
+        'RANK LIKELIHOOD: Which failure modes are most probable given the current context? Which are most devastating regardless of probability?',
+        'DESIGN PREVENTIONS: For the top failure modes, what can you do now to prevent or mitigate them? What early warning signals should you monitor?',
+        'DEFINE SUCCESS SIGNALS: Flip it — what does success look like at 30, 90, and 180 days? What leading indicators confirm you are on track?',
+      ],
+      bestFor: 'high-risk decisions where preventing failure is more valuable than optimizing for the best case',
+    },
+  ],
+
   'battle-cards': [
     {
       id: 'swot',

@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { getFrameworksForOutputType, type DeepDiveFramework } from '@/lib/deep-dive-frameworks'
+import { formatContext } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
@@ -59,11 +60,19 @@ const OUTPUT_TYPE_PROMPTS: Record<string, (item: string, section: string, framew
 
   'battle-cards': (item, section, frameworkCatalog) =>
     `The BATTLE CARD to deeply analyze:\n"${item}"\n\nFrom the "${section}" competitive section.\n\nAVAILABLE FRAMEWORKS:\n${frameworkCatalog}\n\nINSTRUCTIONS:\n1. CHOOSE the single best framework from the catalog above based on the nature of this competitive intelligence.\n2. THINKING FRAMEWORK: Apply that framework's steps to make this intelligence actionable. Each step must map to a framework stage with specific competitive analysis.\n3. CHECKLIST: 6-10 specific objection handlers, proof points, and conversation pivots related to this card.\n4. RESOURCES: 5-8 specific resources for staying current on this competitive landscape.\n5. KEY INSIGHT: The strategic advantage this intelligence gives you in deals.`,
+
+  'decision-books': (item, section, frameworkCatalog) =>
+    `The DECISION to deeply analyze:\n"${item}"\n\nFrom the "${section}" decision domain.\n\nAVAILABLE FRAMEWORKS:\n${frameworkCatalog}\n\nINSTRUCTIONS:\n1. CHOOSE the single best framework from the catalog above based on the nature of this decision.\n2. THINKING FRAMEWORK: Apply that framework's steps to this specific decision. Each step must correspond to a framework stage with deep, context-specific analysis of the options, trade-offs, and stakeholder dynamics.\n3. CHECKLIST: 6-10 specific actions, validations, and stakeholder consultations needed before making this decision.\n4. RESOURCES: 5-8 specific resources (decision frameworks, tools, case studies, industry benchmarks) for making this type of decision well.\n5. KEY INSIGHT: The strategic consequence of getting this decision right vs. wrong — what it unlocks or forecloses.`,
 }
 
 export async function POST(req: Request) {
   try {
-    const { item, section, outputType, role, activity, situation, industry, service } = await req.json()
+    const { item, section, outputType, context } = (await req.json()) as {
+      item: string
+      section: string
+      outputType: string
+      context: Record<string, string>
+    }
 
     const frameworks = getFrameworksForOutputType(outputType)
     const frameworkCatalog = formatFrameworkCatalog(frameworks)
@@ -71,17 +80,15 @@ export async function POST(req: Request) {
     const typePrompt = OUTPUT_TYPE_PROMPTS[outputType] || OUTPUT_TYPE_PROMPTS.questions
     const itemPrompt = typePrompt(item, section, frameworkCatalog)
 
+    const contextBlock = formatContext(context)
+
     const result = await generateText({
       model: 'openai/gpt-5.2',
       output: Output.object({ schema: dissectionSchema }),
       prompt: `You are a senior consultant and domain expert who uses structured analytical frameworks to help professionals think deeply about specific items.
 
-Context:
-- Industry: ${industry}
-- Service: ${service}
-- Role: ${role}
-- Activity: ${activity}
-- Situation: ${situation}
+CONTEXT:
+${contextBlock}
 
 ${itemPrompt}
 
@@ -90,7 +97,7 @@ CRITICAL RULES:
 - The thinkingFramework steps MUST follow the selected framework's structure — each step title should reflect a framework stage.
 - Do NOT generate generic steps. Every step must contain analysis specific to the item, context, and framework.
 - For RESOURCES, use real domains and realistic paths (e.g., hbr.org/..., mckinsey.com/..., specific tool websites).
-- Be specific to the role, industry, and situation throughout.
+- Be specific to the context throughout.
 
 FORMATTING RULES (very important):
 - All description fields support Markdown. You MUST use it for readability.

@@ -47,13 +47,7 @@ function dissectionKey(node: SelectedNode): string {
 interface QuestionDetailPanelProps {
   selectedNode: SelectedNode | null
   perspectives: Perspective[]
-  context: {
-    role: string
-    activity: string
-    situation: string
-    industry: string
-    service: string
-  }
+  context: Record<string, string>
   dissectionMap: Record<string, DissectionData>
   deeperMap: Record<string, DeeperData>
   onDissectionUpdate: (key: string, data: DissectionData | null) => void
@@ -143,7 +137,7 @@ export function QuestionDetailPanel({
         body: JSON.stringify({
           question: displayQuestion,
           perspective: perspective.perspectiveName,
-          ...context,
+          context,
         }),
       })
       if (!res.ok) {
@@ -179,7 +173,7 @@ export function QuestionDetailPanel({
         body: JSON.stringify({
           originalQuestion: question.question,
           perspective: perspective.perspectiveName,
-          ...context,
+          context,
         }),
       })
       if (!res.ok) {

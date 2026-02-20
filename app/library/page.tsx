@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
-import { outputTypeStorage, type OutputTypeDefinition, type OutputTypeField } from '@/lib/output-type-library'
+import { outputTypeStorage, getDefaultSectionDrivers, getDefaultInstructionDirectives, type OutputTypeDefinition, type OutputTypeField } from '@/lib/output-type-library'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,9 @@ import {
   FileOutput,
   Lock,
   ChevronDown,
+  ChevronRight,
+  Layers,
+  ListOrdered,
 } from 'lucide-react'
 
 // ============================================================
@@ -271,6 +274,7 @@ export default function LibraryPage() {
 
   const [fieldForm, setFieldForm] = useState<{ mode: 'closed' | 'create' | 'edit'; data: FieldFormData }>({ mode: 'closed', data: EMPTY_FIELD })
   const [otForm, setOtForm] = useState<{ mode: 'closed' | 'create' | 'edit'; data: OtFormData }>({ mode: 'closed', data: EMPTY_OT })
+  const [expandedOts, setExpandedOts] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setFields(fieldStorage.getAll())
@@ -470,41 +474,98 @@ export default function LibraryPage() {
             )}
 
             <div className="space-y-2">
-              {outputTypes.map((ot) => (
-                <div key={ot.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-foreground">{ot.name}</span>
-                        <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{ot.id}</code>
-                        {ot.isBuiltIn && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+              {outputTypes.map((ot) => {
+                const isExpanded = expandedOts.has(ot.id)
+                const drivers = getDefaultSectionDrivers(ot)
+                const directives = getDefaultInstructionDirectives(ot)
+                const hasDetails = drivers.length > 0 || directives.length > 0
+
+                return (
+                  <div key={ot.id} className="rounded-lg border border-border bg-card shadow-sm">
+                    <div className="flex items-start justify-between gap-3 p-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{ot.name}</span>
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{ot.id}</code>
+                          {ot.isBuiltIn && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{ot.description}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{ot.sectionLabel} → {ot.elementLabel}</span>
+                          {ot.fields.map((f) => (
+                            <span key={f.key} className={`rounded px-1.5 py-0.5 text-[10px] ${f.primary ? 'bg-primary/10 text-primary font-medium' : 'bg-muted text-muted-foreground'}`}>
+                              {f.label} ({f.key})
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-1 line-clamp-2 font-mono text-[11px] text-muted-foreground/70">{ot.prompt}</p>
+                        {hasDetails && (
+                          <button
+                            onClick={() => setExpandedOts((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(ot.id)) next.delete(ot.id)
+                              else next.add(ot.id)
+                              return next
+                            })}
+                            className="mt-2 flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                            {drivers.length > 0 && `${drivers.length} section drivers`}
+                            {drivers.length > 0 && directives.length > 0 && ' · '}
+                            {directives.length > 0 && `${directives.length} directives`}
+                          </button>
+                        )}
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{ot.description}</p>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{ot.sectionLabel} → {ot.elementLabel}</span>
-                        {ot.fields.map((f) => (
-                          <span key={f.key} className={`rounded px-1.5 py-0.5 text-[10px] ${f.primary ? 'bg-primary/10 text-primary font-medium' : 'bg-muted text-muted-foreground'}`}>
-                            {f.label} ({f.key})
-                          </span>
-                        ))}
-                      </div>
-                      <p className="mt-1 line-clamp-2 font-mono text-[11px] text-muted-foreground/70">{ot.prompt}</p>
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setOtForm({ mode: 'edit', data: { ...ot } })}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      {!ot.isBuiltIn && (
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteOt(ot.id)}>
-                          <Trash2 className="h-3 w-3" />
+                      <div className="flex shrink-0 gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => setOtForm({ mode: 'edit', data: { ...ot } })}>
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                      )}
+                        {!ot.isBuiltIn && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteOt(ot.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
+
+                    {isExpanded && hasDetails && (
+                      <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
+                        {drivers.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              <Layers className="h-3 w-3" /> Section Drivers ({drivers.length})
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {drivers.map((d) => (
+                                <span key={d.name} className="rounded border border-border bg-card px-2 py-0.5 text-[10px] text-foreground" title={d.description}>
+                                  {d.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {directives.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              <ListOrdered className="h-3 w-3" /> Instruction Directives ({directives.length})
+                            </div>
+                            <div className="space-y-1">
+                              {directives.map((d, i) => (
+                                <div key={i} className="flex gap-2 text-[11px]">
+                                  <span className="shrink-0 font-semibold text-primary">{d.label}</span>
+                                  <span className="text-muted-foreground">{d.content}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

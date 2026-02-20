@@ -61,13 +61,7 @@ function isSelected(
 }
 
 interface QuestionsTreeNavExtendedProps extends QuestionsTreeNavProps {
-  context?: {
-    role: string
-    activity: string
-    situation: string
-    industry: string
-    service: string
-  }
+  context?: Record<string, string>
   additionalContext?: Array<{ label: string; value: string }>
 }
 

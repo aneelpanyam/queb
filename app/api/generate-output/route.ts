@@ -1,15 +1,20 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { formatContext } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
 export async function POST(req: Request) {
   try {
-    const { prompt, sectionLabel, elementLabel, fields, sectionDrivers, instructionDirectives } = await req.json()
+    const { prompt, context, sectionLabel, elementLabel, fields, sectionDrivers, instructionDirectives } = await req.json()
 
     if (!prompt || !fields || !Array.isArray(fields)) {
       return Response.json({ error: 'Missing prompt or fields' }, { status: 400 })
     }
+
+    const contextBlock = context && typeof context === 'object' && Object.keys(context).length > 0
+      ? `\n\nCONTEXT:\n${formatContext(context)}`
+      : ''
 
     const fieldSchemaEntries: Record<string, z.ZodTypeAny> = {}
     for (const f of fields) {
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
     let finalPrompt: string
     if (hasDirectives) {
       const directivesList = instructionDirectives.map((d: { label: string; content: string }, i: number) => `${i + 1}. [${d.label}] ${d.content}`).join('\n')
-      finalPrompt = `${prompt}\n\nINSTRUCTIONS:\n${directivesList}`
+      finalPrompt = `${prompt}${contextBlock}\n\nINSTRUCTIONS:\n${directivesList}`
       if (hasDrivers) {
         finalPrompt += `\n\nSECTION STRUCTURE:\nGenerate exactly these ${sectionLabel || 'section'}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}`
       }
@@ -45,7 +50,7 @@ export async function POST(req: Request) {
       const driverBlock = hasDrivers
         ? `\n\nSECTION STRUCTURE:\nGenerate exactly these ${sectionLabel || 'section'}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}\nEach ${sectionLabel || 'section'} should contain 3-6 ${elementLabel || 'item'}s.`
         : `\n\nOUTPUT FORMAT:\nGenerate 4-8 ${sectionLabel || 'section'}s, each containing 3-6 ${elementLabel || 'item'}s.\nEach ${sectionLabel || 'section'} should have a clear name and description.`
-      finalPrompt = `${prompt}${driverBlock}\nEach ${elementLabel || 'item'} must have these fields: ${fieldSpec}.\nBe specific, practical, and tailored to the context provided.`
+      finalPrompt = `${prompt}${contextBlock}${driverBlock}\nEach ${elementLabel || 'item'} must have these fields: ${fieldSpec}.\nBe specific, practical, and tailored to the context provided.`
     }
 
     const result = await generateText({

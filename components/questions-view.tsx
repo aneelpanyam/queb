@@ -35,13 +35,7 @@ interface Perspective {
 interface QuestionsViewProps {
   perspectives: Perspective[]
   isLoading: boolean
-  context: {
-    role: string
-    activity: string
-    situation: string
-    industry: string
-    service: string
-  }
+  context: Record<string, string>
   additionalContext?: Array<{ label: string; value: string }>
   initialDissections?: Record<string, DissectionData>
   initialDeeperQuestions?: Record<string, DeeperData>

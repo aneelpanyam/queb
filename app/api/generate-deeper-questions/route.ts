@@ -1,5 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { formatContext } from '@/lib/assemble-prompt'
 
 export const maxDuration = 120
 
@@ -36,20 +37,21 @@ export const deeperQuestionsSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-  const { originalQuestion, perspective, role, activity, situation, industry, service } =
-    await req.json()
-  console.log(`[generate-deeper] Perspective: ${perspective}, Role: ${role}`)
+    const { originalQuestion, perspective, context } = (await req.json()) as {
+      originalQuestion: string
+      perspective: string
+      context: Record<string, string>
+    }
+    console.log(`[generate-deeper] Perspective: ${perspective}`)
 
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an expert in multi-order thinking and systems analysis.
+    const contextBlock = formatContext(context)
+
+    const result = await generateText({
+      model: 'openai/gpt-5.2',
+      prompt: `You are an expert in multi-order thinking and systems analysis.
 
 CONTEXT:
-- Industry: ${industry}
-- Service: ${service}
-- Role: ${role}
-- Activity: ${activity}
-- Situation: "${situation}"
+${contextBlock}
 - Perspective: ${perspective}
 
 ORIGINAL QUESTION:
@@ -67,15 +69,15 @@ These questions go even deeper - exploring systemic ripple effects, long-term em
 Generate 2-3 questions.
 
 GUIDELINES:
-- Every question must be highly specific to the given context (industry, service, role, activity, situation).
+- Every question must be highly specific to the given context.
 - Each question must include a reasoning note that traces the chain of thinking from the original question.
 - Avoid generic questions. Make them reveal non-obvious insights.
 - Consider cascading impacts across the organization, market, and stakeholders.`,
-    output: Output.object({ schema: deeperQuestionsSchema }),
-  })
+      output: Output.object({ schema: deeperQuestionsSchema }),
+    })
 
-  console.log(`[generate-deeper] Success: ${result.output?.secondOrder?.length || 0} 2nd-order, ${result.output?.thirdOrder?.length || 0} 3rd-order`)
-  return Response.json(result.output)
+    console.log(`[generate-deeper] Success: ${result.output?.secondOrder?.length || 0} 2nd-order, ${result.output?.thirdOrder?.length || 0} 3rd-order`)
+    return Response.json(result.output)
   } catch (error) {
     console.error('[generate-deeper] Error:', error)
     return Response.json(
