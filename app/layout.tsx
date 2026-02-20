@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { DebugLogBubble } from '@/components/debug-log-bubble'
 
 import './globals.css'
 
@@ -33,6 +34,7 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}
       >
         {children}
+        {process.env.NEXT_PUBLIC_DEBUG_MODE === 'true' && <DebugLogBubble />}
         <Toaster 
           theme="light" 
           position="bottom-right" 

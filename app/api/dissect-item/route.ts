@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { getFrameworksForOutputType, type DeepDiveFramework } from '@/lib/deep-dive-frameworks'
 import { formatContext } from '@/lib/assemble-prompt'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -91,10 +92,7 @@ export async function POST(req: Request) {
 
     const contextBlock = formatContext(context)
 
-    const result = await generateText({
-      model: 'openai/gpt-5.2',
-      output: Output.object({ schema: dissectionSchema }),
-      prompt: `You are a senior consultant and domain expert who uses structured analytical frameworks to help professionals think deeply about specific items.
+    const prompt = `You are a senior consultant and domain expert who uses structured analytical frameworks to help professionals think deeply about specific items.
 
 CONTEXT:
 ${contextBlock}
@@ -114,10 +112,15 @@ FORMATTING RULES (very important):
 - Use **bold** for key terms, concepts, and emphasis.
 - When listing multiple items, stakeholders, actions, or considerations, ALWAYS use bullet lists (- item) or numbered lists (1. item).
 - Start each step description with a brief framing sentence, then break the detail into a bulleted or numbered list.
-- Keep paragraphs to 2-3 sentences max before breaking into a list.`,
+- Keep paragraphs to 2-3 sentences max before breaking into a list.`
+
+    const result = await generateText({
+      model: 'openai/gpt-5.2',
+      output: Output.object({ schema: dissectionSchema }),
+      prompt,
     })
 
-    return Response.json(result.output)
+    return Response.json(withDebugMeta(result.output as object, [prompt]))
   } catch (error) {
     console.error('[dissect-item] Error:', error)
     return Response.json({ error: 'Failed to generate deep dive.' }, { status: 500 })

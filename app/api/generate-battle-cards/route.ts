@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -48,10 +49,13 @@ async function generateForSection(
   section: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, section, 'Competitor', directives)
     : buildDefaultPrompt(section, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -82,9 +86,10 @@ export async function POST(req: Request) {
     console.log(`[generate-battle-cards] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = sections.map((sec) =>
-      generateForSection(sec, context, instructionDirectives).catch((err) => {
+      generateForSection(sec, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-battle-cards] Error for ${sec.name}:`, err)
         return { sectionName: sec.name, sectionDescription: sec.description, cards: [] }
       })
@@ -95,7 +100,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-battle-cards] ${relevant.length}/${sections.length} sections in ${Date.now() - startTime}ms`)
 
-    return Response.json({ sections: relevant })
+    return Response.json(withDebugMeta({ sections: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-battle-cards] Error:', error)
     return Response.json({ error: 'Failed to generate battle cards.' }, { status: 500 })

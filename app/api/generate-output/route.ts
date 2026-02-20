@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext } from '@/lib/assemble-prompt'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
       output: Output.object({ schema: outputSchema }),
     })
 
-    return Response.json(result.output)
+    return Response.json(withDebugMeta(result.output as object, [finalPrompt]))
   } catch (error) {
     console.error('[generate-output] Error:', error)
     return Response.json(

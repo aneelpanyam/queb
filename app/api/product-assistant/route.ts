@@ -1,5 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -165,7 +166,7 @@ RULES:
       output: Output.object({ schema: suggestionSchema }),
     })
 
-    return Response.json(result.output)
+    return Response.json(withDebugMeta(result.output as object, [prompt]))
   } catch (error) {
     console.error('[product-assistant] Error:', error)
     return Response.json(

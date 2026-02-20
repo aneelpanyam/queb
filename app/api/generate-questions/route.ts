@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -69,10 +70,13 @@ async function generateQuestionsForPerspective(
   perspective: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, perspective, 'Perspective', directives)
     : buildDefaultPrompt(perspective, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -96,9 +100,10 @@ export async function POST(req: Request) {
     console.log(`[generate-questions] Starting parallel generation for ${perspectives.length} perspectives${sectionDrivers?.length ? ' (custom)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const perspectivePromises = perspectives.map((perspective) =>
-      generateQuestionsForPerspective(perspective, context, instructionDirectives).catch((error) => {
+      generateQuestionsForPerspective(perspective, context, instructionDirectives, debugPrompts).catch((error) => {
         console.error(`[generate-questions] Error for perspective ${perspective.name}:`, error)
         return {
           perspectiveName: perspective.name,
@@ -116,7 +121,7 @@ export async function POST(req: Request) {
       `[generate-questions] Success: ${relevantPerspectives.length}/${perspectives.length} relevant perspectives in ${duration}ms`
     )
 
-    return Response.json({ perspectives: relevantPerspectives })
+    return Response.json(withDebugMeta({ perspectives: relevantPerspectives }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-questions] Error:', error)
     return Response.json(

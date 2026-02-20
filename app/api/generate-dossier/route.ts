@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -52,10 +53,13 @@ async function generateForSection(
   section: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, section, 'Intelligence Area', directives)
     : buildDefaultPrompt(section, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -78,9 +82,10 @@ export async function POST(req: Request) {
     console.log(`[generate-dossier] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = sections.map((section) =>
-      generateForSection(section, context, instructionDirectives).catch((err) => {
+      generateForSection(section, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-dossier] Error for ${section.name}:`, err)
         return { sectionName: section.name, sectionDescription: section.description, briefings: [] }
       })
@@ -91,7 +96,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-dossier] ${relevant.length}/${sections.length} sections in ${Date.now() - startTime}ms`)
 
-    return Response.json({ sections: relevant })
+    return Response.json(withDebugMeta({ sections: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-dossier] Error:', error)
     return Response.json({ error: 'Failed to generate dossier.' }, { status: 500 })

@@ -1,5 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 60
 
@@ -17,13 +18,15 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Missing prompt' }, { status: 400 })
     }
 
+    const finalPrompt = `${prompt}\n\nReturn the items as a flat list of concise strings. No numbering, no descriptions — just the values.`
+
     const result = await generateText({
       model: 'openai/gpt-5.2',
-      prompt: `${prompt}\n\nReturn the items as a flat list of concise strings. No numbering, no descriptions — just the values.`,
+      prompt: finalPrompt,
       output: Output.object({ schema: suggestionsSchema }),
     })
 
-    return Response.json({ suggestions: result.output?.suggestions || [] })
+    return Response.json(withDebugMeta({ suggestions: result.output?.suggestions || [] }, [finalPrompt]))
   } catch (error) {
     console.error('[generate-field-suggestions] Error:', error)
     return Response.json(

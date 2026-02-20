@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/use-auth'
 import { productStorage } from '@/lib/product-storage'
+import { aiFetch } from '@/lib/ai-fetch'
 import { getOutputType, getPrimaryField, type OutputTypeDefinition } from '@/lib/output-types'
 import type {
   Product,
@@ -320,18 +321,12 @@ export default function ProductEditorPage() {
       setDissectionLoading(true)
       setActiveDissectKey(key)
       try {
-        const res = await fetch('/api/dissect-item', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const data: DissectionData = await aiFetch('/api/dissect-item', {
             item: itemText,
             section: sectionName,
             outputType: product.outputType || 'questions',
             context: getContextRecord(product),
-          }),
-        })
-        if (!res.ok) throw new Error('AI generation failed')
-        const data: DissectionData = await res.json()
+          }, { action: 'Deep Dive', productId: product.id, productName: product.name })
         setDissectionMap((prev) => ({ ...prev, [key]: data }))
         setHiddenDissections((prev) => { const n = new Set(prev); n.delete(key); return n })
         setHasUnsavedChanges(true)
@@ -353,17 +348,11 @@ export default function ProductEditorPage() {
       if (deeperMap[key]) return
       setDeeperLoading(true)
       try {
-        const res = await fetch('/api/generate-deeper-questions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const data: DeeperData = await aiFetch('/api/generate-deeper-questions', {
             originalQuestion: question,
             perspective: sectionName,
             context: getContextRecord(product),
-          }),
-        })
-        if (!res.ok) throw new Error('AI generation failed')
-        const data: DeeperData = await res.json()
+          }, { action: 'Go Deeper', productId: product.id, productName: product.name })
         setDeeperMap((prev) => ({ ...prev, [key]: data }))
         setHasUnsavedChanges(true)
         toast.success('Deeper questions generated')
@@ -382,13 +371,9 @@ export default function ProductEditorPage() {
       setAnswerLoading(true)
       setActiveAnswerKey(key)
       try {
-        const res = await fetch('/api/find-answer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question, context: getContextRecord(product) }),
-        })
-        if (!res.ok) throw new Error('AI research failed')
-        const data: AnswerData = await res.json()
+        const data: AnswerData = await aiFetch('/api/find-answer', {
+            question, context: getContextRecord(product),
+          }, { action: 'Find Answer', productId: product.id, productName: product.name })
         setAnswerMap((prev) => ({ ...prev, [key]: data }))
         setHiddenAnswers((prev) => { const n = new Set(prev); n.delete(key); return n })
         setHasUnsavedChanges(true)
@@ -548,16 +533,9 @@ export default function ProductEditorPage() {
         }
       }
 
-      const res = await fetch('/api/product-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const data = await aiFetch('/api/product-assistant', payload, {
+        action: 'Smart Analysis', productId: product.id, productName: product.name,
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Request failed')
-      }
-      const data = await res.json()
       const newSuggestions = (data.suggestions || []) as AssistantSuggestion[]
 
       setAssistantData((prev) => {

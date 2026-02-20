@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { ACTIVITY_CATEGORIES } from '@/lib/activity-categories'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -26,13 +27,12 @@ async function generateActivitiesForCategory(
     role: string
     industry: string
     service: string
-  }
+  },
+  collectedPrompts?: string[],
 ) {
   const { role, industry, service } = context
 
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an organizational design expert.
+  const prompt = `You are an organizational design expert.
 
 For the role of "${role}" working in the "${industry}" industry providing "${service}" services, generate 2-4 specific activities for the following category:
 
@@ -47,7 +47,13 @@ RULES:
 - Activities must be specific to the role, not generic. Tailor them to the industry and service context.
 - If this category is not very relevant to this role, still include at least 1 activity, even if it's a minor part of their work.
 - The activity name should be action-oriented (start with a verb or gerund).
-- The description should explain what this specifically looks like for a "${role}".`,
+- The description should explain what this specifically looks like for a "${role}".`
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singleCategorySchema }),
   })
 
@@ -61,6 +67,7 @@ export async function POST(req: Request) {
     console.log(`[generate-activities] Starting parallel generation for ${ACTIVITY_CATEGORIES.length} categories`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     // Generate activities for all categories in parallel
     const categoryPromises = ACTIVITY_CATEGORIES.map((category) =>
@@ -68,7 +75,7 @@ export async function POST(req: Request) {
         role,
         industry,
         service,
-      }).catch((error) => {
+      }, debugPrompts).catch((error) => {
         console.error(`[generate-activities] Error for category ${category.category}:`, error)
         // Return a fallback category with empty activities on error
         return {
@@ -88,7 +95,7 @@ export async function POST(req: Request) {
       `[generate-activities] Success: ${validCategories.length}/${ACTIVITY_CATEGORIES.length} categories in ${duration}ms`
     )
 
-    return Response.json({ categories: validCategories })
+    return Response.json(withDebugMeta({ categories: validCategories }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-activities] Error:', error)
     return Response.json(

@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext } from '@/lib/assemble-prompt'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -61,10 +62,7 @@ export async function POST(req: Request) {
 
     const contextBlock = formatContext(context)
 
-    const result = await generateText({
-      model: 'openai/gpt-5.2',
-      output: Output.object({ schema: dissectionSchema }),
-      prompt: `You are a senior management consultant and strategic advisor. A professional needs help deeply understanding and answering a specific question.
+    const prompt = `You are a senior management consultant and strategic advisor. A professional needs help deeply understanding and answering a specific question.
 
 CONTEXT:
 ${contextBlock}
@@ -80,11 +78,16 @@ Provide:
 
 3. RESOURCES: 5-8 real, specific resources that would help. Include a mix of types (blogs, books, tools, frameworks, reports). For URLs, use real domains and realistic paths (e.g., hbr.org/..., mckinsey.com/..., specific tool websites). Each resource should directly relate to answering this question in the given context.
 
-4. A KEY INSIGHT: One powerful paragraph about what getting the answer to this question right will unlock strategically. Be specific to the context and situation.`,
+4. A KEY INSIGHT: One powerful paragraph about what getting the answer to this question right will unlock strategically. Be specific to the context and situation.`
+
+    const result = await generateText({
+      model: 'openai/gpt-5.2',
+      output: Output.object({ schema: dissectionSchema }),
+      prompt,
     })
 
     console.log(`[dissect-question] Success: ${result.output?.thinkingFramework?.length || 0} steps, ${result.output?.resources?.length || 0} resources`)
-    return Response.json(result.output)
+    return Response.json(withDebugMeta(result.output as object, [prompt]))
   } catch (error) {
     console.error('[dissect-question] Error:', error)
     return Response.json(

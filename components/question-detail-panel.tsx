@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { aiFetch } from '@/lib/ai-fetch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Layers, Loader2, Microscope } from 'lucide-react'
@@ -131,20 +132,11 @@ export function QuestionDetailPanel({
     if (!displayQuestion || !perspective) return
     setDissectionLoading(true)
     try {
-      const res = await fetch('/api/dissect-question', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await aiFetch('/api/dissect-question', {
           question: displayQuestion,
           perspective: perspective.perspectiveName,
           context,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'AI generation failed')
-      }
-      const data = await res.json()
+        }, { action: 'Dissect Question' })
       onDissectionUpdate(key, data)
       // Ensure the dissection is shown when newly generated
       setHiddenDissections(prev => {
@@ -167,20 +159,11 @@ export function QuestionDetailPanel({
     if (deeper) return
     setDeeperLoading(true)
     try {
-      const res = await fetch('/api/generate-deeper-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await aiFetch('/api/generate-deeper-questions', {
           originalQuestion: question.question,
           perspective: perspective.perspectiveName,
           context,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'AI generation failed')
-      }
-      const data = await res.json()
+        }, { action: 'Go Deeper' })
       onDeeperUpdate(pIndex, qIndex, data)
       toast.success('Deeper questions generated')
     } catch (err) {

@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -50,10 +51,13 @@ async function generateForStage(
   stage: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, stage, 'Module', directives)
     : buildDefaultPrompt(stage, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -76,9 +80,10 @@ export async function POST(req: Request) {
     console.log(`[generate-email-course] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom stages)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = stages.map((stage) =>
-      generateForStage(stage, context, instructionDirectives).catch((err) => {
+      generateForStage(stage, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-email-course] Error for ${stage.name}:`, err)
         return { moduleName: stage.name, moduleDescription: stage.description, emails: [] }
       })
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-email-course] ${relevant.length}/${stages.length} modules in ${Date.now() - startTime}ms`)
 
-    return Response.json({ modules: relevant })
+    return Response.json(withDebugMeta({ modules: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-email-course] Error:', error)
     return Response.json({ error: 'Failed to generate email course.' }, { status: 500 })

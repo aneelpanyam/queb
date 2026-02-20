@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -49,10 +50,13 @@ async function generateForDimension(
   dimension: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, dimension, 'Dimension', directives)
     : buildDefaultPrompt(dimension, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -75,9 +79,10 @@ export async function POST(req: Request) {
     console.log(`[generate-checklist] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom dimensions)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = dimensions.map((dim) =>
-      generateForDimension(dim, context, instructionDirectives).catch((err) => {
+      generateForDimension(dim, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-checklist] Error for ${dim.name}:`, err)
         return { dimensionName: dim.name, dimensionDescription: dim.description, items: [] }
       })
@@ -88,7 +93,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-checklist] ${relevant.length}/${dimensions.length} relevant in ${Date.now() - startTime}ms`)
 
-    return Response.json({ dimensions: relevant })
+    return Response.json(withDebugMeta({ dimensions: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-checklist] Error:', error)
     return Response.json({ error: 'Failed to generate checklist.' }, { status: 500 })

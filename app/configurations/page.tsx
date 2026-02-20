@@ -9,6 +9,7 @@ import type { SetupConfiguration, ConfigStep, ConfigStepField, ConfigOutput } fr
 import { fieldStorage, type FieldDefinition, computeDependencies, getTransitiveDependencies, sortFieldsByDependency } from '@/lib/field-library'
 import { outputTypeStorage, type OutputTypeDefinition, type OutputTypeField, type FieldColor, getDefaultSectionDrivers, getDefaultInstructionDirectives } from '@/lib/output-type-library'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
+import { aiFetch } from '@/lib/ai-fetch'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1302,10 +1303,7 @@ function ConfigurationsPageInner() {
     setWizardLoading(true)
     setWizardError(null)
     try {
-      const res = await fetch('/api/generate-configuration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { configuration } = await aiFetch('/api/generate-configuration', {
           description: wizardPrompt.trim(),
           availableFields: allFields.map((f) => ({
             id: f.id,
@@ -1321,13 +1319,7 @@ function ConfigurationsPageInner() {
             elementLabel: ot.elementLabel,
             defaultFields: ot.fields.map((f) => ({ key: f.key, label: f.label, type: f.type })),
           })),
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Request failed')
-      }
-      const { configuration } = await res.json()
+        }, { action: 'Generate Configuration' })
 
       const { builderState, createdFieldCount } = processAIConfiguration(configuration, allFields)
 

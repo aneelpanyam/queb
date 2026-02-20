@@ -10,6 +10,7 @@ import { valuesToLegacyContext } from '@/lib/setup-config-types'
 import { fieldStorage, type FieldDefinition, sortFieldsByDependency } from '@/lib/field-library'
 import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
 import { productStorage } from '@/lib/product-storage'
+import { aiFetch } from '@/lib/ai-fetch'
 import type { ProductSection } from '@/lib/product-types'
 import { SmartField } from '@/components/smart-field'
 import { LoginScreen } from '@/components/login-screen'
@@ -233,101 +234,46 @@ export default function RunConfigPage() {
 
         let sections: ProductSection[]
 
+        const aiFetchMeta = { action: `Generate ${otDef.name}` }
+
         if (co.outputTypeId === 'questions') {
-          const res = await fetch('/api/generate-questions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { perspectives: ApiPerspective[] } = await res.json()
+          const data = await aiFetch('/api/generate-questions', contextPayload, aiFetchMeta) as { perspectives: ApiPerspective[] }
           if (!data.perspectives?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = perspectivesToSections(data.perspectives)
         } else if (co.outputTypeId === 'checklist') {
-          const res = await fetch('/api/generate-checklist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { dimensions: ApiChecklistDimension[] } = await res.json()
+          const data = await aiFetch('/api/generate-checklist', contextPayload, aiFetchMeta) as { dimensions: ApiChecklistDimension[] }
           if (!data.dimensions?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = checklistToSections(data.dimensions)
         } else if (co.outputTypeId === 'email-course') {
-          const res = await fetch('/api/generate-email-course', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { modules: ApiEmailModule[] } = await res.json()
+          const data = await aiFetch('/api/generate-email-course', contextPayload, aiFetchMeta) as { modules: ApiEmailModule[] }
           if (!data.modules?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = emailCourseToSections(data.modules)
         } else if (co.outputTypeId === 'prompts') {
-          const res = await fetch('/api/generate-prompts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { categories: ApiPromptCategory[] } = await res.json()
+          const data = await aiFetch('/api/generate-prompts', contextPayload, aiFetchMeta) as { categories: ApiPromptCategory[] }
           if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = promptsToSections(data.categories)
         } else if (co.outputTypeId === 'battle-cards') {
-          const res = await fetch('/api/generate-battle-cards', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { sections: ApiBattleCardSection[] } = await res.json()
+          const data = await aiFetch('/api/generate-battle-cards', contextPayload, aiFetchMeta) as { sections: ApiBattleCardSection[] }
           if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = battleCardsToSections(data.sections)
         } else if (co.outputTypeId === 'decision-books') {
-          const res = await fetch('/api/generate-decision-books', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { domains: ApiDecisionDomain[] } = await res.json()
+          const data = await aiFetch('/api/generate-decision-books', contextPayload, aiFetchMeta) as { domains: ApiDecisionDomain[] }
           if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = decisionDomainsToSections(data.domains)
         } else if (co.outputTypeId === 'dossier') {
-          const res = await fetch('/api/generate-dossier', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { sections: ApiDossierSection[] } = await res.json()
+          const data = await aiFetch('/api/generate-dossier', contextPayload, aiFetchMeta) as { sections: ApiDossierSection[] }
           if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = dossierToSections(data.sections)
         } else if (co.outputTypeId === 'playbook') {
-          const res = await fetch('/api/generate-playbook', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { phases: ApiPlaybookPhase[] } = await res.json()
+          const data = await aiFetch('/api/generate-playbook', contextPayload, aiFetchMeta) as { phases: ApiPlaybookPhase[] }
           if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = playbookToSections(data.phases)
         } else if (co.outputTypeId === 'cheat-sheets') {
-          const res = await fetch('/api/generate-cheat-sheets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(contextPayload),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { categories: ApiCheatSheetCategory[] } = await res.json()
+          const data = await aiFetch('/api/generate-cheat-sheets', contextPayload, aiFetchMeta) as { categories: ApiCheatSheetCategory[] }
           if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = cheatSheetsToSections(data.categories)
         } else {
-          const res = await fetch('/api/generate-output', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          const data = await aiFetch('/api/generate-output', {
               prompt: resolvedPrompt,
               context: flat,
               sectionLabel: otDef.sectionLabel,
@@ -335,10 +281,7 @@ export default function RunConfigPage() {
               fields: resolvedFields,
               sectionDrivers: drivers,
               instructionDirectives: directives,
-            }),
-          })
-          if (!res.ok) throw new Error(`${otDef.name} generation failed`)
-          const data: { sections: { name: string; description: string; elements: Record<string, string>[] }[] } = await res.json()
+            }, aiFetchMeta) as { sections: { name: string; description: string; elements: Record<string, string>[] }[] }
           if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
           sections = data.sections.map((s) => ({
             name: s.name,

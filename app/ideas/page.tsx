@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { ideaStorage } from '@/lib/idea-storage'
+import { aiFetch } from '@/lib/ai-fetch'
 import { outputTypeStorage } from '@/lib/output-type-library'
 import { fieldStorage } from '@/lib/field-library'
 import {
@@ -244,21 +245,12 @@ export default function IdeasPage() {
     }
     setAiGenerating(true)
     try {
-      const res = await fetch('/api/generate-ideas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await aiFetch('/api/generate-ideas', {
           topic: aiTopic.trim(),
           framework: aiFramework,
           count: aiCount,
           existingIdeas: ideas.map((i) => i.title),
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Generation failed')
-      }
-      const data = await res.json()
+        }, { action: 'Generate Ideas' })
       const generated = data.ideas || []
       let saved = 0
       for (const raw of generated) {
@@ -300,22 +292,11 @@ export default function IdeasPage() {
 
       const description = assembleIdeaDescription(idea, outputTypeNames)
 
-      const res = await fetch('/api/generate-configuration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await aiFetch('/api/generate-configuration', {
           description,
           availableFields: fields.map((f) => ({ id: f.id, name: f.name, description: f.description, category: f.category })),
           availableOutputTypes: outputTypes.map((ot) => ({ id: ot.id, name: ot.name, description: ot.description, sectionLabel: ot.sectionLabel, elementLabel: ot.elementLabel })),
-        }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Configuration generation failed')
-      }
-
-      const data = await res.json()
+        }, { action: 'Generate Configuration' })
       const cfg = data.configuration
 
       ideaStorage.update(idea.id, { status: 'built' })

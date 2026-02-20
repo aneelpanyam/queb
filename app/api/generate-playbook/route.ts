@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -52,10 +53,13 @@ async function generateForPhase(
   phase: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, phase, 'Phase', directives)
     : buildDefaultPrompt(phase, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -78,9 +82,10 @@ export async function POST(req: Request) {
     console.log(`[generate-playbook] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom phases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = phases.map((phase) =>
-      generateForPhase(phase, context, instructionDirectives).catch((err) => {
+      generateForPhase(phase, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-playbook] Error for ${phase.name}:`, err)
         return { phaseName: phase.name, phaseDescription: phase.description, plays: [] }
       })
@@ -91,7 +96,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-playbook] ${relevant.length}/${phases.length} phases in ${Date.now() - startTime}ms`)
 
-    return Response.json({ phases: relevant })
+    return Response.json(withDebugMeta({ phases: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-playbook] Error:', error)
     return Response.json({ error: 'Failed to generate playbook.' }, { status: 500 })

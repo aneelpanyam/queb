@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -50,10 +51,13 @@ async function generateForUseCase(
   useCase: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, useCase, 'Use Case', directives)
     : buildDefaultPrompt(useCase, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -76,9 +80,10 @@ export async function POST(req: Request) {
     console.log(`[generate-prompts] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom use cases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = useCases.map((uc) =>
-      generateForUseCase(uc, context, instructionDirectives).catch((err) => {
+      generateForUseCase(uc, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-prompts] Error for ${uc.name}:`, err)
         return { categoryName: uc.name, categoryDescription: uc.description, prompts: [] }
       })
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-prompts] ${relevant.length}/${useCases.length} categories in ${Date.now() - startTime}ms`)
 
-    return Response.json({ categories: relevant })
+    return Response.json(withDebugMeta({ categories: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-prompts] Error:', error)
     return Response.json({ error: 'Failed to generate prompts.' }, { status: 500 })

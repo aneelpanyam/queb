@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { aiFetch } from '@/lib/ai-fetch'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -89,15 +90,7 @@ export function SmartField({
     setLoading(true)
     setError(null)
 
-    fetch('/api/generate-field-suggestions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: resolvedPrompt }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed')
-        return r.json()
-      })
+    aiFetch('/api/generate-field-suggestions', { prompt: resolvedPrompt }, { action: 'Field Suggestions' })
       .then((data) => {
         if (!cancelled) setSuggestions(data.suggestions || [])
       })
@@ -119,12 +112,7 @@ export function SmartField({
     fetchedForRef.current = null
     setLoading(true)
     setError(null)
-    fetch('/api/generate-field-suggestions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: resolvedPrompt }),
-    })
-      .then((r) => r.json())
+    aiFetch('/api/generate-field-suggestions', { prompt: resolvedPrompt }, { action: 'Field Suggestions' })
       .then((data) => setSuggestions(data.suggestions || []))
       .catch(() => setError('Failed. Check connection.'))
       .finally(() => setLoading(false))

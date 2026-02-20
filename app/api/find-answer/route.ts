@@ -1,5 +1,6 @@
 import { openai } from '@ai-sdk/openai'
 import { generateText } from 'ai'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -70,11 +71,11 @@ CRITICAL FORMAT RULES:
       new Map(verifiedSources.map((s) => [s.url, s])).values()
     )
 
-    return Response.json({
+    return Response.json(withDebugMeta({
       answer: text,
       sources: uniqueSources,
       generatedAt: new Date().toISOString(),
-    })
+    }, [prompt]))
   } catch (error) {
     console.error('[find-answer] Error:', error)
     return Response.json(

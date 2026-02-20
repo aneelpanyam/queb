@@ -1,5 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -36,10 +37,8 @@ export const rolesSchema = z.object({
 })
 
 // Phase 1: Identify departments
-async function identifyDepartments(industry: string, service: string) {
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an organizational design expert.
+async function identifyDepartments(industry: string, service: string, collectedPrompts?: string[]) {
+  const prompt = `You are an organizational design expert.
 
 For an organization in the "${industry}" industry that provides "${service}" as its core service, identify all the standard departments and functions that such an organization would typically have.
 
@@ -51,7 +50,13 @@ Be comprehensive and practical. Include departments like:
 - Sales, marketing, and business development
 - Any industry-specific departments
 
-Provide a list of 8-12 key departments with brief descriptions.`,
+Provide a list of 8-12 key departments with brief descriptions.`
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: departmentListSchema }),
   })
 
@@ -64,13 +69,12 @@ async function generateRolesForDepartment(
   context: {
     industry: string
     service: string
-  }
+  },
+  collectedPrompts?: string[],
 ) {
   const { industry, service } = context
 
-  const result = await generateText({
-    model: 'openai/gpt-5.2',
-    prompt: `You are an organizational design expert.
+  const prompt = `You are an organizational design expert.
 
 For an organization in the "${industry}" industry that provides "${service}" as its core service:
 
@@ -83,7 +87,13 @@ RULES:
 - For each role, provide a clear title and a brief description of their primary responsibilities.
 - Tailor roles to the specific duties and activities needed to deliver "${service}" within the "${industry}" industry.
 - Include both senior/leadership roles and individual contributor roles where appropriate.
-- Roles should be realistic and commonly found in this type of organization.`,
+- Roles should be realistic and commonly found in this type of organization.`
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
+
+  const result = await generateText({
+    model: 'openai/gpt-5.2',
+    prompt,
     output: Output.object({ schema: singleDepartmentSchema }),
   })
 
@@ -96,10 +106,11 @@ export async function POST(req: Request) {
     console.log(`[generate-roles] Industry: ${industry}, Service: ${service}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     // Phase 1: Identify departments
     console.log(`[generate-roles] Phase 1: Identifying departments`)
-    const departments = await identifyDepartments(industry, service)
+    const departments = await identifyDepartments(industry, service, debugPrompts)
     console.log(`[generate-roles] Identified ${departments.length} departments`)
 
     // Phase 2: Generate roles for all departments in parallel
@@ -108,7 +119,7 @@ export async function POST(req: Request) {
       generateRolesForDepartment(department, {
         industry,
         service,
-      }).catch((error) => {
+      }, debugPrompts).catch((error) => {
         console.error(`[generate-roles] Error for department ${department.name}:`, error)
         // Return a fallback department with empty roles on error
         return {
@@ -128,7 +139,7 @@ export async function POST(req: Request) {
       `[generate-roles] Success: ${validDepartments.length}/${departments.length} departments in ${duration}ms`
     )
 
-    return Response.json({ departments: validDepartments })
+    return Response.json(withDebugMeta({ departments: validDepartments }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-roles] Error:', error)
     return Response.json(

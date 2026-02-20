@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext } from '@/lib/assemble-prompt'
+import { withDebugMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -46,9 +47,7 @@ export async function POST(req: Request) {
 
     const contextBlock = formatContext(context)
 
-    const result = await generateText({
-      model: 'openai/gpt-5.2',
-      prompt: `You are an expert in multi-order thinking and systems analysis.
+    const prompt = `You are an expert in multi-order thinking and systems analysis.
 
 CONTEXT:
 ${contextBlock}
@@ -72,12 +71,16 @@ GUIDELINES:
 - Every question must be highly specific to the given context.
 - Each question must include a reasoning note that traces the chain of thinking from the original question.
 - Avoid generic questions. Make them reveal non-obvious insights.
-- Consider cascading impacts across the organization, market, and stakeholders.`,
+- Consider cascading impacts across the organization, market, and stakeholders.`
+
+    const result = await generateText({
+      model: 'openai/gpt-5.2',
+      prompt,
       output: Output.object({ schema: deeperQuestionsSchema }),
     })
 
     console.log(`[generate-deeper] Success: ${result.output?.secondOrder?.length || 0} 2nd-order, ${result.output?.thirdOrder?.length || 0} 3rd-order`)
-    return Response.json(result.output)
+    return Response.json(withDebugMeta(result.output as object, [prompt]))
   } catch (error) {
     console.error('[generate-deeper] Error:', error)
     return Response.json(

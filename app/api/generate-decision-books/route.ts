@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { DECISION_DOMAINS } from '@/lib/decision-domains'
 import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -52,10 +53,13 @@ async function generateForDomain(
   domain: { name: string; description: string },
   context: Record<string, string>,
   directives?: { label: string; content: string }[],
+  collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
     ? assembleDirectivesPrompt(context, domain, 'Decision Domain', directives)
     : buildDefaultPrompt(domain, context)
+
+  if (collectedPrompts) collectedPrompts.push(prompt)
 
   const result = await generateText({
     model: 'openai/gpt-5.2',
@@ -78,9 +82,10 @@ export async function POST(req: Request) {
     console.log(`[generate-decision-books] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom domains)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
 
     const startTime = Date.now()
+    const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
     const promises = domains.map((domain) =>
-      generateForDomain(domain, context, instructionDirectives).catch((err) => {
+      generateForDomain(domain, context, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-decision-books] Error for ${domain.name}:`, err)
         return { domainName: domain.name, domainDescription: domain.description, decisions: [] }
       })
@@ -91,7 +96,7 @@ export async function POST(req: Request) {
 
     console.log(`[generate-decision-books] ${relevant.length}/${domains.length} domains in ${Date.now() - startTime}ms`)
 
-    return Response.json({ domains: relevant })
+    return Response.json(withDebugMeta({ domains: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-decision-books] Error:', error)
     return Response.json({ error: 'Failed to generate decision book.' }, { status: 500 })
