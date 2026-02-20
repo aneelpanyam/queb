@@ -42,6 +42,7 @@ import {
   Users,
   Compass,
   FileOutput,
+  FlaskConical,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -86,7 +87,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   GitBranch, Info, CheckCheck, ListChecks, BarChart3, AlertOctagon,
   Lightbulb, ClipboardCheck, Bookmark, Repeat, CalendarClock,
   Shuffle, FileText, ShieldQuestion, Trophy, DollarSign, Users,
-  Compass, FileOutput, Copy, Check, Pencil,
+  Compass, FileOutput, FlaskConical, Copy, Check, Pencil,
 }
 
 // ============================================================

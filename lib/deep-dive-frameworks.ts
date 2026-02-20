@@ -419,6 +419,49 @@ export const DEEP_DIVE_FRAMEWORKS: Record<string, DeepDiveFramework[]> = {
     },
   ],
 
+  ebook: [
+    {
+      id: 'explain-like-a-book',
+      name: 'Explain Like a Book',
+      shortDescription: 'Context → Core Idea → Nuance → Application → Synthesis',
+      steps: [
+        'CONTEXT: Why does this topic matter right now? What is the reader\'s world like before they understand this? Set the stage with stakes and relevance.',
+        'CORE IDEA: What is the central concept or principle? Explain it clearly and precisely — strip away jargon and build understanding from first principles.',
+        'NUANCE: What are the subtleties, exceptions, and edge cases? Where do common explanations oversimplify? Add the depth that separates surface knowledge from mastery.',
+        'APPLICATION: How does this play out in the real world? Walk through a specific, detailed scenario where this knowledge changes what the reader does or decides.',
+        'SYNTHESIS: What is the bigger picture? How does this connect to other concepts in the book? What should the reader do differently now that they understand this?',
+      ],
+      bestFor: 'expanding book sub-sections that need more depth, clarity, and narrative richness',
+    },
+    {
+      id: 'addie',
+      name: 'ADDIE Instructional Design',
+      shortDescription: 'Analyze → Design → Develop → Implement → Evaluate',
+      steps: [
+        'ANALYZE: Who is the reader? What do they already know? What knowledge gap does this sub-section fill? What is the learning objective?',
+        'DESIGN: How should the content be structured for maximum understanding? What sequence of ideas, examples, and activities will build knowledge most effectively?',
+        'DEVELOP: What specific content, examples, and exercises will achieve the learning objective? Draft the key explanations and illustrations.',
+        'IMPLEMENT: How will the reader apply this knowledge? What specific task, reflection, or real-world exercise bridges the gap between learning and doing?',
+        'EVALUATE: How will the reader know they have understood? What self-check or test of understanding validates the learning?',
+      ],
+      bestFor: 'ensuring book sub-sections are pedagogically sound and genuinely teach the reader',
+    },
+    {
+      id: 'case-method',
+      name: 'Case Method',
+      shortDescription: 'Situation → Challenge → Analysis → Decision → Outcome → Lesson',
+      steps: [
+        'SITUATION: Set up the real-world context — who is involved, what is the environment, what constraints exist? Paint a vivid picture.',
+        'CHALLENGE: What problem or decision did the protagonist face? What made it difficult? What tensions or trade-offs were at play?',
+        'ANALYSIS: Walk through the thinking process — what information was gathered, what options were considered, what criteria were applied?',
+        'DECISION: What was chosen and why? What was explicitly traded away? How was the decision communicated and executed?',
+        'OUTCOME: What happened? Include both intended and unintended consequences. Be honest about what worked and what didn\'t.',
+        'LESSON: What transferable principle does this case illustrate? How should the reader apply this to their own situation?',
+      ],
+      bestFor: 'turning abstract concepts into memorable, story-driven book content',
+    },
+  ],
+
   'cheat-sheets': [
     {
       id: 'feynman-technique',

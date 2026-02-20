@@ -13,6 +13,7 @@ import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
 import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
 import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
 import { AGENT_OPPORTUNITY_AREAS } from '@/lib/agent-opportunity-areas'
+import { EBOOK_CHAPTERS } from '@/lib/ebook-chapters'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
 
 export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
@@ -362,6 +363,36 @@ GUIDELINES:
     defaultSectionDrivers: AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
     isBuiltIn: true,
   },
+  {
+    id: 'ebook',
+    name: 'e-Book',
+    description: 'Long-form guides organized into chapters — comprehensive knowledge products for education, training, and thought leadership',
+    icon: 'BookText',
+    prompt: `You are an expert author and instructional designer who creates compelling, comprehensive guides.
+
+TASK:
+Generate an e-Book organized into chapters, each containing detailed sub-sections with long-form educational content.
+
+GUIDELINES:
+- Create 3-5 substantial sub-sections per chapter
+- Each sub-section must contain rich, long-form prose (400-800 words) — not bullet points or summaries
+- Content should teach, explain, and illustrate — the reader should walk away truly understanding the material
+- Include concrete examples, scenarios, and practical illustrations throughout
+- Build progressively within each chapter from context-setting to actionable knowledge
+- Tailor depth, terminology, and examples to the specific audience and context provided`,
+    sectionLabel: 'Chapter',
+    elementLabel: 'Section',
+    fields: [
+      { key: 'title', label: 'Section Title', type: 'short-text', primary: true },
+      { key: 'content', label: 'Content', type: 'long-text', color: 'none', icon: 'FileText' },
+      { key: 'keyInsight', label: 'Key Insight', type: 'long-text', color: 'violet', icon: 'Lightbulb' },
+      { key: 'practicalExample', label: 'Practical Example', type: 'long-text', color: 'emerald', icon: 'FlaskConical' },
+      { key: 'actionItem', label: 'Reader Action Item', type: 'long-text', color: 'primary', icon: 'ListChecks' },
+    ],
+    supportsDeepDive: true,
+    defaultSectionDrivers: EBOOK_CHAPTERS.map((c) => ({ name: c.name, description: c.description })),
+    isBuiltIn: true,
+  },
 ]
 
 // ============================================================
@@ -370,7 +401,7 @@ GUIDELINES:
 // existing users get the updated defaults.
 // ============================================================
 
-const SEED_VERSION = 3
+const SEED_VERSION = 4
 const VERSION_KEY = STORAGE_KEY + '-version'
 
 function ensureSeeded(): OutputTypeDefinition[] {
@@ -609,6 +640,20 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Complexity range', content: 'Vary the complexity across agents — include both quick-win automations and more ambitious multi-step orchestrations.' },
     { label: 'Tailoring', content: 'Tailor all agent recommendations to the specific role, industry, workflow, and constraints provided.' },
   ],
+  ebook: [
+    { label: 'Role', content: 'You are an expert author and instructional designer who creates compelling, comprehensive guides that educate professionals.' },
+    { label: 'Task', content: 'Generate 3-5 substantial sub-sections for this chapter of the e-Book.' },
+    { label: 'Relevance filter', content: 'Only generate sub-sections if this chapter theme is genuinely relevant to the given context. If not relevant, return an empty sections array.' },
+    { label: 'Specificity', content: 'Every sub-section must be specific to the described context — not generic filler content.' },
+    { label: 'Context integration', content: 'Actively incorporate all context provided to make the content sharper, more relevant, and more actionable for the target audience.' },
+    { label: 'Long-form prose', content: 'The "content" field is the heart of the book. Write 400-800 words of rich, flowing prose per sub-section — teach, explain, and illustrate. This is a book, not a cheat sheet. Use paragraphs, transitions, and narrative structure.' },
+    { label: 'Key insight', content: 'The "keyInsight" field should distill the single most important takeaway from this sub-section — the idea the reader should remember even if they forget everything else.' },
+    { label: 'Practical examples', content: 'The "practicalExample" field must include a concrete, detailed example or scenario that makes the abstract tangible. Use realistic names, numbers, and situations relevant to the reader\'s context.' },
+    { label: 'Action items', content: 'The "actionItem" field should give the reader something specific to do after reading this sub-section — a task, exercise, or reflection that helps them apply the knowledge immediately.' },
+    { label: 'Progressive depth', content: 'Within each chapter, sub-sections should build on each other — start with context-setting, move to core material, and end with application or synthesis.' },
+    { label: 'Tone', content: 'Write as an authoritative but approachable expert — like a trusted mentor sharing hard-won knowledge. Avoid academic dryness and marketing fluff.' },
+    { label: 'Tailoring', content: 'Tailor all content to the specific audience, their knowledge level, their industry context, and their daily challenges.' },
+  ],
 }
 
 /** Returns default instruction directives for an output type, from definition or built-in fallback */
@@ -633,6 +678,7 @@ const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
   playbook: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
   'cheat-sheets': CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
   'agent-book': AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
+  ebook: EBOOK_CHAPTERS.map((c) => ({ name: c.name, description: c.description })),
 }
 
 /** Returns default section drivers for an output type, from definition or built-in fallback */

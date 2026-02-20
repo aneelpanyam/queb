@@ -94,6 +94,12 @@ interface ApiAgentOpportunity {
   agents: Record<string, string>[]
 }
 
+interface ApiEbookChapter {
+  chapterName: string
+  chapterDescription: string
+  sections: Record<string, string>[]
+}
+
 function toFields(obj: Record<string, string>): Record<string, string> {
   const fields: Record<string, string> = {}
   for (const [k, v] of Object.entries(obj)) {
@@ -182,6 +188,14 @@ function agentBookToSections(opportunities: ApiAgentOpportunity[]): ProductSecti
   }))
 }
 
+function ebookToSections(chapters: ApiEbookChapter[]): ProductSection[] {
+  return chapters.map((c) => ({
+    name: c.chapterName,
+    description: c.chapterDescription,
+    elements: c.sections.map((s) => ({ fields: toFields(s) })),
+  }))
+}
+
 export default function RunConfigPage() {
   const router = useRouter()
   const params = useParams()
@@ -266,6 +280,7 @@ export default function RunConfigPage() {
           playbook: '/api/generate-playbook',
           'cheat-sheets': '/api/generate-cheat-sheets',
           'agent-book': '/api/generate-agent-book',
+          ebook: '/api/generate-ebook',
         }
 
         const route = routeMap[co.outputTypeId]
@@ -308,6 +323,9 @@ export default function RunConfigPage() {
           } else if (co.outputTypeId === 'agent-book') {
             if (!data.opportunities?.length) throw new Error(`${otDef.name}: no content generated`)
             sections = agentBookToSections(data.opportunities)
+          } else if (co.outputTypeId === 'ebook') {
+            if (!data.chapters?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = ebookToSections(data.chapters)
           } else {
             if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
             sections = cheatSheetsToSections(data.categories)
