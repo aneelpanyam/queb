@@ -1,10 +1,12 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
-import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
+
+const DEFAULT_LABEL = 'Category'
 
 const singleCategorySchema = z.object({
   categoryName: z.string().describe('The cheat sheet category name'),
@@ -24,17 +26,19 @@ const singleCategorySchema = z.object({
 function buildDefaultPrompt(
   category: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
 ) {
   const contextBlock = formatContext(context)
+  const label = sectionLabel.toLowerCase()
   return `You are an expert educator and knowledge distiller who creates scannable, high-density reference materials.
 
 CONTEXT:
 ${contextBlock}
 
 TASK:
-Generate 4-8 quick-reference entries for the "${category.name}" category.
+Generate 4-8 quick-reference entries for the "${category.name}" ${label}.
 
-CATEGORY DEFINITION:
+${sectionLabel.toUpperCase()} DEFINITION:
 ${category.name}: ${category.description}
 
 GUIDELINES:
@@ -52,12 +56,13 @@ GUIDELINES:
 async function generateForCategory(
   category: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
   directives?: { label: string; content: string }[],
   collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, category, 'Category', directives)
-    : buildDefaultPrompt(category, context)
+    ? assembleDirectivesPrompt(context, category, sectionLabel, directives)
+    : buildDefaultPrompt(category, context, sectionLabel)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -72,20 +77,65 @@ async function generateForCategory(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
       context: Record<string, string>
-      sectionDrivers?: { name: string; description: string }[]
+      sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
+      sectionLabel?: string
     }
 
+    const label = sectionLabel || DEFAULT_LABEL
     const categories = sectionDrivers?.length ? sectionDrivers : CHEAT_SHEET_CATEGORIES
-    console.log(`[generate-cheat-sheets] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom categories)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
+    const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
+
+    console.log(`[generate-cheat-sheets] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom categories)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
 
     const startTime = Date.now()
     const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
+    if (hasPerDriverFields) {
+      const drivers = categories as { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
+      const promises = drivers.map((cat) => {
+        const fields = cat.fields
+        if (fields?.length) {
+          const elementSchema = buildElementSchema(fields)
+          const schema = z.object({
+            sectionName: z.string(),
+            sectionDescription: z.string(),
+            elements: z.array(elementSchema),
+          })
+          const prompt = (instructionDirectives?.length
+            ? assembleDirectivesPrompt(context, cat, label, instructionDirectives)
+            : buildDefaultPrompt(cat, context, label))
+            + buildFieldOverrideBlock(fields)
+          if (debugPrompts) debugPrompts.push(prompt)
+          return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
+            .then((r) => ({ ...(r.output as object), resolvedFields: fields }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields: typeof fields })
+            .catch((err) => {
+              console.error(`[generate-cheat-sheets] Error for category ${cat.name}:`, err)
+              return { sectionName: cat.name, sectionDescription: cat.description, elements: [] as Record<string, string>[], resolvedFields: fields }
+            })
+        }
+        return generateForCategory(cat, context, label, instructionDirectives, debugPrompts)
+          .then((r) => ({
+            sectionName: r.categoryName,
+            sectionDescription: r.categoryDescription,
+            elements: r.entries as unknown as Record<string, string>[],
+          }))
+          .catch((err) => {
+            console.error(`[generate-cheat-sheets] Error for category ${cat.name}:`, err)
+            return { sectionName: cat.name, sectionDescription: cat.description, elements: [] as Record<string, string>[] }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+      console.log(`[generate-cheat-sheets] ${relevant.length}/${categories.length} categories in ${Date.now() - startTime}ms (per-driver fields)`)
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
+
     const promises = categories.map((category) =>
-      generateForCategory(category, context, instructionDirectives, debugPrompts).catch((err) => {
+      generateForCategory(category, context, label, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-cheat-sheets] Error for ${category.name}:`, err)
         return { categoryName: category.name, categoryDescription: category.description, entries: [] }
       })

@@ -1,10 +1,12 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
-import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
+
+const DEFAULT_LABEL = 'Perspective'
 
 const singlePerspectiveSchema = z.object({
   perspectiveName: z.string().describe('The name of the perspective'),
@@ -43,6 +45,7 @@ export const questionsSchema = z.object({
 function buildDefaultPrompt(
   perspective: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
 ) {
   const contextBlock = formatContext(context)
   return `You are an expert thinking coach and organizational consultant.
@@ -53,7 +56,7 @@ ${contextBlock}
 TASK:
 Generate 3-5 thoughtful, probing questions specifically from the "${perspective.name}" perspective.
 
-PERSPECTIVE DEFINITION:
+${sectionLabel.toUpperCase()} DEFINITION:
 ${perspective.name}: ${perspective.description}
 
 GUIDELINES:
@@ -69,12 +72,13 @@ GUIDELINES:
 async function generateQuestionsForPerspective(
   perspective: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
   directives?: { label: string; content: string }[],
   collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, perspective, 'Perspective', directives)
-    : buildDefaultPrompt(perspective, context)
+    ? assembleDirectivesPrompt(context, perspective, sectionLabel, directives)
+    : buildDefaultPrompt(perspective, context, sectionLabel)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -89,21 +93,68 @@ async function generateQuestionsForPerspective(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
       context: Record<string, string>
-      sectionDrivers?: { name: string; description: string }[]
+      sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
+      sectionLabel?: string
     }
 
+    const label = sectionLabel || DEFAULT_LABEL
     const perspectives = sectionDrivers?.length ? sectionDrivers : BUSINESS_PERSPECTIVES
+    const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
+
     console.log(`[generate-questions] Context keys: ${Object.keys(context).join(', ')}`)
-    console.log(`[generate-questions] Starting parallel generation for ${perspectives.length} perspectives${sectionDrivers?.length ? ' (custom)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
+    console.log(`[generate-questions] Starting parallel generation for ${perspectives.length} perspectives${sectionDrivers?.length ? ' (custom)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
 
     const startTime = Date.now()
     const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
+    if (hasPerDriverFields) {
+      const customDrivers = sectionDrivers!
+      const promises = customDrivers.map((perspective) => {
+        const fields = perspective.fields
+        if (fields?.length) {
+          const elementSchema = buildElementSchema(fields)
+          const schema = z.object({
+            sectionName: z.string(),
+            sectionDescription: z.string(),
+            elements: z.array(elementSchema),
+          })
+          const prompt = (instructionDirectives?.length
+            ? assembleDirectivesPrompt(context, perspective, label, instructionDirectives)
+            : buildDefaultPrompt(perspective, context, label))
+            + buildFieldOverrideBlock(fields)
+          if (debugPrompts) debugPrompts.push(prompt)
+          return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
+            .then((r) => ({ ...(r.output as object), resolvedFields: fields }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields: typeof fields })
+            .catch((err) => {
+              console.error(`[generate-questions] Error for perspective ${perspective.name}:`, err)
+              return { sectionName: perspective.name, sectionDescription: perspective.description, elements: [] as Record<string, string>[], resolvedFields: fields }
+            })
+        }
+        return generateQuestionsForPerspective(perspective, context, label, instructionDirectives, debugPrompts)
+          .then((r) => ({
+            sectionName: r.perspectiveName,
+            sectionDescription: r.perspectiveDescription,
+            elements: r.questions as unknown as Record<string, string>[],
+          }))
+          .catch((err) => {
+            console.error(`[generate-questions] Error for perspective ${perspective.name}:`, err)
+            return { sectionName: perspective.name, sectionDescription: perspective.description, elements: [] as Record<string, string>[] }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+      console.log(
+        `[generate-questions] Success: ${relevant.length}/${perspectives.length} relevant perspectives in ${Date.now() - startTime}ms (per-driver fields)`
+      )
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
+
     const perspectivePromises = perspectives.map((perspective) =>
-      generateQuestionsForPerspective(perspective, context, instructionDirectives, debugPrompts).catch((error) => {
+      generateQuestionsForPerspective(perspective, context, label, instructionDirectives, debugPrompts).catch((error) => {
         console.error(`[generate-questions] Error for perspective ${perspective.name}:`, error)
         return {
           perspectiveName: perspective.name,

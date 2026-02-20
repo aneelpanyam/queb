@@ -1,10 +1,12 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
-import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
+
+const DEFAULT_LABEL = 'Intelligence Area'
 
 const singleSectionSchema = z.object({
   sectionName: z.string().describe('The intelligence area name'),
@@ -25,17 +27,19 @@ const singleSectionSchema = z.object({
 function buildDefaultPrompt(
   section: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
 ) {
   const contextBlock = formatContext(context)
+  const label = sectionLabel.toLowerCase()
   return `You are a senior intelligence analyst and strategic research expert who produces rigorous, evidence-based briefings.
 
 CONTEXT:
 ${contextBlock}
 
 TASK:
-Generate 3-5 intelligence briefings for the "${section.name}" research area.
+Generate 3-5 intelligence briefings for the "${section.name}" ${label}.
 
-AREA DEFINITION:
+${sectionLabel.toUpperCase()} DEFINITION:
 ${section.name}: ${section.description}
 
 GUIDELINES:
@@ -52,12 +56,13 @@ GUIDELINES:
 async function generateForSection(
   section: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
   directives?: { label: string; content: string }[],
   collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, section, 'Intelligence Area', directives)
-    : buildDefaultPrompt(section, context)
+    ? assembleDirectivesPrompt(context, section, sectionLabel, directives)
+    : buildDefaultPrompt(section, context, sectionLabel)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -72,20 +77,65 @@ async function generateForSection(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
       context: Record<string, string>
-      sectionDrivers?: { name: string; description: string }[]
+      sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
+      sectionLabel?: string
     }
 
+    const label = sectionLabel || DEFAULT_LABEL
     const sections = sectionDrivers?.length ? sectionDrivers : DOSSIER_SECTIONS
-    console.log(`[generate-dossier] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
+    const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
+
+    console.log(`[generate-dossier] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
 
     const startTime = Date.now()
     const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
+    if (hasPerDriverFields) {
+      const drivers = sections as { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
+      const promises = drivers.map((sec) => {
+        const fields = sec.fields
+        if (fields?.length) {
+          const elementSchema = buildElementSchema(fields)
+          const schema = z.object({
+            sectionName: z.string(),
+            sectionDescription: z.string(),
+            elements: z.array(elementSchema),
+          })
+          const prompt = (instructionDirectives?.length
+            ? assembleDirectivesPrompt(context, sec, label, instructionDirectives)
+            : buildDefaultPrompt(sec, context, label))
+            + buildFieldOverrideBlock(fields)
+          if (debugPrompts) debugPrompts.push(prompt)
+          return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
+            .then((r) => ({ ...(r.output as object), resolvedFields: fields }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields: typeof fields })
+            .catch((err) => {
+              console.error(`[generate-dossier] Error for section ${sec.name}:`, err)
+              return { sectionName: sec.name, sectionDescription: sec.description, elements: [] as Record<string, string>[], resolvedFields: fields }
+            })
+        }
+        return generateForSection(sec, context, label, instructionDirectives, debugPrompts)
+          .then((r) => ({
+            sectionName: r.sectionName,
+            sectionDescription: r.sectionDescription,
+            elements: r.briefings as unknown as Record<string, string>[],
+          }))
+          .catch((err) => {
+            console.error(`[generate-dossier] Error for section ${sec.name}:`, err)
+            return { sectionName: sec.name, sectionDescription: sec.description, elements: [] as Record<string, string>[] }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+      console.log(`[generate-dossier] ${relevant.length}/${sections.length} sections in ${Date.now() - startTime}ms (per-driver fields)`)
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
+
     const promises = sections.map((section) =>
-      generateForSection(section, context, instructionDirectives, debugPrompts).catch((err) => {
+      generateForSection(section, context, label, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-dossier] Error for ${section.name}:`, err)
         return { sectionName: section.name, sectionDescription: section.description, briefings: [] }
       })

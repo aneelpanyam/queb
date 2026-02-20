@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { formatContext } from '@/lib/assemble-prompt'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -13,9 +13,60 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Missing prompt or fields' }, { status: 400 })
     }
 
+    const label = sectionLabel || 'section'
+    const elLabel = elementLabel || 'item'
+
     const contextBlock = context && typeof context === 'object' && Object.keys(context).length > 0
       ? `\n\nCONTEXT:\n${formatContext(context)}`
       : ''
+
+    const hasDrivers = Array.isArray(sectionDrivers) && sectionDrivers.length > 0
+    const hasPerDriverFields = hasDrivers && sectionDrivers.some((d: { fields?: unknown[] }) => d.fields?.length)
+    const hasDirectives = Array.isArray(instructionDirectives) && instructionDirectives.length > 0
+
+    if (hasPerDriverFields) {
+      const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
+      const startTime = Date.now()
+
+      const promises = sectionDrivers.map((driver: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }) => {
+        const driverFields = driver.fields || fields
+        const elementSchema = buildElementSchema(driverFields)
+        const schema = z.object({
+          sectionName: z.string(),
+          sectionDescription: z.string(),
+          elements: z.array(elementSchema),
+        })
+
+        const driverPrompt = (hasDirectives
+          ? assembleDirectivesPrompt(context, driver, label, instructionDirectives)
+          : `${prompt}${contextBlock}\n\n${label.toUpperCase()} DEFINITION:\n${driver.name}: ${driver.description}\nBe specific, practical, and tailored to the context provided.`)
+          + buildFieldOverrideBlock(driverFields)
+
+        if (debugPrompts) debugPrompts.push(driverPrompt)
+
+        return generateText({ model: 'openai/gpt-5.2', prompt: driverPrompt, output: Output.object({ schema }) })
+          .then((r) => ({
+            ...(r.output as object),
+            resolvedFields: driver.fields ? driverFields : undefined,
+          }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: typeof driverFields })
+          .catch((err) => {
+            console.error(`[generate-output] Error for ${driver.name}:`, err)
+            return {
+              sectionName: driver.name,
+              sectionDescription: driver.description,
+              elements: [] as Record<string, string>[],
+              resolvedFields: driver.fields ? driverFields : undefined,
+            }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+
+      console.log(`[generate-output] ${relevant.length}/${sectionDrivers.length} sections in ${Date.now() - startTime}ms (per-driver fields)`)
+
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
 
     const fieldSchemaEntries: Record<string, z.ZodTypeAny> = {}
     for (const f of fields) {
@@ -25,33 +76,30 @@ export async function POST(req: Request) {
     const elementSchema = z.object(fieldSchemaEntries)
 
     const sectionSchema = z.object({
-      name: z.string().describe(`The ${sectionLabel || 'section'} name`),
-      description: z.string().describe(`A brief description of this ${sectionLabel || 'section'}`),
-      elements: z.array(elementSchema).describe(`The ${elementLabel || 'item'}s in this ${sectionLabel || 'section'}`),
+      name: z.string().describe(`The ${label} name`),
+      description: z.string().describe(`A brief description of this ${label}`),
+      elements: z.array(elementSchema).describe(`The ${elLabel}s in this ${label}`),
     })
 
     const outputSchema = z.object({
       sections: z.array(sectionSchema),
     })
 
-    const hasDrivers = Array.isArray(sectionDrivers) && sectionDrivers.length > 0
     const fieldSpec = fields.map((f: { key: string; label: string }) => `"${f.key}" (${f.label})`).join(', ')
-
-    const hasDirectives = Array.isArray(instructionDirectives) && instructionDirectives.length > 0
 
     let finalPrompt: string
     if (hasDirectives) {
       const directivesList = instructionDirectives.map((d: { label: string; content: string }, i: number) => `${i + 1}. [${d.label}] ${d.content}`).join('\n')
       finalPrompt = `${prompt}${contextBlock}\n\nINSTRUCTIONS:\n${directivesList}`
       if (hasDrivers) {
-        finalPrompt += `\n\nSECTION STRUCTURE:\nGenerate exactly these ${sectionLabel || 'section'}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}`
+        finalPrompt += `\n\nSECTION STRUCTURE:\nGenerate exactly these ${label}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}`
       }
-      finalPrompt += `\nEach ${elementLabel || 'item'} must have these fields: ${fieldSpec}.`
+      finalPrompt += `\nEach ${elLabel} must have these fields: ${fieldSpec}.`
     } else {
       const driverBlock = hasDrivers
-        ? `\n\nSECTION STRUCTURE:\nGenerate exactly these ${sectionLabel || 'section'}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}\nEach ${sectionLabel || 'section'} should contain 3-6 ${elementLabel || 'item'}s.`
-        : `\n\nOUTPUT FORMAT:\nGenerate 4-8 ${sectionLabel || 'section'}s, each containing 3-6 ${elementLabel || 'item'}s.\nEach ${sectionLabel || 'section'} should have a clear name and description.`
-      finalPrompt = `${prompt}${contextBlock}${driverBlock}\nEach ${elementLabel || 'item'} must have these fields: ${fieldSpec}.\nBe specific, practical, and tailored to the context provided.`
+        ? `\n\nSECTION STRUCTURE:\nGenerate exactly these ${label}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}\nEach ${label} should contain 3-6 ${elLabel}s.`
+        : `\n\nOUTPUT FORMAT:\nGenerate 4-8 ${label}s, each containing 3-6 ${elLabel}s.\nEach ${label} should have a clear name and description.`
+      finalPrompt = `${prompt}${contextBlock}${driverBlock}\nEach ${elLabel} must have these fields: ${fieldSpec}.\nBe specific, practical, and tailored to the context provided.`
     }
 
     const result = await generateText({

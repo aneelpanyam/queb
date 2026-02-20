@@ -3,6 +3,18 @@
 // Used by all generation API routes.
 // ============================================================
 
+import { z, type ZodTypeAny } from 'zod'
+
+/**
+ * Builds a dynamic Zod element schema from field definitions.
+ * Used when a section driver has custom per-driver fields.
+ */
+export function buildElementSchema(fields: { key: string; label: string }[]) {
+  const entries: Record<string, ZodTypeAny> = {}
+  for (const f of fields) entries[f.key] = z.string().describe(f.label)
+  return z.object(entries)
+}
+
 export function formatContext(context: Record<string, string>): string {
   return Object.entries(context)
     .filter(([, v]) => v?.trim())
@@ -18,6 +30,17 @@ export function formatContext(context: Record<string, string>): string {
  * @param sectionLabel  - Human label for the section type (e.g. "Perspective", "Dimension")
  * @param directives    - Ordered list of instruction directives to include
  */
+/**
+ * Builds a strong field-override block for prompts when a section driver
+ * has custom fields that differ from the output type defaults.
+ * Placed at the end of the prompt so the AI ignores any conflicting
+ * field guidance in instruction directives.
+ */
+export function buildFieldOverrideBlock(fields: { key: string; label: string }[]): string {
+  const fieldLines = fields.map((f) => `- "${f.key}": ${f.label}`).join('\n')
+  return `\n\nFIELD SCHEMA (use ONLY these fields for each element — ignore any conflicting field guidance above):\n${fieldLines}`
+}
+
 export function assembleDirectivesPrompt(
   context: Record<string, string>,
   section: { name: string; description: string },

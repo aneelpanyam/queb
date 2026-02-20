@@ -1,22 +1,24 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
+const DEFAULT_LABEL = 'Lens'
+
 const singleSectionSchema = z.object({
-  sectionName: z.string().describe('The competitor or competitive theme name'),
-  sectionDescription: z.string().describe('Brief description of this competitive section'),
+  sectionName: z.string().describe('The lens or theme name'),
+  sectionDescription: z.string().describe('Brief description of this analytical lens'),
   cards: z.array(
     z.object({
       title: z.string().describe('A clear, specific card title'),
-      strengths: z.string().describe('Their key strengths and advantages'),
-      weaknesses: z.string().describe('Their weaknesses, gaps, and vulnerabilities'),
-      talkingPoints: z.string().describe('Your talking points, differentiators, and objection handlers'),
+      strengths: z.string().describe('Key strengths and advantages'),
+      weaknesses: z.string().describe('Weaknesses, gaps, and vulnerabilities'),
+      talkingPoints: z.string().describe('Key talking points and differentiators'),
       objectionHandling: z.string().describe('Anticipated objections with concrete responses — "When they say X, you say Y". Empty string if not applicable.'),
-      winStrategy: z.string().describe('The game plan to win against this competitor. Empty string if not applicable.'),
-      pricingIntel: z.string().describe('Their pricing model, relative price position, and discounting patterns. Empty string if not applicable.'),
+      winStrategy: z.string().describe('The strategic game plan or recommended response. Empty string if not applicable.'),
+      pricingIntel: z.string().describe('Relevant pricing, cost, or resource implications. Empty string if not applicable.'),
     })
   ),
 })
@@ -24,36 +26,37 @@ const singleSectionSchema = z.object({
 function buildDefaultPrompt(
   section: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
 ) {
   const contextBlock = formatContext(context)
-  return `You are a competitive intelligence and sales enablement expert.
+  return `You are a structured analysis and strategic intelligence expert.
 
 CONTEXT:
 ${contextBlock}
 
 TASK:
-Generate 3-5 battle cards for the "${section.name}" competitive section.
+Generate 3-5 battle cards for the "${section.name}" ${sectionLabel.toLowerCase()}.
 
-SECTION DEFINITION:
+${sectionLabel.toUpperCase()} DEFINITION:
 ${section.name}: ${section.description}
 
 GUIDELINES:
-- Only generate cards if this competitive section is genuinely relevant to the given context. If not relevant, return an empty cards array.
-- Each card needs a clear title, honest strength/weakness analysis, and actionable talking points.
-- Focus on intelligence that sales teams can use in real conversations.
-- Include specific differentiators and objection handlers.
+- Only generate cards if this ${sectionLabel.toLowerCase()} is genuinely relevant to the given context. If not relevant, return an empty cards array.
+- Each card needs a clear title, honest analysis, and actionable insights.
+- Focus on intelligence the reader can use immediately.
 - Tailor everything to the specific context provided.`
 }
 
 async function generateForSection(
   section: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
   directives?: { label: string; content: string }[],
   collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, section, 'Competitor', directives)
-    : buildDefaultPrompt(section, context)
+    ? assembleDirectivesPrompt(context, section, sectionLabel, directives)
+    : buildDefaultPrompt(section, context, sectionLabel)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -67,29 +70,74 @@ async function generateForSection(
 }
 
 const DEFAULT_SECTIONS = [
-  { name: 'Direct Competitors', description: 'Head-to-head competitors offering similar products or services to the same target market' },
-  { name: 'Indirect Competitors', description: 'Alternative solutions or substitute approaches that solve the same underlying problem differently' },
-  { name: 'Emerging Threats', description: 'New entrants, disruptors, or adjacent players expanding into this space' },
-  { name: 'DIY & Status Quo', description: 'The option to do nothing, build in-house, or continue with current manual processes' },
-  { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
+  { name: 'Current Landscape', description: 'The state of play today — key players, dominant approaches, and the baseline the reader operates from' },
+  { name: 'Strengths & Advantages', description: 'What the reader (or their approach) does well — capabilities, differentiators, and leverage points' },
+  { name: 'Weaknesses & Risks', description: 'Vulnerabilities, blind spots, and areas where the reader is exposed or under-performing' },
+  { name: 'Emerging Forces', description: 'New trends, technologies, entrants, or shifts that will reshape the landscape' },
+  { name: 'Strategic Response', description: 'How to respond — positioning, actions, investments, and narrative to stay ahead' },
 ] as const
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
       context: Record<string, string>
-      sectionDrivers?: { name: string; description: string }[]
+      sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
+      sectionLabel?: string
     }
 
+    const label = sectionLabel || DEFAULT_LABEL
     const sections = sectionDrivers?.length ? sectionDrivers : DEFAULT_SECTIONS
-    console.log(`[generate-battle-cards] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
+    const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
+
+    console.log(`[generate-battle-cards] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom sections)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
 
     const startTime = Date.now()
     const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
+    if (hasPerDriverFields) {
+      const customDrivers = sectionDrivers!
+      const promises = customDrivers.map((sec) => {
+        const fields = sec.fields
+        if (fields?.length) {
+          const elementSchema = buildElementSchema(fields)
+          const schema = z.object({
+            sectionName: z.string(),
+            sectionDescription: z.string(),
+            elements: z.array(elementSchema),
+          })
+          const prompt = (instructionDirectives?.length
+            ? assembleDirectivesPrompt(context, sec, label, instructionDirectives)
+            : buildDefaultPrompt(sec, context, label))
+            + buildFieldOverrideBlock(fields)
+          if (debugPrompts) debugPrompts.push(prompt)
+          return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
+            .then((r) => ({ ...(r.output as object), resolvedFields: fields }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields: typeof fields })
+            .catch((err) => {
+              console.error(`[generate-battle-cards] Error for ${sec.name}:`, err)
+              return { sectionName: sec.name, sectionDescription: sec.description, elements: [] as Record<string, string>[], resolvedFields: fields }
+            })
+        }
+        return generateForSection(sec, context, label, instructionDirectives, debugPrompts)
+          .then((r) => ({
+            sectionName: r.sectionName,
+            sectionDescription: r.sectionDescription,
+            elements: r.cards as unknown as Record<string, string>[],
+          }))
+          .catch((err) => {
+            console.error(`[generate-battle-cards] Error for ${sec.name}:`, err)
+            return { sectionName: sec.name, sectionDescription: sec.description, elements: [] as Record<string, string>[] }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+      console.log(`[generate-battle-cards] ${relevant.length}/${sections.length} sections in ${Date.now() - startTime}ms (per-driver fields)`)
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
+
     const promises = sections.map((sec) =>
-      generateForSection(sec, context, instructionDirectives, debugPrompts).catch((err) => {
+      generateForSection(sec, context, label, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-battle-cards] Error for ${sec.name}:`, err)
         return { sectionName: sec.name, sectionDescription: sec.description, cards: [] }
       })

@@ -60,6 +60,7 @@ export interface ElementDetailProps {
   onCancelEdit: () => void
   onEditValueChange: (value: string) => void
   resolvedFields?: OutputTypeField[]
+  sectionResolvedFields?: OutputTypeField[]
 }
 
 // ============================================================
@@ -255,8 +256,8 @@ function FieldCard({
 }
 
 export function ElementDetail(props: ElementDetailProps) {
-  const { element, sIndex, eIndex, outputTypeDef, outputType, resolvedFields } = props
-  const fields = resolvedFields ?? outputTypeDef.fields
+  const { element, sIndex, eIndex, outputTypeDef, outputType, resolvedFields, sectionResolvedFields } = props
+  const fields = sectionResolvedFields ?? resolvedFields ?? outputTypeDef.fields
   const primaryField = fields.find((f) => f.primary)
   const primaryKey = primaryField?.key || Object.keys(element.fields)[0]
   const primaryVal = element.fields[primaryKey] || ''

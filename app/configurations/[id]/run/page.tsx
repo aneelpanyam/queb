@@ -227,67 +227,99 @@ export default function RunConfigPage() {
           (match, fieldId) => flat[fieldId] || match,
         )
 
+        const sectionLabel = co.sectionLabelOverride || otDef.sectionLabel
         const drivers = co.sectionDrivers?.length ? co.sectionDrivers : undefined
         const directives = co.instructionDirectives?.length ? co.instructionDirectives : undefined
         const resolvedFields = co.fieldOverrides ?? otDef.fields
-        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives }
+        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives, sectionLabel }
 
         let sections: ProductSection[]
 
         const aiFetchMeta = { action: `Generate ${otDef.name}` }
 
-        if (co.outputTypeId === 'questions') {
-          const data = await aiFetch('/api/generate-questions', contextPayload, aiFetchMeta) as { perspectives: ApiPerspective[] }
-          if (!data.perspectives?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = perspectivesToSections(data.perspectives)
-        } else if (co.outputTypeId === 'checklist') {
-          const data = await aiFetch('/api/generate-checklist', contextPayload, aiFetchMeta) as { dimensions: ApiChecklistDimension[] }
-          if (!data.dimensions?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = checklistToSections(data.dimensions)
-        } else if (co.outputTypeId === 'email-course') {
-          const data = await aiFetch('/api/generate-email-course', contextPayload, aiFetchMeta) as { modules: ApiEmailModule[] }
-          if (!data.modules?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = emailCourseToSections(data.modules)
-        } else if (co.outputTypeId === 'prompts') {
-          const data = await aiFetch('/api/generate-prompts', contextPayload, aiFetchMeta) as { categories: ApiPromptCategory[] }
-          if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = promptsToSections(data.categories)
-        } else if (co.outputTypeId === 'battle-cards') {
-          const data = await aiFetch('/api/generate-battle-cards', contextPayload, aiFetchMeta) as { sections: ApiBattleCardSection[] }
-          if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = battleCardsToSections(data.sections)
-        } else if (co.outputTypeId === 'decision-books') {
-          const data = await aiFetch('/api/generate-decision-books', contextPayload, aiFetchMeta) as { domains: ApiDecisionDomain[] }
-          if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = decisionDomainsToSections(data.domains)
-        } else if (co.outputTypeId === 'dossier') {
-          const data = await aiFetch('/api/generate-dossier', contextPayload, aiFetchMeta) as { sections: ApiDossierSection[] }
-          if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = dossierToSections(data.sections)
-        } else if (co.outputTypeId === 'playbook') {
-          const data = await aiFetch('/api/generate-playbook', contextPayload, aiFetchMeta) as { phases: ApiPlaybookPhase[] }
-          if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = playbookToSections(data.phases)
-        } else if (co.outputTypeId === 'cheat-sheets') {
-          const data = await aiFetch('/api/generate-cheat-sheets', contextPayload, aiFetchMeta) as { categories: ApiCheatSheetCategory[] }
-          if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = cheatSheetsToSections(data.categories)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type AnyData = any
+
+        // Determine route
+        const routeMap: Record<string, string> = {
+          questions: '/api/generate-questions',
+          checklist: '/api/generate-checklist',
+          'email-course': '/api/generate-email-course',
+          prompts: '/api/generate-prompts',
+          'battle-cards': '/api/generate-battle-cards',
+          'decision-books': '/api/generate-decision-books',
+          dossier: '/api/generate-dossier',
+          playbook: '/api/generate-playbook',
+          'cheat-sheets': '/api/generate-cheat-sheets',
+        }
+
+        const route = routeMap[co.outputTypeId]
+
+        if (route) {
+          const data: AnyData = await aiFetch(route, contextPayload, aiFetchMeta)
+
+          if (data._perDriverFields && Array.isArray(data.sections)) {
+            if (!data.sections.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = data.sections.map((s: { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: import('@/lib/output-type-library').OutputTypeField[] }) => ({
+              name: s.sectionName,
+              description: s.sectionDescription,
+              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
+              resolvedFields: s.resolvedFields,
+            }))
+          } else if (co.outputTypeId === 'questions') {
+            if (!data.perspectives?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = perspectivesToSections(data.perspectives)
+          } else if (co.outputTypeId === 'checklist') {
+            if (!data.dimensions?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = checklistToSections(data.dimensions)
+          } else if (co.outputTypeId === 'email-course') {
+            if (!data.modules?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = emailCourseToSections(data.modules)
+          } else if (co.outputTypeId === 'prompts') {
+            if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = promptsToSections(data.categories)
+          } else if (co.outputTypeId === 'battle-cards') {
+            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = battleCardsToSections(data.sections)
+          } else if (co.outputTypeId === 'decision-books') {
+            if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = decisionDomainsToSections(data.domains)
+          } else if (co.outputTypeId === 'dossier') {
+            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = dossierToSections(data.sections)
+          } else if (co.outputTypeId === 'playbook') {
+            if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = playbookToSections(data.phases)
+          } else {
+            if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = cheatSheetsToSections(data.categories)
+          }
         } else {
-          const data = await aiFetch('/api/generate-output', {
+          const data: AnyData = await aiFetch('/api/generate-output', {
               prompt: resolvedPrompt,
               context: flat,
-              sectionLabel: otDef.sectionLabel,
+              sectionLabel,
               elementLabel: otDef.elementLabel,
               fields: resolvedFields,
               sectionDrivers: drivers,
               instructionDirectives: directives,
-            }, aiFetchMeta) as { sections: { name: string; description: string; elements: Record<string, string>[] }[] }
-          if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-          sections = data.sections.map((s) => ({
-            name: s.name,
-            description: s.description,
-            elements: s.elements.map((el) => ({ fields: el })),
-          }))
+            }, aiFetchMeta)
+          if (data._perDriverFields && Array.isArray(data.sections)) {
+            if (!data.sections.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = data.sections.map((s: { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: import('@/lib/output-type-library').OutputTypeField[] }) => ({
+              name: s.sectionName,
+              description: s.sectionDescription,
+              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
+              resolvedFields: s.resolvedFields,
+            }))
+          } else {
+            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+            sections = data.sections.map((s: { name: string; description: string; elements: Record<string, string>[] }) => ({
+              name: s.name,
+              description: s.description,
+              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
+            }))
+          }
         }
 
         const product = productStorage.save({

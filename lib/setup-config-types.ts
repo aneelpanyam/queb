@@ -24,6 +24,8 @@ export interface ConfigStep {
 export interface SectionDriver {
   name: string
   description: string
+  /** Per-driver element fields — overrides the output type / config-level fields for this section only */
+  fields?: import('@/lib/output-type-library').OutputTypeField[]
 }
 
 export interface InstructionDirective {
@@ -34,6 +36,8 @@ export interface InstructionDirective {
 export interface ConfigOutput {
   outputTypeId: string
   promptOverride?: string
+  /** Override the output type's section label (e.g. "Competitor" → "Lens") */
+  sectionLabelOverride?: string
   /** Custom section drivers (perspectives, dimensions, stages, etc.) to use instead of defaults */
   sectionDrivers?: SectionDriver[]
   /** Custom instruction directives — individual rules/guidelines the AI follows when generating. Uses full defaults when omitted. */

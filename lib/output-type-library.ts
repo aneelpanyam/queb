@@ -170,37 +170,37 @@ GUIDELINES:
   {
     id: 'battle-cards',
     name: 'Battle Cards',
-    description: 'Competitive intelligence cards for sales teams',
+    description: 'Structured analysis cards organized by lens — for competitive intel, impact assessment, or any structured comparison',
     icon: 'Swords',
-    prompt: `You are a competitive intelligence and sales enablement expert.
+    prompt: `You are a structured analysis and strategic intelligence expert.
 
 TASK:
-Create battle cards organized by competitor or competitive theme.
+Create battle cards organized by analytical lens or theme.
 
 GUIDELINES:
-- Create 4-6 competitor or competitive theme sections
-- Each section should have 3-5 intelligence cards
-- Each card needs a clear title, strength/weakness analysis, and talking points
-- Focus on actionable intelligence that sales teams can use in conversations
-- Include specific differentiators and objection handlers`,
-    sectionLabel: 'Competitor',
+- Create 4-6 thematic sections (lenses)
+- Each section should have 3-5 analysis cards
+- Each card needs a clear title and structured fields covering strengths, weaknesses, and strategic response
+- Focus on actionable intelligence the reader can use immediately
+- Tailor all analysis to the specific context provided`,
+    sectionLabel: 'Lens',
     elementLabel: 'Card',
     fields: [
       { key: 'title', label: 'Card Title', type: 'short-text', primary: true },
-      { key: 'strengths', label: 'Their Strengths', type: 'long-text', color: 'red', icon: 'ThumbsUp' },
-      { key: 'weaknesses', label: 'Their Weaknesses', type: 'long-text', color: 'green', icon: 'ThumbsDown' },
-      { key: 'talkingPoints', label: 'Your Talking Points', type: 'long-text', color: 'primary', icon: 'MessageSquare' },
+      { key: 'strengths', label: 'Strengths & Advantages', type: 'long-text', color: 'red', icon: 'ThumbsUp' },
+      { key: 'weaknesses', label: 'Weaknesses & Risks', type: 'long-text', color: 'green', icon: 'ThumbsDown' },
+      { key: 'talkingPoints', label: 'Key Talking Points', type: 'long-text', color: 'primary', icon: 'MessageSquare' },
       { key: 'objectionHandling', label: 'Objection Handling', type: 'long-text', color: 'amber', icon: 'ShieldQuestion' },
-      { key: 'winStrategy', label: 'How to Win', type: 'long-text', color: 'primary', icon: 'Trophy' },
+      { key: 'winStrategy', label: 'Strategic Response', type: 'long-text', color: 'primary', icon: 'Trophy' },
       { key: 'pricingIntel', label: 'Pricing & Packaging Intel', type: 'long-text', color: 'emerald', icon: 'DollarSign' },
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: [
-      { name: 'Direct Competitors', description: 'Head-to-head competitors offering similar products or services to the same target market' },
-      { name: 'Indirect Competitors', description: 'Alternative solutions or substitute approaches that solve the same underlying problem differently' },
-      { name: 'Emerging Threats', description: 'New entrants, disruptors, or adjacent players expanding into this space' },
-      { name: 'DIY & Status Quo', description: 'The option to do nothing, build in-house, or continue with current manual processes' },
-      { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
+      { name: 'Current Landscape', description: 'The state of play today — key players, dominant approaches, and the baseline the reader operates from' },
+      { name: 'Strengths & Advantages', description: 'What the reader (or their approach) does well — capabilities, differentiators, and leverage points' },
+      { name: 'Weaknesses & Risks', description: 'Vulnerabilities, blind spots, and areas where the reader is exposed or under-performing' },
+      { name: 'Emerging Forces', description: 'New trends, technologies, entrants, or shifts that will reshape the landscape' },
+      { name: 'Strategic Response', description: 'How to respond — positioning, actions, investments, and narrative to stay ahead' },
     ],
     isBuiltIn: true,
   },
@@ -333,7 +333,12 @@ GUIDELINES:
 
 // ============================================================
 // Storage with auto-seeding
+// Bump SEED_VERSION when built-in definitions change so
+// existing users get the updated defaults.
 // ============================================================
+
+const SEED_VERSION = 2
+const VERSION_KEY = STORAGE_KEY + '-version'
 
 function ensureSeeded(): OutputTypeDefinition[] {
   if (typeof window === 'undefined') return []
@@ -342,6 +347,17 @@ function ensureSeeded(): OutputTypeDefinition[] {
   if (raw) {
     try {
       const stored: OutputTypeDefinition[] = JSON.parse(raw)
+      const storedVersion = localStorage.getItem(VERSION_KEY)
+
+      if (storedVersion !== String(SEED_VERSION)) {
+        const userCreated = stored.filter((t) => !t.isBuiltIn)
+        const freshBuiltIns = SEED_OUTPUT_TYPES.map((o) => ({ ...o, createdAt: now, updatedAt: now }))
+        const merged = [...freshBuiltIns, ...userCreated]
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+        localStorage.setItem(VERSION_KEY, String(SEED_VERSION))
+        return merged
+      }
+
       const storedIds = new Set(stored.map((t) => t.id))
       const missing = SEED_OUTPUT_TYPES.filter((s) => !storedIds.has(s.id))
       if (missing.length > 0) {
@@ -361,6 +377,7 @@ function ensureSeeded(): OutputTypeDefinition[] {
     updatedAt: now,
   }))
   localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+  localStorage.setItem(VERSION_KEY, String(SEED_VERSION))
   return seeded
 }
 
@@ -473,16 +490,16 @@ const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
     { label: 'Minimum output', content: 'If this use case is not very relevant, still include at least 1 prompt.' },
   ],
   'battle-cards': [
-    { label: 'Role', content: 'You are a competitive intelligence and sales enablement expert.' },
-    { label: 'Task', content: 'Generate 3-5 battle cards for this competitive section.' },
-    { label: 'Relevance filter', content: 'Only generate cards if this competitive section is genuinely relevant to the given context. If not relevant, return an empty cards array.' },
-    { label: 'Honesty', content: 'Be honest about competitor strengths — credibility requires acknowledging where they excel.' },
-    { label: 'Weaknesses', content: 'Identify real weaknesses backed by common customer complaints, architectural limitations, or market gaps — not straw-man arguments.' },
-    { label: 'Talking points', content: 'Talking points must be specific, conversational, and usable in a live sales call — not marketing copy.' },
-    { label: 'Objection handling', content: 'Each card must include objectionHandling: anticipated prospect objections with concrete responses. Format as "When they say X, you say Y."' },
-    { label: 'Win strategy', content: 'Each card should include winStrategy: given their strengths and weaknesses, what is the game plan to win this deal?' },
-    { label: 'Pricing intel', content: 'Each card should include pricingIntel: their pricing model, where they are cheaper or pricier, known discounting patterns.' },
-    { label: 'Tailoring', content: 'Tailor all intelligence to the specific context provided.' },
+    { label: 'Role', content: 'You are a structured analysis and strategic intelligence expert.' },
+    { label: 'Task', content: 'Generate 3-5 battle cards for this analytical lens.' },
+    { label: 'Relevance filter', content: 'Only generate cards if this lens is genuinely relevant to the given context. If not relevant, return an empty cards array.' },
+    { label: 'Strengths', content: 'Identify real strengths and advantages — be specific about what works well, why, and what leverage it provides.' },
+    { label: 'Weaknesses', content: 'Identify real weaknesses, risks, and vulnerabilities — backed by evidence, patterns, or structural limitations. No straw-man arguments.' },
+    { label: 'Talking points', content: 'Key talking points must be specific, conversational, and immediately usable — not generic marketing copy.' },
+    { label: 'Objection handling', content: 'Each card should include objectionHandling: anticipated pushback or objections with concrete responses. Format as "When they say X, you say Y." Empty string if not applicable.' },
+    { label: 'Strategic response', content: 'Each card should include winStrategy: given the strengths and weaknesses, what is the strategic game plan or recommended response?' },
+    { label: 'Pricing intel', content: 'Each card should include pricingIntel: relevant pricing, cost, or resource implications. Empty string if not applicable.' },
+    { label: 'Tailoring', content: 'Tailor all analysis to the specific context provided.' },
   ],
   'decision-books': [
     { label: 'Role', content: 'You are a senior decision strategist and organizational advisor who helps leaders navigate complex choices.' },
@@ -556,11 +573,11 @@ const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
   'email-course': EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
   prompts: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
   'battle-cards': [
-    { name: 'Direct Competitors', description: 'Head-to-head competitors offering similar products or services to the same target market' },
-    { name: 'Indirect Competitors', description: 'Alternative solutions or substitute approaches that solve the same underlying problem differently' },
-    { name: 'Emerging Threats', description: 'New entrants, disruptors, or adjacent players expanding into this space' },
-    { name: 'DIY & Status Quo', description: 'The option to do nothing, build in-house, or continue with current manual processes' },
-    { name: 'Positioning & Differentiation', description: 'How to position against the competitive landscape — unique value, messaging, and strategic narrative' },
+    { name: 'Current Landscape', description: 'The state of play today — key players, dominant approaches, and the baseline the reader operates from' },
+    { name: 'Strengths & Advantages', description: 'What the reader (or their approach) does well — capabilities, differentiators, and leverage points' },
+    { name: 'Weaknesses & Risks', description: 'Vulnerabilities, blind spots, and areas where the reader is exposed or under-performing' },
+    { name: 'Emerging Forces', description: 'New trends, technologies, entrants, or shifts that will reshape the landscape' },
+    { name: 'Strategic Response', description: 'How to respond — positioning, actions, investments, and narrative to stay ahead' },
   ],
   'decision-books': DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
   dossier: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),

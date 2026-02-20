@@ -1,10 +1,12 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
-import { formatContext, assembleDirectivesPrompt } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
+
+const DEFAULT_LABEL = 'Phase'
 
 const singlePhaseSchema = z.object({
   phaseName: z.string().describe('The playbook phase name'),
@@ -26,17 +28,19 @@ const singlePhaseSchema = z.object({
 function buildDefaultPrompt(
   phase: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
 ) {
   const contextBlock = formatContext(context)
+  const label = sectionLabel.toLowerCase()
   return `You are a senior operations strategist and execution expert who creates practical, field-tested playbooks.
 
 CONTEXT:
 ${contextBlock}
 
 TASK:
-Generate 3-5 actionable plays for the "${phase.name}" execution phase.
+Generate 3-5 actionable plays for the "${phase.name}" ${label}.
 
-PHASE DEFINITION:
+${sectionLabel.toUpperCase()} DEFINITION:
 ${phase.name}: ${phase.description}
 
 GUIDELINES:
@@ -52,12 +56,13 @@ GUIDELINES:
 async function generateForPhase(
   phase: { name: string; description: string },
   context: Record<string, string>,
+  sectionLabel: string,
   directives?: { label: string; content: string }[],
   collectedPrompts?: string[],
 ) {
   const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, phase, 'Phase', directives)
-    : buildDefaultPrompt(phase, context)
+    ? assembleDirectivesPrompt(context, phase, sectionLabel, directives)
+    : buildDefaultPrompt(phase, context, sectionLabel)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -72,20 +77,65 @@ async function generateForPhase(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
       context: Record<string, string>
-      sectionDrivers?: { name: string; description: string }[]
+      sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
+      sectionLabel?: string
     }
 
+    const label = sectionLabel || DEFAULT_LABEL
     const phases = sectionDrivers?.length ? sectionDrivers : PLAYBOOK_PHASES
-    console.log(`[generate-playbook] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom phases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}`)
+    const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
+
+    console.log(`[generate-playbook] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom phases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
 
     const startTime = Date.now()
     const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
 
+    if (hasPerDriverFields) {
+      const drivers = phases as { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
+      const promises = drivers.map((ph) => {
+        const fields = ph.fields
+        if (fields?.length) {
+          const elementSchema = buildElementSchema(fields)
+          const schema = z.object({
+            sectionName: z.string(),
+            sectionDescription: z.string(),
+            elements: z.array(elementSchema),
+          })
+          const prompt = (instructionDirectives?.length
+            ? assembleDirectivesPrompt(context, ph, label, instructionDirectives)
+            : buildDefaultPrompt(ph, context, label))
+            + buildFieldOverrideBlock(fields)
+          if (debugPrompts) debugPrompts.push(prompt)
+          return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
+            .then((r) => ({ ...(r.output as object), resolvedFields: fields }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields: typeof fields })
+            .catch((err) => {
+              console.error(`[generate-playbook] Error for phase ${ph.name}:`, err)
+              return { sectionName: ph.name, sectionDescription: ph.description, elements: [] as Record<string, string>[], resolvedFields: fields }
+            })
+        }
+        return generateForPhase(ph, context, label, instructionDirectives, debugPrompts)
+          .then((r) => ({
+            sectionName: r.phaseName,
+            sectionDescription: r.phaseDescription,
+            elements: r.plays as unknown as Record<string, string>[],
+          }))
+          .catch((err) => {
+            console.error(`[generate-playbook] Error for phase ${ph.name}:`, err)
+            return { sectionName: ph.name, sectionDescription: ph.description, elements: [] as Record<string, string>[] }
+          })
+      })
+
+      const allSections = await Promise.all(promises)
+      const relevant = allSections.filter((s) => s.elements.length > 0)
+      console.log(`[generate-playbook] ${relevant.length}/${phases.length} phases in ${Date.now() - startTime}ms (per-driver fields)`)
+      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
+    }
+
     const promises = phases.map((phase) =>
-      generateForPhase(phase, context, instructionDirectives, debugPrompts).catch((err) => {
+      generateForPhase(phase, context, label, instructionDirectives, debugPrompts).catch((err) => {
         console.error(`[generate-playbook] Error for ${phase.name}:`, err)
         return { phaseName: phase.name, phaseDescription: phase.description, plays: [] }
       })

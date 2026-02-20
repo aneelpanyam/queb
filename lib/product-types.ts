@@ -31,6 +31,8 @@ export interface ProductSection {
   description: string
   elements: ProductElement[]
   hidden?: boolean
+  /** Per-section field schema snapshot — when sections have different fields */
+  resolvedFields?: import('@/lib/output-type-library').OutputTypeField[]
 }
 
 export interface AnswerSource {

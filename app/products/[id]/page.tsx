@@ -478,19 +478,20 @@ export default function ProductEditorPage() {
 
   const buildSectionsPayload = useCallback(() => {
     if (!product || !outputTypeDef) return []
-    const primaryKey = getPrimaryField(outputTypeDef).key
+    const defaultPK = getPrimaryField(outputTypeDef).key
     return product.sections.map((s, sIdx) => {
       const visibleEls = s.elements.filter((el) => !el.hidden)
       const sectionAnnCount = visibleEls.reduce(
         (sum, _, eIdx) => sum + (product.annotations[`${sIdx}-${eIdx}`]?.length || 0), 0
       ) + (product.annotations[`section-${sIdx}`]?.length || 0)
+      const pk = s.resolvedFields?.find((f) => f.primary)?.key || s.resolvedFields?.[0]?.key || product.resolvedFields?.find((f) => f.primary)?.key || defaultPK
       return {
         name: s.name,
         description: s.description,
         elementCount: visibleEls.length,
         annotationCount: sectionAnnCount,
         sampleElements: visibleEls.map(
-          (el) => el.fields[primaryKey] || Object.values(el.fields)[0] || ''
+          (el) => el.fields[pk] || Object.values(el.fields)[0] || ''
         ),
       }
     })
@@ -608,10 +609,24 @@ export default function ProductEditorPage() {
 
   const primaryFieldDef = getPrimaryField(outputTypeDef)
 
+  const getSectionPrimaryKey = (sIdx: number): string => {
+    const sec = product.sections[sIdx]
+    if (sec?.resolvedFields?.length) {
+      const pf = sec.resolvedFields.find((f) => f.primary)
+      return pf?.key || sec.resolvedFields[0]?.key || primaryFieldDef.key
+    }
+    if (product.resolvedFields?.length) {
+      const pf = product.resolvedFields.find((f) => f.primary)
+      return pf?.key || product.resolvedFields[0]?.key || primaryFieldDef.key
+    }
+    return primaryFieldDef.key
+  }
+
   const getElementPrimary = (sIdx: number, eIdx: number): string => {
     const el = product.sections[sIdx]?.elements[eIdx]
     if (!el) return ''
-    return el.fields[primaryFieldDef.key] || Object.values(el.fields)[0] || ''
+    const key = getSectionPrimaryKey(sIdx)
+    return el.fields[key] || Object.values(el.fields)[0] || ''
   }
 
   const matchesElement = (suggestion: AssistantSuggestion, elementPrimary: string): boolean => {
@@ -633,7 +648,7 @@ export default function ProductEditorPage() {
 
   const displayPrimary =
     selectedNode?.type === 'element'
-      ? selectedElement?.fields[primaryFieldDef.key]
+      ? selectedElement?.fields[getSectionPrimaryKey(selectedNode.sIndex)] || (selectedElement ? Object.values(selectedElement.fields)[0] : undefined)
       : selectedNode?.type === 'second'
         ? secondQ?.question
         : thirdQ?.question
@@ -804,9 +819,10 @@ export default function ProductEditorPage() {
                       const isParent = selectedNode && 'eIndex' in selectedNode && selectedNode.sIndex === sIndex && selectedNode.eIndex === eIndex
                       const elHidden = !!el.hidden
                       const elAnnotations = product.annotations[`${sIndex}-${eIndex}`]?.length || 0
-                      const label = el.fields[primaryFieldDef.key] || '(empty)'
+                      const sectionPK = getSectionPrimaryKey(sIndex)
+                      const label = el.fields[sectionPK] || Object.values(el.fields)[0] || '(empty)'
                       const short = label.length > 60 ? label.slice(0, 57) + '...' : label
-                      const elPrimary = el.fields[primaryFieldDef.key] || Object.values(el.fields)[0] || ''
+                      const elPrimary = el.fields[sectionPK] || Object.values(el.fields)[0] || ''
                       const hasElSuggestions = assistantData?.suggestions.some(
                         (s) => s.targetSection === section.name && matchesElement(s, elPrimary)
                       ) || false
@@ -941,6 +957,7 @@ export default function ProductEditorPage() {
                     onCancelEdit={cancelEdit}
                     onEditValueChange={setEditValue}
                     resolvedFields={product.resolvedFields}
+                    sectionResolvedFields={selectedSection?.resolvedFields}
                   />
                 ) : (
                   <h2 className="text-[16px] font-bold leading-tight tracking-tight text-foreground">{displayPrimary}</h2>
