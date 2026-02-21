@@ -57,12 +57,22 @@ export interface ConfigOutput {
   fieldOverrides?: import('@/lib/output-type-library').OutputTypeField[]
 }
 
+/** Snapshot of the wizard inputs used to AI-generate this configuration */
+export interface ConfigGenerationInputs {
+  framework: string
+  frameworkData: Record<string, string>
+  notes?: string
+  suggestedOutputTypes?: string[]
+  sourceIdeaId?: string
+}
+
 export interface SetupConfiguration {
   id: string
   name: string
   description: string
   steps: ConfigStep[]
   outputs: ConfigOutput[]
+  generationInputs?: ConfigGenerationInputs
   createdAt: string
   updatedAt: string
 }

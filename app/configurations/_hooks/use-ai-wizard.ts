@@ -2,8 +2,14 @@ import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import type { FieldDefinition } from '@/lib/field-library'
 import type { OutputTypeDefinition } from '@/lib/output-type-library'
-import type { ConfigStepField } from '@/lib/setup-config-types'
+import type { ConfigStepField, ConfigGenerationInputs } from '@/lib/setup-config-types'
 import { aiFetch } from '@/lib/ai-fetch'
+import {
+  FRAMEWORK_DEFINITIONS,
+  getFrameworkDef,
+  type IdeaFramework,
+  type Idea,
+} from '@/lib/idea-types'
 import { type BuilderState, type AIStep, type AIOutput } from '../_lib/config-builder-utils'
 
 export function useAIWizard(
@@ -12,9 +18,36 @@ export function useAIWizard(
   onGenerated: (builderState: BuilderState) => void,
 ) {
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [wizardPrompt, setWizardPrompt] = useState('')
+  const [wizardFramework, setWizardFramework] = useState<IdeaFramework>('problem-solution')
+  const [wizardFrameworkData, setWizardFrameworkData] = useState<Record<string, string>>({})
+  const [wizardNotes, setWizardNotes] = useState('')
+  const [wizardOutputTypes, setWizardOutputTypes] = useState<string[]>([])
+  const [sourceIdeaId, setSourceIdeaId] = useState<string | null>(null)
   const [wizardLoading, setWizardLoading] = useState(false)
   const [wizardError, setWizardError] = useState<string | null>(null)
+
+  const resetWizardFields = useCallback(() => {
+    setWizardFramework('problem-solution')
+    setWizardFrameworkData({})
+    setWizardNotes('')
+    setWizardOutputTypes([])
+    setSourceIdeaId(null)
+    setWizardError(null)
+  }, [])
+
+  const prefillFromIdea = useCallback((idea: Idea) => {
+    setWizardFramework(idea.framework)
+    setWizardFrameworkData({ ...idea.frameworkData })
+    setWizardNotes(idea.notes || '')
+    setWizardOutputTypes([...idea.suggestedOutputTypes])
+    setSourceIdeaId(idea.id)
+    setWizardError(null)
+    setWizardOpen(true)
+  }, [])
+
+  const hasContent = useCallback(() => {
+    return Object.values(wizardFrameworkData).some((v) => v?.trim())
+  }, [wizardFrameworkData])
 
   const processAIConfiguration = useCallback((
     configuration: { name?: string; description?: string; steps?: AIStep[]; outputs?: AIOutput[] },
@@ -80,12 +113,15 @@ export function useAIWizard(
   }, [])
 
   const handleWizardGenerate = async () => {
-    if (!wizardPrompt.trim()) return
+    if (!hasContent()) return
     setWizardLoading(true)
     setWizardError(null)
     try {
       const { configuration } = await aiFetch('/api/generate-configuration', {
-        description: wizardPrompt.trim(),
+        framework: wizardFramework,
+        frameworkData: wizardFrameworkData,
+        notes: wizardNotes || undefined,
+        suggestedOutputTypes: wizardOutputTypes.length ? wizardOutputTypes : undefined,
         availableFields: allFields
           .filter((f) => f.id !== 'empty-field')
           .map((f) => ({
@@ -106,8 +142,17 @@ export function useAIWizard(
 
       const { builderState } = processAIConfiguration(configuration, allFields)
 
+      const genInputs: ConfigGenerationInputs = {
+        framework: wizardFramework,
+        frameworkData: { ...wizardFrameworkData },
+        notes: wizardNotes || undefined,
+        suggestedOutputTypes: wizardOutputTypes.length ? [...wizardOutputTypes] : undefined,
+        sourceIdeaId: sourceIdeaId || undefined,
+      }
+      builderState.generationInputs = genInputs
+
       setWizardOpen(false)
-      setWizardPrompt('')
+      resetWizardFields()
       onGenerated(builderState)
       toast.success('Configuration generated! Review and save below.')
     } catch (err) {
@@ -119,8 +164,14 @@ export function useAIWizard(
 
   return {
     wizardOpen, setWizardOpen,
-    wizardPrompt, setWizardPrompt,
+    wizardFramework, setWizardFramework,
+    wizardFrameworkData, setWizardFrameworkData,
+    wizardNotes, setWizardNotes,
+    wizardOutputTypes, setWizardOutputTypes,
     wizardLoading, wizardError, setWizardError,
+    hasContent,
+    resetWizardFields,
+    prefillFromIdea,
     processAIConfiguration,
     handleWizardGenerate,
   }

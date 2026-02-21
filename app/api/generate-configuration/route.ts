@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
+import { FRAMEWORK_DEFINITIONS, type IdeaFramework } from '@/lib/idea-types'
 
 export const maxDuration = 120
 
@@ -60,23 +61,56 @@ const configSchema = z.object({
   ),
 })
 
+function buildConceptBlock(body: {
+  framework: IdeaFramework
+  frameworkData: Record<string, string>
+  notes?: string
+  suggestedOutputTypes?: string[]
+  availableOutputTypes: { id: string; name: string }[]
+}): string {
+  const fwDef = FRAMEWORK_DEFINITIONS.find((f) => f.id === body.framework) ?? FRAMEWORK_DEFINITIONS[0]
+  const lines: string[] = [`PRODUCT CONCEPT (${fwDef.name} Framework):`]
+
+  for (const field of fwDef.fields) {
+    const val = body.frameworkData[field.key]?.trim()
+    if (val) lines.push(`  ${field.label}: "${val}"`)
+  }
+
+  if (body.notes?.trim()) {
+    lines.push(`  Additional Notes: "${body.notes.trim()}"`)
+  }
+
+  if (body.suggestedOutputTypes?.length) {
+    const names = body.suggestedOutputTypes
+      .map((id) => body.availableOutputTypes.find((ot) => ot.id === id)?.name || id)
+      .join(', ')
+    lines.push(`  Suggested Output Types: ${names}`)
+  }
+
+  return lines.join('\n')
+}
+
 export async function POST(req: Request) {
   try {
-    const { description, availableFields, availableOutputTypes } = (await req.json()) as {
-      description: string
+    const body = (await req.json()) as {
+      framework: IdeaFramework
+      frameworkData: Record<string, string>
+      notes?: string
+      suggestedOutputTypes?: string[]
       availableFields: { id: string; name: string; description: string; category: string }[]
       availableOutputTypes: { id: string; name: string; description: string; sectionLabel?: string; elementLabel?: string; defaultFields?: { key: string; label: string; type: string }[] }[]
     }
 
-    if (!description?.trim()) {
-      return Response.json({ error: 'Description is required' }, { status: 400 })
+    const hasContent = Object.values(body.frameworkData || {}).some((v) => v?.trim())
+    if (!hasContent) {
+      return Response.json({ error: 'At least one framework field is required' }, { status: 400 })
     }
 
-    const fieldsList = availableFields
+    const fieldsList = body.availableFields
       .map((f) => `  - "${f.id}" (${f.name}): ${f.description} [${f.category}]`)
       .join('\n')
 
-    const outputTypesList = availableOutputTypes
+    const outputTypesList = body.availableOutputTypes
       .map((ot) => {
         let line = `  - "${ot.id}" (${ot.name}): ${ot.description}${ot.sectionLabel ? ` — sections called "${ot.sectionLabel}s"` : ''}`
         if (ot.defaultFields?.length) {
@@ -85,6 +119,8 @@ export async function POST(req: Request) {
         return line
       })
       .join('\n')
+
+    const conceptBlock = buildConceptBlock(body)
 
     const prompt = `You are an expert product configuration architect for an AI-powered digital product creation platform.
 
@@ -95,8 +131,7 @@ Design a reusable configuration blueprint that acts as a mold or factory for gen
 
 The configuration you design is NOT a single product. It is a production system — a blueprint that generates many different products, each tailored to whoever runs it. Think of it as designing a cookie cutter, not baking a single cookie.
 
-USER'S DESCRIPTION:
-"${description}"
+${conceptBlock}
 
 LIBRARY FIELDS (optional shortcuts — use only when a perfect match exists):
 ${fieldsList}
@@ -236,7 +271,7 @@ Generate a complete configuration.`
 
     const result = await generateText({
       model: 'openai/gpt-5.2',
-      providerOptions: { reasoning: { effort: 'high' } },
+      providerOptions: { reasoning: { effort: 'medium' } },
       temperature: 0.75,
       prompt,
       output: Output.object({ schema: configSchema }),

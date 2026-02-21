@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { ideaStorage } from '@/lib/idea-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import { outputTypeStorage } from '@/lib/output-type-library'
-import { fieldStorage } from '@/lib/field-library'
 import {
   getFrameworkDef,
   assembleIdeaDescription,
@@ -31,9 +30,6 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
   const [aiStrategy, setAiStrategy] = useState<IdeationStrategy>('balanced')
   const [aiCount, setAiCount] = useState(5)
   const [aiGenerating, setAiGenerating] = useState(false)
-
-  // Config generation
-  const [generatingConfigId, setGeneratingConfigId] = useState<string | null>(null)
 
   // Output type recommendations
   const [recommendingId, setRecommendingId] = useState<string | null>(null)
@@ -106,34 +102,8 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     }
   }
 
-  const handleCreateConfiguration = async (idea: Idea) => {
-    setGeneratingConfigId(idea.id)
-    try {
-      const outputTypes = outputTypeStorage.getAll()
-      const fields = fieldStorage.getAll()
-
-      const outputTypeNames: Record<string, string> = {}
-      for (const ot of outputTypes) outputTypeNames[ot.id] = ot.name
-
-      const description = assembleIdeaDescription(idea, outputTypeNames)
-
-      const data = await aiFetch('/api/generate-configuration', {
-        description,
-        availableFields: fields.map((f) => ({ id: f.id, name: f.name, description: f.description, category: f.category })),
-        availableOutputTypes: outputTypes.map((ot) => ({ id: ot.id, name: ot.name, description: ot.description, sectionLabel: ot.sectionLabel, elementLabel: ot.elementLabel })),
-      }, { action: 'Generate Configuration' })
-      const cfg = data.configuration
-
-      ideaStorage.update(idea.id, { status: 'built' })
-      reload()
-
-      const params = new URLSearchParams({ ideaConfig: JSON.stringify(cfg), ideaId: idea.id })
-      router.push(`/configurations?${params.toString()}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to generate configuration')
-    } finally {
-      setGeneratingConfigId(null)
-    }
+  const handleCreateConfiguration = (idea: Idea) => {
+    router.push(`/configurations?fromIdea=${idea.id}`)
   }
 
   const handleGetRecommendations = async (idea: Idea) => {
@@ -188,7 +158,6 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     aiCount, setAiCount,
     aiGenerating,
     handleAIGenerate,
-    generatingConfigId,
     handleCreateConfiguration,
     recommendingId,
     handleGetRecommendations,

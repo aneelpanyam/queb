@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, Suspense } from 'react'
+import { useEffect, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
+import { ideaStorage } from '@/lib/idea-storage'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import {
@@ -57,21 +57,19 @@ function ConfigurationsPageInner() {
     () => cfgs.loadData(),
   )
 
+  const prefillHandled = useRef(false)
   useEffect(() => {
-    const { fields } = cfgs.loadData()
+    cfgs.loadData()
 
-    const ideaConfigParam = searchParams.get('ideaConfig')
-    if (ideaConfigParam) {
-      try {
-        const configuration = JSON.parse(ideaConfigParam)
-        const { builderState } = wizard.processAIConfiguration(configuration, fields)
-
-        cfgs.openBuilderWithState(builderState)
-        toast.success('Configuration generated from idea! Review and save below.')
-        router.replace('/configurations')
-      } catch {
-        // Ignore malformed param
+    if (prefillHandled.current) return
+    const fromIdeaId = searchParams.get('fromIdea')
+    if (fromIdeaId) {
+      prefillHandled.current = true
+      const idea = ideaStorage.getById(fromIdeaId)
+      if (idea) {
+        wizard.prefillFromIdea(idea)
       }
+      router.replace('/configurations')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router])
@@ -203,10 +201,18 @@ function ConfigurationsPageInner() {
         <AIWizardDialog
           open={wizard.wizardOpen}
           onOpenChange={wizard.setWizardOpen}
-          prompt={wizard.wizardPrompt}
-          onPromptChange={wizard.setWizardPrompt}
+          framework={wizard.wizardFramework}
+          onFrameworkChange={wizard.setWizardFramework}
+          frameworkData={wizard.wizardFrameworkData}
+          onFrameworkDataChange={wizard.setWizardFrameworkData}
+          notes={wizard.wizardNotes}
+          onNotesChange={wizard.setWizardNotes}
+          selectedOutputTypes={wizard.wizardOutputTypes}
+          onOutputTypesChange={wizard.setWizardOutputTypes}
+          availableOutputTypes={cfgs.allOutputTypes.map((ot) => ({ id: ot.id, name: ot.name }))}
           loading={wizard.wizardLoading}
           error={wizard.wizardError}
+          hasContent={wizard.hasContent()}
           onGenerate={wizard.handleWizardGenerate}
           onClearError={() => wizard.setWizardError(null)}
         />

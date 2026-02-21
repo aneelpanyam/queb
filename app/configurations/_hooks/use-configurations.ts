@@ -62,6 +62,7 @@ export function useConfigurations() {
       description: data.description.trim(),
       steps: data.steps,
       outputs: data.outputs,
+      generationInputs: data.generationInputs,
     }
     if (builderMode === 'create') {
       configStorage.save(payload)

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -10,57 +11,164 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Wand2, Sparkles, Loader2 } from 'lucide-react'
+import {
+  FRAMEWORK_DEFINITIONS,
+  getFrameworkDef,
+  type IdeaFramework,
+} from '@/lib/idea-types'
 
 interface AIWizardDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  prompt: string
-  onPromptChange: (value: string) => void
+  framework: IdeaFramework
+  onFrameworkChange: (fw: IdeaFramework) => void
+  frameworkData: Record<string, string>
+  onFrameworkDataChange: (data: Record<string, string>) => void
+  notes: string
+  onNotesChange: (value: string) => void
+  selectedOutputTypes: string[]
+  onOutputTypesChange: (types: string[]) => void
+  availableOutputTypes: { id: string; name: string }[]
   loading: boolean
   error: string | null
+  hasContent: boolean
   onGenerate: () => void
   onClearError: () => void
 }
 
 export function AIWizardDialog({
-  open, onOpenChange, prompt, onPromptChange,
-  loading, error, onGenerate, onClearError,
+  open, onOpenChange,
+  framework, onFrameworkChange,
+  frameworkData, onFrameworkDataChange,
+  notes, onNotesChange,
+  selectedOutputTypes, onOutputTypesChange,
+  availableOutputTypes,
+  loading, error, hasContent,
+  onGenerate, onClearError,
 }: AIWizardDialogProps) {
+  const fwDef = getFrameworkDef(framework)
+
+  const updateField = (key: string, value: string) => {
+    onFrameworkDataChange({ ...frameworkData, [key]: value })
+  }
+
+  const toggleOutputType = (id: string) => {
+    onOutputTypesChange(
+      selectedOutputTypes.includes(id)
+        ? selectedOutputTypes.filter((t) => t !== id)
+        : [...selectedOutputTypes, id]
+    )
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasContent && !loading) {
+      onGenerate()
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!loading) { onOpenChange(o); if (!o) onClearError() } }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="h-5 w-5 text-primary" />
             AI Configuration Wizard
           </DialogTitle>
           <DialogDescription>
-            Describe what you want to generate in plain English. The AI will design a complete configuration with steps, fields, output types, section drivers, and instruction directives.
+            Describe your product idea using a structured framework. The AI will design a complete configuration with steps, fields, output types, section drivers, and instruction directives.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">Framework</label>
+            <Select value={framework} onValueChange={(v) => onFrameworkChange(v as IdeaFramework)} disabled={loading}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FRAMEWORK_DEFINITIONS.map((fw) => (
+                  <SelectItem key={fw.id} value={fw.id}>
+                    <span className="font-medium">{fw.name}</span>
+                    <span className="ml-2 text-muted-foreground">{fw.description}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {fwDef.fields.map((field) => (
+            <div key={field.key} className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">{field.label}</label>
+              {field.multiline ? (
+                <Textarea
+                  value={frameworkData[field.key] || ''}
+                  onChange={(e) => updateField(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  rows={3}
+                  className="resize-none text-sm"
+                  disabled={loading}
+                  onKeyDown={handleKeyDown}
+                />
+              ) : (
+                <Input
+                  value={frameworkData[field.key] || ''}
+                  onChange={(e) => updateField(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="text-sm"
+                  disabled={loading}
+                  onKeyDown={handleKeyDown}
+                />
+              )}
+            </div>
+          ))}
+
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
-              What would you like to create?
+              Target Output Types
+              <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {availableOutputTypes.map((ot) => (
+                <button
+                  key={ot.id}
+                  type="button"
+                  onClick={() => toggleOutputType(ot.id)}
+                  disabled={loading}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    selectedOutputTypes.includes(ot.id)
+                      ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {ot.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">
+              Additional Notes
+              <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
             </label>
             <Textarea
-              value={prompt}
-              onChange={(e) => onPromptChange(e.target.value)}
-              placeholder={'e.g. "Know your role: Pain points of CISO"\n\nor\n\n"An email course teaching SaaS founders how to reduce churn, organized by lifecycle stage"'}
-              rows={5}
-              className="resize-none"
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              placeholder="Any extra context, constraints, or preferences..."
+              rows={2}
+              className="resize-none text-sm"
               disabled={loading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && prompt.trim() && !loading) {
-                  onGenerate()
-                }
-              }}
+              onKeyDown={handleKeyDown}
             />
-            <p className="text-xs text-muted-foreground">
-              Be specific about the topic, target audience, and type of content you want.
-            </p>
           </div>
 
           {error && (
@@ -90,7 +198,7 @@ export function AIWizardDialog({
           </Button>
           <Button
             onClick={onGenerate}
-            disabled={!prompt.trim() || loading}
+            disabled={!hasContent || loading}
             className="gap-2"
           >
             {loading ? (

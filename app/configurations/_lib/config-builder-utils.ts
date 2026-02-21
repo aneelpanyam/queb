@@ -1,4 +1,4 @@
-import type { ConfigStep, ConfigOutput } from '@/lib/setup-config-types'
+import type { ConfigStep, ConfigOutput, ConfigGenerationInputs } from '@/lib/setup-config-types'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
 import type { FieldColor } from '@/lib/output-type-library'
 
@@ -7,6 +7,7 @@ export interface BuilderState {
   description: string
   steps: ConfigStep[]
   outputs: ConfigOutput[]
+  generationInputs?: ConfigGenerationInputs
 }
 
 export const FIELD_COLOR_OPTIONS: { value: FieldColor | ''; label: string }[] = [
@@ -39,7 +40,7 @@ export function emptyBuilder(): BuilderState {
 }
 
 export function configToBuilder(c: SetupConfiguration): BuilderState {
-  return { name: c.name, description: c.description, steps: c.steps, outputs: c.outputs }
+  return { name: c.name, description: c.description, steps: c.steps, outputs: c.outputs, generationInputs: c.generationInputs }
 }
 
 export function uid() {

@@ -180,7 +180,6 @@ export default function IdeasPage() {
                           onUpdate={(updates) => ideasHook.handleUpdateIdea(idea.id, updates)}
                           onDelete={() => ideasHook.handleDelete(idea.id)}
                           onCreateConfig={() => gen.handleCreateConfiguration(idea)}
-                          generatingConfig={gen.generatingConfigId === idea.id}
                           onRecommend={() => gen.handleGetRecommendations(idea)}
                           recommending={gen.recommendingId === idea.id}
                         />

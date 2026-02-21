@@ -30,7 +30,6 @@ interface IdeaCardProps {
   onUpdate: (updates: Partial<Omit<Idea, 'id' | 'createdAt'>>) => void
   onDelete: () => void
   onCreateConfig: () => void
-  generatingConfig: boolean
   onRecommend: () => void
   recommending: boolean
 }
@@ -42,7 +41,6 @@ export function IdeaCard({
   onUpdate,
   onDelete,
   onCreateConfig,
-  generatingConfig,
   onRecommend,
   recommending,
 }: IdeaCardProps) {
@@ -144,12 +142,11 @@ export function IdeaCard({
               variant="outline"
               size="sm"
               onClick={onCreateConfig}
-              disabled={generatingConfig}
               className="h-8 gap-1.5 text-xs"
               title="Create Configuration from this idea"
             >
-              {generatingConfig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
-              {generatingConfig ? 'Creating...' : 'Create Config'}
+              <ArrowRight className="h-3.5 w-3.5" />
+              Create Config
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onDelete} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" title="Delete">
@@ -283,11 +280,10 @@ export function IdeaCard({
                   variant="outline"
                   size="sm"
                   onClick={onCreateConfig}
-                  disabled={generatingConfig}
                   className="gap-1.5"
                 >
-                  {generatingConfig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
-                  {generatingConfig ? 'Generating Configuration...' : 'Create Configuration'}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                  Create Configuration
                 </Button>
               )}
               {idea.configurationId && (
