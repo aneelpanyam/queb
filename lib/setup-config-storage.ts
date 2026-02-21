@@ -1,4 +1,5 @@
 import type { SetupConfiguration } from './setup-config-types'
+import { installSeedData } from './seed-data'
 
 const STORAGE_KEY = 'queb-setup-configurations'
 const MIGRATION_KEY = 'queb-config-migration-v2'
@@ -27,6 +28,7 @@ function migrateIfNeeded(configs: SetupConfiguration[]): SetupConfiguration[] {
 
 function getAll(): SetupConfiguration[] {
   if (typeof window === 'undefined') return []
+  installSeedData()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const configs: SetupConfiguration[] = raw ? JSON.parse(raw) : []

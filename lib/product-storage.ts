@@ -1,9 +1,11 @@
 import type { Product } from './product-types'
+import { installSeedData } from './seed-data'
 
 const STORAGE_KEY = 'digicraft-products'
 
 function getAll(): Product[] {
   if (typeof window === 'undefined') return []
+  installSeedData()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : []
