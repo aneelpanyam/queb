@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { productStorage } from '@/lib/product-storage'
 import { getOutputType, type OutputTypeDefinition } from '@/lib/output-types'
@@ -19,6 +19,7 @@ export function useProductEditor(productId: string) {
   const [answerMap, setAnswerMap] = useState<Record<string, AnswerData>>({})
   const [assistantData, setAssistantData] = useState<AssistantData | null>(null)
   const [costData, setCostData] = useState<ProductCostData>(emptyCostData())
+  const costDataRef = useRef<ProductCostData>(emptyCostData())
 
   useEffect(() => {
     if (!productId) return
@@ -29,7 +30,10 @@ export function useProductEditor(productId: string) {
       setDeeperMap(p.deeperQuestions || {})
       setAnswerMap(p.answers || {})
       if (p.assistantData) setAssistantData(p.assistantData)
-      if (p.costData) setCostData(p.costData)
+      if (p.costData) {
+        setCostData(p.costData)
+        costDataRef.current = p.costData
+      }
       const otDef = getOutputType(p.outputType)
       setOutputTypeDef(otDef || null)
       const useSectionNav = SECTION_NAV_TYPES.has(p.outputType)
@@ -166,11 +170,14 @@ export function useProductEditor(productId: string) {
 
   const addCost = useCallback(
     (entry: CostEntry) => {
-      setCostData((prev) => addCostEntry(prev, entry))
+      const updated = addCostEntry(costDataRef.current, entry)
+      costDataRef.current = updated
+      setCostData(updated)
+      productStorage.update(productId, { costData: updated })
       setHasUnsavedChanges(true)
       setSaveStatus('idle')
     },
-    []
+    [productId]
   )
 
   const deleteAnnotation = useCallback(
