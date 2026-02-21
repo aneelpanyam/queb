@@ -3,6 +3,7 @@
 import type { Product } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { formatCost, type ProductCostData } from '@/lib/ai-pricing'
+import { getOutputTypeIcon } from '../_lib/product-editor-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -40,6 +41,8 @@ export function ProductEditorHeader({
   onBack, onSave, onExportHtml, onExportJson, onAssistant, onLogout,
   onStartEditName, onSaveEditName, onCancelEditName, onNameValueChange, onUpdateName,
 }: ProductEditorHeaderProps) {
+  const TypeIcon = getOutputTypeIcon(product.outputType)
+
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 shadow-sm sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -49,7 +52,7 @@ export function ProductEditorHeader({
         <div className="h-5 w-px bg-border" />
         {editingName ? (
           <div className="flex items-center gap-2">
-            <Input value={nameValue} onChange={(e) => onNameValueChange(e.target.value)} className="h-8 w-64 text-sm font-semibold" autoFocus
+            <Input value={nameValue} onChange={(e) => onNameValueChange(e.target.value)} className="h-8 w-72 font-display text-sm font-bold tracking-tight" autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter' && nameValue.trim()) { onUpdateName(nameValue.trim()); onSaveEditName() } if (e.key === 'Escape') onCancelEditName() }}
             />
             <button onClick={() => { if (nameValue.trim()) { onUpdateName(nameValue.trim()); onSaveEditName() } }} className="rounded p-1 text-primary hover:bg-primary/10"><Check className="h-4 w-4" /></button>
@@ -57,11 +60,12 @@ export function ProductEditorHeader({
           </div>
         ) : (
           <button onClick={onStartEditName} className="group flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-foreground">{product.name}</span>
+            <span className="truncate font-display text-[15px] font-bold tracking-tight text-foreground">{product.name}</span>
             <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
         )}
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-0.5 text-[10px] font-bold text-primary">
+          <TypeIcon className="h-3 w-3" />
           {outputTypeDef.name}
         </span>
         {costData.totalCost > 0 && (
@@ -75,10 +79,11 @@ export function ProductEditorHeader({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onAssistant} disabled={assistantLoading} className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5">
+        <Button variant="outline" size="sm" onClick={onAssistant} disabled={assistantLoading} className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
           {assistantLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
           Smart Assistant
         </Button>
+        <div className="h-5 w-px bg-border" />
         <Button variant="outline" size="sm" onClick={onExportJson} className="gap-1.5">
           <FileJson className="h-3.5 w-3.5" />
           Export JSON
@@ -87,11 +92,12 @@ export function ProductEditorHeader({
           {exportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Export HTML
         </Button>
+        <div className="h-5 w-px bg-border" />
         <Button size="sm" onClick={onSave} disabled={!hasUnsavedChanges && saveStatus !== 'idle'} className="gap-1.5">
           {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveStatus === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
           {saveStatus === 'saved' ? 'Saved' : 'Save'}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onLogout} className="h-8 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={onLogout} className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Logout">
           <LogOut className="h-3.5 w-3.5" />
         </Button>
       </div>

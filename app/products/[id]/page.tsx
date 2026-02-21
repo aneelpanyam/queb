@@ -18,6 +18,7 @@ import { ProductEditorHeader } from './_components/product-editor-header'
 import { ProductEditorSidebar } from './_components/product-editor-sidebar'
 import { ProductDetailPanel } from './_components/product-detail-panel'
 import { ProductAssistantSheet } from './_components/product-assistant-sheet'
+import { ProductCoverPage } from './_components/product-cover-page'
 
 export default function ProductEditorPage() {
   const router = useRouter()
@@ -163,6 +164,17 @@ export default function ProductEditorPage() {
     )
   }
 
+  if (editor.coverMode) {
+    return (
+      <ProductCoverPage
+        product={product}
+        outputTypeDef={outputTypeDef}
+        onOpenEditor={() => editor.setCoverMode(false)}
+        onSelectNode={(node) => { editor.setSelectedNode(node); editor.setCoverMode(false) }}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <ProductEditorHeader
@@ -195,11 +207,13 @@ export default function ProductEditorPage() {
           costData={editor.costData}
           selectedNode={editor.selectedNode}
           deeperMap={editor.deeperMap}
+          dissectionMap={editor.dissectionMap}
           assistantData={assistant.assistantData}
           onSelectNode={editor.setSelectedNode}
           onToggleSectionVisibility={editor.toggleSectionVisibility}
           onToggleElementVisibility={editor.toggleElementVisibility}
           onOpenAssistant={assistant.openAssistant}
+          onCoverMode={() => editor.setCoverMode(true)}
         />
 
         <ProductDetailPanel

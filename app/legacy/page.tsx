@@ -111,7 +111,7 @@ function LegacyPageInner() {
       <main className="flex min-h-[calc(100vh-3.5rem)] flex-1">
         {view === 'history' && (
           <div className="flex-1 px-4 py-8 sm:px-6 sm:py-10">
-            <div className="mx-auto max-w-3xl">
+            <div className="mx-auto">
               <div className="mb-8 text-center">
                 <h2 className="font-display text-2xl font-bold text-balance text-foreground sm:text-3xl">Saved Sessions</h2>
                 <p className="mt-2 text-sm text-muted-foreground sm:text-base">Browse and reload your previous question bank sessions</p>

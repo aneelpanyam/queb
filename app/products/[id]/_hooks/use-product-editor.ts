@@ -13,6 +13,7 @@ export function useProductEditor(productId: string) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
+  const [coverMode, setCoverMode] = useState(true)
 
   const [dissectionMap, setDissectionMap] = useState<Record<string, DissectionData>>({})
   const [deeperMap, setDeeperMap] = useState<Record<string, DeeperData>>({})
@@ -36,25 +37,6 @@ export function useProductEditor(productId: string) {
       }
       const otDef = getOutputType(p.outputType)
       setOutputTypeDef(otDef || null)
-      const useSectionNav = SECTION_NAV_TYPES.has(p.outputType)
-      if (useSectionNav) {
-        for (let s = 0; s < p.sections.length; s++) {
-          if (!p.sections[s].hidden) {
-            setSelectedNode({ type: 'section', sIndex: s })
-            return
-          }
-        }
-      } else {
-        for (let s = 0; s < p.sections.length; s++) {
-          if (p.sections[s].hidden) continue
-          for (let e = 0; e < p.sections[s].elements.length; e++) {
-            if (!p.sections[s].elements[e].hidden) {
-              setSelectedNode({ type: 'element', sIndex: s, eIndex: e })
-              return
-            }
-          }
-        }
-      }
     } else {
       setNotFound(true)
     }
@@ -197,6 +179,7 @@ export function useProductEditor(productId: string) {
     hasUnsavedChanges, setHasUnsavedChanges,
     saveStatus, setSaveStatus,
     selectedNode, setSelectedNode,
+    coverMode, setCoverMode,
     dissectionMap, setDissectionMap,
     deeperMap, setDeeperMap,
     answerMap, setAnswerMap,

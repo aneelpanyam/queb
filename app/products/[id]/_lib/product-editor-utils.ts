@@ -1,6 +1,29 @@
 import type { Product, AssistantSuggestion } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { getPrimaryField } from '@/lib/output-types'
+import {
+  BookOpen, CheckSquare, Mail, Sparkles, Swords, Scale,
+  FileSearch, BookMarked, Zap, Bot, BookText, FileOutput,
+  type LucideIcon,
+} from 'lucide-react'
+
+export const OUTPUT_TYPE_ICONS: Record<string, LucideIcon> = {
+  questions: BookOpen,
+  checklist: CheckSquare,
+  'email-course': Mail,
+  prompts: Sparkles,
+  'battle-cards': Swords,
+  'decision-books': Scale,
+  dossier: FileSearch,
+  playbook: BookMarked,
+  'cheat-sheets': Zap,
+  'agent-book': Bot,
+  ebook: BookText,
+}
+
+export function getOutputTypeIcon(outputType: string): LucideIcon {
+  return OUTPUT_TYPE_ICONS[outputType] || FileOutput
+}
 
 export type SelectedNode =
   | { type: 'section'; sIndex: number }
@@ -26,6 +49,14 @@ export function dissectionKey(node: SelectedNode): string {
 
 export function annotationKey(node: SelectedNode): string {
   return dissectionKey(node)
+}
+
+/**
+ * Strips leading sequential numbering from AI-generated titles.
+ * Handles: "1. Title", "1) Title", "1 - Title", "1: Title"
+ */
+export function stripLeadingNumber(text: string): string {
+  return text.replace(/^\d+[\.\)\-:]\s+/, '')
 }
 
 export function formatFieldLabel(key: string): string {

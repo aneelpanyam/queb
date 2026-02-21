@@ -72,6 +72,7 @@ export function buildDefaultAntiPatterns(): string[] {
     'Uniform depth — vary element complexity. Include some quick, tactical items alongside deeper strategic ones.',
     'Placeholder language ("various tools", "key metrics", "relevant stakeholders") — always name specific tools, metrics, people, or artifacts.',
     'Filler fields — every field in every element must carry independent value. If a field just restates another field in different words, rewrite it with distinct content.',
+    'Numbered titles — do NOT prefix element titles or section names with sequential numbers (e.g. "1. Title", "2) Title"). Numbering is handled by the UI. Write titles as plain descriptive text.',
   ]
 }
 

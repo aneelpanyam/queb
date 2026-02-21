@@ -6,6 +6,7 @@ import type { ProductSection } from '@/lib/product-types'
 import type { DissectionData } from '@/lib/product-types'
 import { QuestionDissection } from '@/components/question-dissection'
 import { MarkdownProse } from '@/components/markdown-prose'
+import { MarkdownEditor } from '@/components/markdown-editor'
 import { ProductAnnotations } from '@/components/product-annotation'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -96,23 +97,21 @@ export function ChecklistSectionDetail({
 
   return (
     <div className="space-y-6">
-      {/* Section header */}
       <div>
-        <div className="mb-2.5 inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+        <div className="mb-3 inline-block rounded-lg bg-primary/10 px-3 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
           {section.name}
         </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">{section.description}</p>
+        <p className="text-[15px] leading-relaxed text-muted-foreground">{section.description}</p>
         <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
           <span>{visibleSteps.length} of {totalSteps} steps visible</span>
           {highCount > 0 && (
-            <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+            <span className="flex items-center gap-1 font-semibold text-red-600 dark:text-red-400">
               <Zap className="h-3 w-3" /> {highCount} high priority
             </span>
           )}
         </div>
       </div>
 
-      {/* Checklist-level deep dive */}
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm"
           onClick={() => {
@@ -144,14 +143,12 @@ export function ChecklistSectionDetail({
         </Button>
       </div>
 
-      {/* Section-level dissection */}
       {sectionDissection && !hiddenDissections.has(sectionDissectKey) && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
           <QuestionDissection data={sectionDissection} />
         </div>
       )}
 
-      {/* Section-level annotations */}
       <div className="border-t border-border pt-4">
         <ProductAnnotations
           annotations={product.annotations[sectionDissectKey] || []}
@@ -162,14 +159,12 @@ export function ChecklistSectionDetail({
         />
       </div>
 
-      {/* Divider */}
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Steps</span>
+        <span className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">Steps</span>
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      {/* Individual steps */}
       {section.elements.map((el, eIndex) => {
         const isHidden = !!el.hidden
         const isExpanded = expandedSteps.has(eIndex)
@@ -181,16 +176,20 @@ export function ChecklistSectionDetail({
         const stepAnnotations = product.annotations[stepDissectKey] || []
         const itemEditKey = `step-item-${sIndex}-${eIndex}`
         const descEditKey = `step-desc-${sIndex}-${eIndex}`
+        const stepNum = eIndex + 1
 
         return (
-          <div key={eIndex} className={cn('rounded-lg border transition-all', isHidden ? 'opacity-40 border-border/50' : 'border-border', isExpanded && !isHidden && 'shadow-sm')}>
-            {/* Step header — always visible */}
+          <div key={eIndex} className={cn('rounded-xl border transition-all', isHidden ? 'opacity-40 border-border/50' : 'border-border', isExpanded && !isHidden && 'shadow-sm')}>
             <div className="flex items-center gap-3 p-4">
               <button onClick={() => toggleStep(eIndex)} className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground">
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
 
-              <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold', pStyle.bg, pStyle.text, pStyle.border)}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted font-display text-[11px] font-bold text-muted-foreground">
+                {stepNum}
+              </span>
+
+              <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold', pStyle.bg, pStyle.text, pStyle.border)}>
                 <PIcon className="h-3 w-3" /> {priority}
               </span>
 
@@ -212,46 +211,43 @@ export function ChecklistSectionDetail({
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {stepAnnotations.length > 0 && (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">{stepAnnotations.length}</span>
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary">{stepAnnotations.length}</span>
                 )}
-                {stepDissection && <Microscope className="h-3 w-3 text-primary/60" />}
+                {stepDissection && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
                 <button onClick={() => onToggleElementVisibility(sIndex, eIndex)}
-                  className="rounded p-0.5 text-muted-foreground/50 transition-colors hover:text-foreground">
+                  className="rounded p-0.5 text-muted-foreground/40 transition-colors hover:text-foreground">
                   {isHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                 </button>
               </div>
             </div>
 
-            {/* Expanded step detail */}
             {isExpanded && !isHidden && (
               <div className="border-t border-border/50 px-4 pb-5 pt-4 space-y-4">
-                {/* Description */}
                 {el.fields.description && (
-                  <div className={cn('rounded-lg border p-4', pStyle.bg, pStyle.border)}>
+                  <div className={cn('rounded-xl border p-5', pStyle.bg, pStyle.border)}>
                     <div className={cn('mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide', pStyle.text)}>
                       <Shield className="h-3.5 w-3.5" /> What to Know
                     </div>
                     {editingField === descEditKey ? (
-                      <div className="space-y-2">
-                        <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} className="text-[13px]" autoFocus rows={4} />
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => saveEdit(eIndex, 'description')} className="gap-1.5"><Check className="h-3.5 w-3.5" /> Save</Button>
-                          <Button variant="ghost" size="sm" onClick={cancelEdit}>Cancel</Button>
-                        </div>
-                      </div>
+                      <MarkdownEditor
+                        value={editValue}
+                        onChange={setEditValue}
+                        onSave={() => saveEdit(eIndex, 'description')}
+                        onCancel={cancelEdit}
+                        minRows={4}
+                      />
                     ) : (
                       <div onClick={() => startEdit(descEditKey, el.fields.description)}
-                        className="group cursor-text hover:text-primary/80" title="Click to edit">
-                        <MarkdownProse className="text-[13px]">{el.fields.description}</MarkdownProse>
+                        className="group cursor-text rounded-lg transition-colors hover:bg-background/30" title="Click to edit">
+                        <MarkdownProse className="text-[13.5px]">{el.fields.description}</MarkdownProse>
                         <Pencil className="ml-1.5 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Step-level deep dive */}
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm"
                     onClick={() => {
@@ -279,9 +275,8 @@ export function ChecklistSectionDetail({
                   </Button>
                 </div>
 
-                {/* Step dissection content */}
                 {stepDissection && !hiddenDissections.has(stepDissectKey) && (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="rounded-xl border border-border bg-muted/30 p-5">
                     <QuestionDissection data={stepDissection} />
                   </div>
                 )}
@@ -289,7 +284,6 @@ export function ChecklistSectionDetail({
                   <div className="space-y-3 p-4"><Skeleton className="h-4 w-48" /><Skeleton className="h-20 w-full" /></div>
                 )}
 
-                {/* Step-level annotations */}
                 <div className="border-t border-border/50 pt-3">
                   <ProductAnnotations
                     annotations={stepAnnotations}

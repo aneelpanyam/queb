@@ -16,6 +16,7 @@ import {
   type SelectedNode, type AssistantScope,
   SECTION_NAV_TYPES, dissectionKey, annotationKey,
   getContextEntries, getSectionPrimaryKey, getElementPrimary, matchesElement,
+  getOutputTypeIcon, stripLeadingNumber,
 } from '../_lib/product-editor-utils'
 
 interface ProductDetailPanelProps {
@@ -94,21 +95,22 @@ export function ProductDetailPanel({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center gap-6 border-b border-border bg-card/95 px-8 py-3.5 text-xs text-muted-foreground backdrop-blur-sm">
+      {/*<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/95 px-8 py-3 backdrop-blur-sm">
         {getContextEntries(product).map((e) => (
-          <span key={e.label}><strong className="font-semibold text-foreground">{e.label}:</strong> {e.value}</span>
+          <span key={e.label} className="inline-flex items-center gap-1.5 rounded-full bg-muted/80 px-2.5 py-1 text-[11px]">
+            <span className="font-medium text-muted-foreground">{e.label}</span>
+            <span className="font-semibold text-foreground">{e.value}</span>
+          </span>
         ))}
-      </div>
+      </div>*/}
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-background">
         {!selectedNode || !selectedSection ? (
-          <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              Select {SECTION_NAV_TYPES.has(product.outputType) ? 'a checklist' : `a ${outputTypeDef.elementLabel.toLowerCase()}`} from the left to edit and annotate.
-            </p>
+          <div className="flex flex-1 items-center justify-center p-12">
+            <p className="text-sm text-muted-foreground">Select an item from the sidebar to view and edit.</p>
           </div>
         ) : selectedNode.type === 'section' ? (
-          <div className="mx-auto w-full px-6 py-4 pb-12">
+          <div className="mx-auto w-full px-8 py-6 pb-16">
             <ChecklistSectionDetail
               section={selectedSection}
               sIndex={selectedNode.sIndex}
@@ -125,11 +127,11 @@ export function ProductDetailPanel({
             />
           </div>
         ) : (
-          <div className="mx-auto w-full space-y-5 px-6 py-4 pb-12">
+          <div className="mx-auto w-full space-y-6 px-8 py-6 pb-16">
             <div>
-              <div className="mb-2.5 flex items-center gap-2">
-                <div className="inline-block rounded-md bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary">
-                  {selectedSection.name}
+              <div className="mb-3 flex items-center gap-2">
+                <div className="inline-block rounded-lg bg-primary/10 px-3 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
+                  {stripLeadingNumber(selectedSection.name)}
                 </div>
                 {(() => {
                   const count = assistantData?.suggestions.filter((s) => s.targetSection === selectedSection.name && !s.targetElement).length || 0
@@ -145,7 +147,7 @@ export function ProductDetailPanel({
                   )
                 })()}
               </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">{selectedSection.description}</p>
+              <p className="text-[15px] leading-relaxed text-muted-foreground">{selectedSection.description}</p>
             </div>
 
             {selectedNode.type === 'element' && selectedElement ? (
@@ -167,13 +169,13 @@ export function ProductDetailPanel({
                 sectionResolvedFields={selectedSection?.resolvedFields}
               />
             ) : (
-              <MarkdownProse className="text-[16px] font-bold leading-tight tracking-tight">{displayPrimary || ''}</MarkdownProse>
+              <MarkdownProse className="font-display text-xl font-bold leading-tight tracking-tight">{displayPrimary || ''}</MarkdownProse>
             )}
 
             {displayReasoning && (
-              <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Context & Reasoning</div>
-                <MarkdownProse className="text-[14.5px]">{displayReasoning || ''}</MarkdownProse>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <div className="mb-3 font-display text-xs font-bold uppercase tracking-wide text-primary">Context & Reasoning</div>
+                <MarkdownProse>{displayReasoning || ''}</MarkdownProse>
               </div>
             )}
 
@@ -274,10 +276,10 @@ export function ProductDetailPanel({
             )}
 
             {selectedNode.type === 'element' && selectedDeeper && (
-              <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div className="mb-3 flex items-center gap-2">
                   <Layers className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">Deeper Questions</h3>
+                  <h3 className="font-display text-sm font-semibold text-foreground">Deeper Questions</h3>
                 </div>
                 <p className="mb-3 text-xs text-muted-foreground">Select any from the sidebar to view and annotate.</p>
                 <div className="space-y-2">

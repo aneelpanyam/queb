@@ -272,7 +272,7 @@ export default function RunConfigPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
+      <main className="mx-auto px-4 py-8 sm:px-6 sm:py-10">
         <Button variant="ghost" size="sm" onClick={() => router.push('/configurations')} className="mb-6 gap-1.5 text-muted-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Configurations
         </Button>
