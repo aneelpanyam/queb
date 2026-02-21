@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { ACTIVITY_CATEGORIES } from '@/lib/activity-categories'
-import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -57,7 +57,7 @@ RULES:
     output: Output.object({ schema: singleCategorySchema }),
   })
 
-  return result.output
+  return { ...result.output, _partialUsage: result.usage }
 }
 
 export async function POST(req: Request) {
@@ -87,15 +87,26 @@ export async function POST(req: Request) {
 
     const allCategories = await Promise.all(categoryPromises)
 
+    const aggregatedUsage = allCategories.reduce((acc, c) => {
+      const u = (c as any)._partialUsage as { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
+      return {
+        inputTokens: acc.inputTokens + (u?.inputTokens ?? 0),
+        outputTokens: acc.outputTokens + (u?.outputTokens ?? 0),
+        totalTokens: acc.totalTokens + (u?.totalTokens ?? 0),
+      }
+    }, { inputTokens: 0, outputTokens: 0, totalTokens: 0 })
+
     // Filter out categories with no activities (errors)
-    const validCategories = allCategories.filter((c) => c.activities.length > 0)
+    const validCategories = allCategories
+      .filter((c) => c.activities.length > 0)
+      .map(({ _partialUsage, ...rest }: any) => rest)
 
     const duration = Date.now() - startTime
     console.log(
       `[generate-activities] Success: ${validCategories.length}/${ACTIVITY_CATEGORIES.length} categories in ${duration}ms`
     )
 
-    return Response.json(withDebugMeta({ categories: validCategories }, debugPrompts ?? []))
+    return Response.json(withUsageMeta(withDebugMeta({ categories: validCategories }, debugPrompts ?? []), aggregatedUsage))
   } catch (error) {
     console.error('[generate-activities] Error:', error)
     return Response.json(

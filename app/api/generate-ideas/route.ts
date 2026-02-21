@@ -2,7 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { FRAMEWORK_DEFINITIONS } from '@/lib/idea-types'
 import type { IdeaFramework } from '@/lib/idea-types'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -91,7 +91,7 @@ Generate ${count} ideas.`
       frameworkData: Object.fromEntries(idea.frameworkFields.map((f) => [f.key, f.value])),
       suggestedOutputTypes: idea.suggestedOutputTypes,
     }))
-    return Response.json(withDebugMeta({ ideas }, [prompt]))
+    return Response.json(withUsageMeta(withDebugMeta({ ideas }, [prompt]), result.usage))
   } catch (error) {
     console.error('[generate-ideas] Error:', error)
     return Response.json(

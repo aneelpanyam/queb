@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -27,7 +27,7 @@ Examples for "Technology": Software Development, Cloud Services, Cybersecurity, 
   })
 
   console.log(`[generate-services] Success: ${result.output?.services?.length || 0} services`)
-  return Response.json(withDebugMeta(result.output as object, [prompt]))
+  return Response.json(withUsageMeta(withDebugMeta(result.output as object, [prompt]), result.usage))
   } catch (error) {
     console.error('[generate-services] Error:', error)
     return Response.json(

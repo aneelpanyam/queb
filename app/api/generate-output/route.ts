@@ -4,7 +4,7 @@ import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, 
 import { SEED_OUTPUT_TYPES } from '@/lib/output-type-definitions'
 import { BUILTIN_INSTRUCTION_DIRECTIVES, BUILTIN_SECTION_DRIVERS } from '@/lib/output-type-directives'
 import { BUILTIN_PROMPT_METADATA } from '@/lib/output-type-prompt-metadata'
-import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -100,10 +100,10 @@ export async function POST(req: Request) {
       if (debugPrompts) debugPrompts.push(driverPrompt)
 
       return generateText({ model: 'openai/gpt-5.2', prompt: driverPrompt, output: Output.object({ schema }) })
-        .then((r) => ({
-          ...(r.output as object),
-          resolvedFields: driver.fields ? driverFields : undefined,
-        }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: FieldDef[] })
+        .then((r) => {
+          const out = r.output as { sectionName: string; sectionDescription: string; elements: Record<string, string>[] }
+          return { ...out, resolvedFields: driver.fields ? driverFields : undefined, _partialUsage: r.usage }
+        })
         .catch((err) => {
           console.error(`[generate-output] Error for ${driver.name}:`, err)
           return {
@@ -111,16 +111,28 @@ export async function POST(req: Request) {
             sectionDescription: driver.description,
             elements: [] as Record<string, string>[],
             resolvedFields: driver.fields ? driverFields : undefined,
+            _partialUsage: undefined,
           }
         })
     })
 
     const allSections = await Promise.all(promises)
-    const relevant = allSections.filter((s) => s.elements.length > 0)
+    const aggregatedUsage = allSections.reduce((acc, s) => {
+      const u = s._partialUsage as { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
+      return {
+        inputTokens: acc.inputTokens + (u?.inputTokens ?? 0),
+        outputTokens: acc.outputTokens + (u?.outputTokens ?? 0),
+        totalTokens: acc.totalTokens + (u?.totalTokens ?? 0),
+      }
+    }, { inputTokens: 0, outputTokens: 0, totalTokens: 0 })
+
+    const relevant = allSections
+      .filter((s) => s.elements.length > 0)
+      .map(({ _partialUsage, ...rest }) => rest)
 
     console.log(`[generate-output] ${relevant.length}/${drivers.length} sections in ${Date.now() - startTime}ms`)
 
-    return Response.json(withDebugMeta({ sections: relevant }, debugPrompts ?? []))
+    return Response.json(withUsageMeta(withDebugMeta({ sections: relevant }, debugPrompts ?? []), aggregatedUsage))
   } catch (error) {
     console.error('[generate-output] Error:', error)
     return Response.json(

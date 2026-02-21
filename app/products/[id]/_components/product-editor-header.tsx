@@ -1,17 +1,19 @@
 'use client'
 
-import type { Product, AssistantData } from '@/lib/product-types'
+import type { Product } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
+import { formatCost, type ProductCostData } from '@/lib/ai-pricing'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   ArrowLeft, Save, CheckCircle2, Download, Loader2,
-  LogOut, Pencil, X, Check, Sparkles, FileJson,
+  LogOut, Pencil, X, Check, Sparkles, FileJson, Coins,
 } from 'lucide-react'
 
 interface ProductEditorHeaderProps {
   product: Product
   outputTypeDef: OutputTypeDefinition
+  costData: ProductCostData
   hasUnsavedChanges: boolean
   saveStatus: 'idle' | 'saving' | 'saved'
   exportLoading: boolean
@@ -32,7 +34,7 @@ interface ProductEditorHeaderProps {
 }
 
 export function ProductEditorHeader({
-  product, outputTypeDef,
+  product, outputTypeDef, costData,
   hasUnsavedChanges, saveStatus, exportLoading, assistantLoading,
   editingName, nameValue,
   onBack, onSave, onExportHtml, onExportJson, onAssistant, onLogout,
@@ -62,6 +64,12 @@ export function ProductEditorHeader({
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
           {outputTypeDef.name}
         </span>
+        {costData.totalCost > 0 && (
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600" title={`${costData.entries.length} AI call${costData.entries.length !== 1 ? 's' : ''}`}>
+            <Coins className="h-3 w-3" />
+            {formatCost(costData.totalCost)}
+          </span>
+        )}
         {hasUnsavedChanges && (
           <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">Unsaved</span>
         )}

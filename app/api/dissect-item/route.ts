@@ -2,7 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { getFrameworksForOutputType, type DeepDiveFramework } from '@/lib/deep-dive-frameworks'
 import { formatContext } from '@/lib/assemble-prompt'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -123,7 +123,7 @@ FORMATTING RULES (very important):
       prompt,
     })
 
-    return Response.json(withDebugMeta(result.output as object, [prompt]))
+    return Response.json(withUsageMeta(withDebugMeta(result.output as object, [prompt]), result.usage))
   } catch (error) {
     console.error('[dissect-item] Error:', error)
     return Response.json({ error: 'Failed to generate deep dive.' }, { status: 500 })

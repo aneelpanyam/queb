@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext } from '@/lib/assemble-prompt'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -87,7 +87,7 @@ Provide:
     })
 
     console.log(`[dissect-question] Success: ${result.output?.thinkingFramework?.length || 0} steps, ${result.output?.resources?.length || 0} resources`)
-    return Response.json(withDebugMeta(result.output as object, [prompt]))
+    return Response.json(withUsageMeta(withDebugMeta(result.output as object, [prompt]), result.usage))
   } catch (error) {
     console.error('[dissect-question] Error:', error)
     return Response.json(

@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 60
 
@@ -75,7 +75,7 @@ GUIDELINES:
       output: Output.object({ schema: outputSchema }),
     })
 
-    return Response.json(withDebugMeta(result.output as object, debugPrompts ?? []))
+    return Response.json(withUsageMeta(withDebugMeta(result.output as object, debugPrompts ?? []), result.usage))
   } catch (error) {
     console.error('[recommend-output-types] Error:', error)
     return Response.json(

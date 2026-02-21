@@ -122,6 +122,9 @@ export interface Product {
   // Annotations keyed by "sectionIndex-elementIndex"
   annotations: Record<string, Annotation[]>
 
+  // AI cost tracking
+  costData?: import('./ai-pricing').ProductCostData
+
   branding: {
     accentColor: string
     authorName: string

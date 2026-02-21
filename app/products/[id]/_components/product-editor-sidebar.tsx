@@ -1,17 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Product, AssistantData, DeeperData } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
+import { formatCost, formatTokenCount, type ProductCostData } from '@/lib/ai-pricing'
 import {
   type SelectedNode, type AssistantScope,
   SECTION_NAV_TYPES, getContextEntries, getSectionPrimaryKey, getElementPrimary, matchesElement,
 } from '../_lib/product-editor-utils'
-import { Eye, EyeOff, MessageSquareText, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, MessageSquareText, Sparkles, ChevronDown, ChevronRight, Coins } from 'lucide-react'
 
 interface ProductEditorSidebarProps {
   product: Product
   outputTypeDef: OutputTypeDefinition
+  costData: ProductCostData
   selectedNode: SelectedNode | null
   deeperMap: Record<string, DeeperData>
   assistantData: AssistantData | null
@@ -22,9 +25,11 @@ interface ProductEditorSidebarProps {
 }
 
 export function ProductEditorSidebar({
-  product, outputTypeDef, selectedNode, deeperMap, assistantData,
+  product, outputTypeDef, costData, selectedNode, deeperMap, assistantData,
   onSelectNode, onToggleSectionVisibility, onToggleElementVisibility, onOpenAssistant,
 }: ProductEditorSidebarProps) {
+  const [costOpen, setCostOpen] = useState(false)
+
   return (
     <aside className="flex w-[340px] min-w-[340px] flex-col border-r border-border bg-card">
       <div className="shrink-0 border-b border-border p-4">
@@ -190,6 +195,47 @@ export function ProductEditorSidebar({
           )
         })}
       </nav>
+
+      {costData.entries.length > 0 && (
+        <div className="shrink-0 border-t border-border">
+          <button
+            onClick={() => setCostOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center gap-2">
+              <Coins className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">AI Cost</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-bold text-emerald-600">{formatCost(costData.totalCost)}</span>
+              {costOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            </div>
+          </button>
+
+          {costOpen && (
+            <div className="max-h-[240px] overflow-y-auto border-t border-border/50 px-4 py-2">
+              <div className="mb-2 flex gap-3 text-[10px] text-muted-foreground">
+                <span>{formatTokenCount(costData.totalInputTokens)} in</span>
+                <span>{formatTokenCount(costData.totalOutputTokens)} out</span>
+                <span>{costData.entries.length} call{costData.entries.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-1.5">
+                {[...costData.entries].reverse().map((entry, i) => (
+                  <div key={i} className="flex items-start justify-between gap-2 rounded-md bg-muted/40 px-2.5 py-1.5">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-medium text-foreground">{entry.action}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {formatTokenCount(entry.usage.promptTokens)} in · {formatTokenCount(entry.usage.completionTokens)} out · {entry.model}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-[11px] font-semibold text-emerald-600">{formatCost(entry.cost)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </aside>
   )
 }

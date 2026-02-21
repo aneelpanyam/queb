@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -60,7 +60,7 @@ Provide a list of 8-12 key departments with brief descriptions.`
     output: Output.object({ schema: departmentListSchema }),
   })
 
-  return result.output.departments
+  return { departments: result.output.departments, usage: result.usage }
 }
 
 // Phase 2: Generate roles for a single department
@@ -97,7 +97,7 @@ RULES:
     output: Output.object({ schema: singleDepartmentSchema }),
   })
 
-  return result.output
+  return { ...result.output, _partialUsage: result.usage }
 }
 
 export async function POST(req: Request) {
@@ -110,7 +110,10 @@ export async function POST(req: Request) {
 
     // Phase 1: Identify departments
     console.log(`[generate-roles] Phase 1: Identifying departments`)
-    const departments = await identifyDepartments(industry, service, debugPrompts)
+    const phase1 = await identifyDepartments(industry, service, debugPrompts)
+    const departments = phase1.departments
+    const p1u = phase1.usage as { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+    let aggregatedUsage = { inputTokens: p1u.inputTokens ?? 0, outputTokens: p1u.outputTokens ?? 0, totalTokens: p1u.totalTokens ?? 0 }
     console.log(`[generate-roles] Identified ${departments.length} departments`)
 
     // Phase 2: Generate roles for all departments in parallel
@@ -131,15 +134,28 @@ export async function POST(req: Request) {
 
     const allDepartments = await Promise.all(rolePromises)
 
+    for (const d of allDepartments) {
+      if ((d as any)._partialUsage) {
+        const u = (d as any)._partialUsage as { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+        aggregatedUsage = {
+          inputTokens: aggregatedUsage.inputTokens + (u.inputTokens ?? 0),
+          outputTokens: aggregatedUsage.outputTokens + (u.outputTokens ?? 0),
+          totalTokens: aggregatedUsage.totalTokens + (u.totalTokens ?? 0),
+        }
+      }
+    }
+
     // Filter out departments with no roles (errors)
-    const validDepartments = allDepartments.filter((d) => d.roles.length > 0)
+    const validDepartments = allDepartments
+      .filter((d) => d.roles.length > 0)
+      .map(({ _partialUsage, ...rest }: any) => rest)
 
     const duration = Date.now() - startTime
     console.log(
       `[generate-roles] Success: ${validDepartments.length}/${departments.length} departments in ${duration}ms`
     )
 
-    return Response.json(withDebugMeta({ departments: validDepartments }, debugPrompts ?? []))
+    return Response.json(withUsageMeta(withDebugMeta({ departments: validDepartments }, debugPrompts ?? []), aggregatedUsage))
   } catch (error) {
     console.error('[generate-roles] Error:', error)
     return Response.json(

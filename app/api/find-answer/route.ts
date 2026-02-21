@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai'
 import { generateText } from 'ai'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -52,13 +52,14 @@ CRITICAL FORMAT RULES:
 - If there are important variables that would change the answer, present them as a decision-tree or "it depends" section WITHIN the answer itself (e.g., "If you have X, then Y; if not, then Z").
 - End the answer with the conclusion or a clear summary — never with questions directed at the reader.`
 
-    const { text, sources } = await generateText({
+    const genResult = await generateText({
       model: 'openai/gpt-5.2',
       prompt,
       tools: {
         web_search: openai.tools.webSearch({}),
       },
     })
+    const { text, sources } = genResult
 
     const verifiedSources = (sources ?? [])
       .filter(
@@ -71,11 +72,12 @@ CRITICAL FORMAT RULES:
       new Map(verifiedSources.map((s) => [s.url, s])).values()
     )
 
-    return Response.json(withDebugMeta({
+    const usage = genResult.totalUsage ?? genResult.usage
+    return Response.json(withUsageMeta(withDebugMeta({
       answer: text,
       sources: uniqueSources,
       generatedAt: new Date().toISOString(),
-    }, [prompt]))
+    }, [prompt]), usage))
   } catch (error) {
     console.error('[find-answer] Error:', error)
     return Response.json(

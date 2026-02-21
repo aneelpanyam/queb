@@ -8,6 +8,7 @@ import { productStorage } from '@/lib/product-storage'
 import { getOutputType, getOutputTypes } from '@/lib/output-types'
 import { configStorage } from '@/lib/setup-config-storage'
 import type { Product } from '@/lib/product-types'
+import { formatCost } from '@/lib/ai-pricing'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ import {
   LogOut,
   Package,
   MessageSquareText,
+  Coins,
   Eye,
   EyeOff,
   Search,
@@ -542,6 +544,12 @@ export default function ProductsPage() {
                                     <span className="flex items-center gap-1">
                                       <MessageSquareText className="h-3 w-3" />
                                       {annCount} annotation{annCount !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                  {product.costData && product.costData.totalCost > 0 && (
+                                    <span className="flex items-center gap-1 text-emerald-600">
+                                      <Coins className="h-3 w-3" />
+                                      {formatCost(product.costData.totalCost)}
                                     </span>
                                   )}
                                 </div>

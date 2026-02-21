@@ -3,12 +3,14 @@ import { toast } from 'sonner'
 import { aiFetch } from '@/lib/ai-fetch'
 import { getPrimaryField, type OutputTypeDefinition } from '@/lib/output-types'
 import type { Product, AssistantData, AssistantSuggestion } from '@/lib/product-types'
+import { calculateCost, type CostEntry } from '@/lib/ai-pricing'
 import { type AssistantScope, getContextEntries, getElementPrimary, matchesElement } from '../_lib/product-editor-utils'
 
 export function useProductAssistant(
   product: Product | null,
   outputTypeDef: OutputTypeDefinition | null,
   markUnsaved: () => void,
+  addCost: (entry: CostEntry) => void,
 ) {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantScope, setAssistantScope] = useState<AssistantScope>({ level: 'product' })
@@ -73,9 +75,11 @@ export function useProductAssistant(
         }
       }
 
-      const data = await aiFetch('/api/product-assistant', payload, {
+      const raw = await aiFetch('/api/product-assistant', payload, {
         action: 'Smart Analysis', productId: product.id, productName: product.name,
       })
+      const { _usage, ...data } = raw as any
+      if (_usage) addCost({ route: '/api/product-assistant', action: 'Smart Analysis', model: _usage.model, usage: _usage, cost: calculateCost(_usage, _usage.model), timestamp: new Date().toISOString() })
       const newSuggestions = (data.suggestions || []) as AssistantSuggestion[]
 
       setAssistantData((prev) => {
@@ -104,7 +108,7 @@ export function useProductAssistant(
     } finally {
       setAssistantLoading(false)
     }
-  }, [product, outputTypeDef, buildSectionsPayload, markUnsaved])
+  }, [product, outputTypeDef, buildSectionsPayload, markUnsaved, addCost])
 
   const handleAssistant = useCallback(() => {
     const scope: AssistantScope = { level: 'product' }

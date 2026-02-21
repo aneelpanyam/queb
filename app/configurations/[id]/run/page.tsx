@@ -12,6 +12,7 @@ import { outputTypeStorage, type OutputTypeDefinition, getPromptAssemblyOptions 
 import { productStorage } from '@/lib/product-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import type { ProductSection } from '@/lib/product-types'
+import { calculateCost, emptyCostData, addCostEntry } from '@/lib/ai-pricing'
 import { SmartField } from '@/components/smart-field'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
@@ -118,14 +119,27 @@ export default function RunConfigPage() {
           promptOptions: promptOpts,
         }, { action: `Generate ${otDef.name}` })
 
-        if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
+        const { _usage, ...cleanData } = data as any
+        if (!cleanData.sections?.length) throw new Error(`${otDef.name}: no content generated`)
 
-        const sections: ProductSection[] = data.sections.map((s: UnifiedSection) => ({
+        const sections: ProductSection[] = cleanData.sections.map((s: UnifiedSection) => ({
           name: s.sectionName,
           description: s.sectionDescription,
           elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
           resolvedFields: s.resolvedFields,
         }))
+
+        let costData = emptyCostData()
+        if (_usage) {
+          costData = addCostEntry(costData, {
+            route: '/api/generate-output',
+            action: 'Initial Generation',
+            model: _usage.model || 'gpt-5.2',
+            usage: _usage,
+            cost: calculateCost(_usage, _usage.model || 'gpt-5.2'),
+            timestamp: new Date().toISOString(),
+          })
+        }
 
         const product = productStorage.save({
           name,
@@ -140,6 +154,7 @@ export default function RunConfigPage() {
           dissections: {},
           deeperQuestions: {},
           annotations: {},
+          costData,
           branding: { accentColor: '#1a5186', authorName: authorName.trim(), authorBio: '' },
         })
 

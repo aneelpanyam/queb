@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { productStorage } from '@/lib/product-storage'
 import { getOutputType, type OutputTypeDefinition } from '@/lib/output-types'
 import type { Product, Annotation, DissectionData, DeeperData, AnswerData, AssistantData } from '@/lib/product-types'
+import { emptyCostData, addCostEntry, type CostEntry, type ProductCostData } from '@/lib/ai-pricing'
 import { SECTION_NAV_TYPES, type SelectedNode } from '../_lib/product-editor-utils'
 
 export function useProductEditor(productId: string) {
@@ -17,6 +18,7 @@ export function useProductEditor(productId: string) {
   const [deeperMap, setDeeperMap] = useState<Record<string, DeeperData>>({})
   const [answerMap, setAnswerMap] = useState<Record<string, AnswerData>>({})
   const [assistantData, setAssistantData] = useState<AssistantData | null>(null)
+  const [costData, setCostData] = useState<ProductCostData>(emptyCostData())
 
   useEffect(() => {
     if (!productId) return
@@ -27,6 +29,7 @@ export function useProductEditor(productId: string) {
       setDeeperMap(p.deeperQuestions || {})
       setAnswerMap(p.answers || {})
       if (p.assistantData) setAssistantData(p.assistantData)
+      if (p.costData) setCostData(p.costData)
       const otDef = getOutputType(p.outputType)
       setOutputTypeDef(otDef || null)
       const useSectionNav = SECTION_NAV_TYPES.has(p.outputType)
@@ -74,6 +77,7 @@ export function useProductEditor(productId: string) {
       deeperQuestions: deeperMap,
       answers: answerMap,
       assistantData: assistantData || undefined,
+      costData,
     })
     if (updated) {
       setProduct(updated)
@@ -85,7 +89,7 @@ export function useProductEditor(productId: string) {
       setSaveStatus('idle')
       toast.error('Failed to save')
     }
-  }, [product, dissectionMap, deeperMap, answerMap, assistantData])
+  }, [product, dissectionMap, deeperMap, answerMap, assistantData, costData])
 
   const updateElementField = useCallback(
     (sIndex: number, eIndex: number, fieldKey: string, value: string) => {
@@ -160,6 +164,15 @@ export function useProductEditor(productId: string) {
     [updateProduct]
   )
 
+  const addCost = useCallback(
+    (entry: CostEntry) => {
+      setCostData((prev) => addCostEntry(prev, entry))
+      setHasUnsavedChanges(true)
+      setSaveStatus('idle')
+    },
+    []
+  )
+
   const deleteAnnotation = useCallback(
     (key: string, annotationId: string) => {
       updateProduct((prev) => ({
@@ -181,6 +194,7 @@ export function useProductEditor(productId: string) {
     deeperMap, setDeeperMap,
     answerMap, setAnswerMap,
     assistantData, setAssistantData,
+    costData, addCost,
     updateProduct, handleSave,
     updateElementField, toggleElementVisibility, toggleSectionVisibility,
     addAnnotation, updateAnnotation, deleteAnnotation,

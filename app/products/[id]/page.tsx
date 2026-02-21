@@ -39,9 +39,10 @@ export default function ProductEditorPage() {
     editor.deeperMap, editor.setDeeperMap,
     editor.answerMap, editor.setAnswerMap,
     markUnsaved,
+    editor.addCost,
   )
 
-  const assistant = useProductAssistant(product, outputTypeDef, markUnsaved)
+  const assistant = useProductAssistant(product, outputTypeDef, markUnsaved, editor.addCost)
 
   const inlineEdit = useInlineEditing(editor.updateElementField)
 
@@ -167,6 +168,7 @@ export default function ProductEditorPage() {
       <ProductEditorHeader
         product={product}
         outputTypeDef={outputTypeDef}
+        costData={editor.costData}
         hasUnsavedChanges={editor.hasUnsavedChanges}
         saveStatus={editor.saveStatus}
         exportLoading={exportLoading}
@@ -190,6 +192,7 @@ export default function ProductEditorPage() {
         <ProductEditorSidebar
           product={product}
           outputTypeDef={outputTypeDef}
+          costData={editor.costData}
           selectedNode={editor.selectedNode}
           deeperMap={editor.deeperMap}
           assistantData={assistant.assistantData}

@@ -1,7 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { formatContext } from '@/lib/assemble-prompt'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -80,7 +80,7 @@ GUIDELINES:
     })
 
     console.log(`[generate-deeper] Success: ${result.output?.secondOrder?.length || 0} 2nd-order, ${result.output?.thirdOrder?.length || 0} 3rd-order`)
-    return Response.json(withDebugMeta(result.output as object, [prompt]))
+    return Response.json(withUsageMeta(withDebugMeta(result.output as object, [prompt]), result.usage))
   } catch (error) {
     console.error('[generate-deeper] Error:', error)
     return Response.json(

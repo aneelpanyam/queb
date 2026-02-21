@@ -20,9 +20,10 @@ export async function aiFetch(
   const json = await res.json()
   const success = res.ok && !json.error
 
+  const { _meta, _usage, ...rest } = json
+
   if (DEBUG) {
     const durationMs = Date.now() - start
-    const { _meta, ...result } = json
     saveLogEntry({
       action: meta?.action ?? route,
       route,
@@ -32,14 +33,13 @@ export async function aiFetch(
       durationMs,
       success,
       error: json.error,
-      responsePreview: truncate(JSON.stringify(result), 500),
+      responsePreview: truncate(JSON.stringify(rest), 500),
       productId: meta?.productId,
       productName: meta?.productName,
     })
-    if (!success) throw new Error(json.error || 'AI request failed')
-    return result
   }
 
   if (!success) throw new Error(json.error || 'AI request failed')
-  return json
+  if (_usage) (rest as any)._usage = _usage
+  return rest
 }

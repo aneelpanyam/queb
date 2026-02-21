@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 60
 
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       output: Output.object({ schema: suggestionsSchema }),
     })
 
-    return Response.json(withDebugMeta({ suggestions: result.output?.suggestions || [] }, [finalPrompt]))
+    return Response.json(withUsageMeta(withDebugMeta({ suggestions: result.output?.suggestions || [] }, [finalPrompt]), result.usage))
   } catch (error) {
     console.error('[generate-field-suggestions] Error:', error)
     return Response.json(

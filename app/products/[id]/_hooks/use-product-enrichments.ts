@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { aiFetch } from '@/lib/ai-fetch'
 import type { Product, DissectionData, DeeperData, AnswerData } from '@/lib/product-types'
+import { calculateCost, type CostEntry } from '@/lib/ai-pricing'
 import { getContextRecord } from '../_lib/product-editor-utils'
 
 export function useProductEnrichments(
@@ -13,6 +14,7 @@ export function useProductEnrichments(
   answerMap: Record<string, AnswerData>,
   setAnswerMap: React.Dispatch<React.SetStateAction<Record<string, AnswerData>>>,
   markUnsaved: () => void,
+  addCost: (entry: CostEntry) => void,
 ) {
   const [dissectionLoading, setDissectionLoading] = useState(false)
   const [activeDissectKey, setActiveDissectKey] = useState<string | null>(null)
@@ -29,12 +31,14 @@ export function useProductEnrichments(
       setDissectionLoading(true)
       setActiveDissectKey(key)
       try {
-        const data: DissectionData = await aiFetch('/api/dissect-item', {
+        const raw = await aiFetch('/api/dissect-item', {
           item: itemText,
           section: sectionName,
           outputType: product.outputType || 'questions',
           context: getContextRecord(product),
         }, { action: 'Deep Dive', productId: product.id, productName: product.name })
+        const { _usage, ...data } = raw as DissectionData & { _usage?: any }
+        if (_usage) addCost({ route: '/api/dissect-item', action: 'Deep Dive', model: _usage.model, usage: _usage, cost: calculateCost(_usage, _usage.model), timestamp: new Date().toISOString() })
         setDissectionMap((prev) => ({ ...prev, [key]: data }))
         setHiddenDissections((prev) => { const n = new Set(prev); n.delete(key); return n })
         markUnsaved()
@@ -46,7 +50,7 @@ export function useProductEnrichments(
         setActiveDissectKey(null)
       }
     },
-    [product, setDissectionMap, markUnsaved]
+    [product, setDissectionMap, markUnsaved, addCost]
   )
 
   const handleGoDeeper = useCallback(
@@ -56,11 +60,13 @@ export function useProductEnrichments(
       if (deeperMap[key]) return
       setDeeperLoading(true)
       try {
-        const data: DeeperData = await aiFetch('/api/generate-deeper-questions', {
+        const raw = await aiFetch('/api/generate-deeper-questions', {
           originalQuestion: question,
           perspective: sectionName,
           context: getContextRecord(product),
         }, { action: 'Go Deeper', productId: product.id, productName: product.name })
+        const { _usage, ...data } = raw as DeeperData & { _usage?: any }
+        if (_usage) addCost({ route: '/api/generate-deeper-questions', action: 'Go Deeper', model: _usage.model, usage: _usage, cost: calculateCost(_usage, _usage.model), timestamp: new Date().toISOString() })
         setDeeperMap((prev) => ({ ...prev, [key]: data }))
         markUnsaved()
         toast.success('Deeper questions generated')
@@ -70,7 +76,7 @@ export function useProductEnrichments(
         setDeeperLoading(false)
       }
     },
-    [product, deeperMap, setDeeperMap, markUnsaved]
+    [product, deeperMap, setDeeperMap, markUnsaved, addCost]
   )
 
   const handleFindAnswer = useCallback(
@@ -79,9 +85,11 @@ export function useProductEnrichments(
       setAnswerLoading(true)
       setActiveAnswerKey(key)
       try {
-        const data: AnswerData = await aiFetch('/api/find-answer', {
+        const raw = await aiFetch('/api/find-answer', {
           question, context: getContextRecord(product),
         }, { action: 'Find Answer', productId: product.id, productName: product.name })
+        const { _usage: ansUsage, ...data } = raw as AnswerData & { _usage?: any }
+        if (ansUsage) addCost({ route: '/api/find-answer', action: 'Find Answer', model: ansUsage.model, usage: ansUsage, cost: calculateCost(ansUsage, ansUsage.model), timestamp: new Date().toISOString() })
         setAnswerMap((prev) => ({ ...prev, [key]: data }))
         setHiddenAnswers((prev) => { const n = new Set(prev); n.delete(key); return n })
         markUnsaved()
@@ -95,7 +103,7 @@ export function useProductEnrichments(
         setActiveAnswerKey(null)
       }
     },
-    [product, setAnswerMap, markUnsaved]
+    [product, setAnswerMap, markUnsaved, addCost]
   )
 
   return {

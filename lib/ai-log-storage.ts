@@ -65,4 +65,20 @@ export function withDebugMeta<T extends object>(
   return { ...result, _meta: { prompts, model } }
 }
 
+export function withUsageMeta<T extends object>(
+  result: T,
+  usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number },
+  model: string = 'gpt-5.2'
+): T & { _usage: { promptTokens: number; completionTokens: number; totalTokens: number; model: string } } {
+  return {
+    ...result,
+    _usage: {
+      promptTokens: usage.promptTokens ?? usage.inputTokens ?? 0,
+      completionTokens: usage.completionTokens ?? usage.outputTokens ?? 0,
+      totalTokens: usage.totalTokens ?? 0,
+      model,
+    },
+  }
+}
+
 export const aiLogStorage = { getAll, save, remove, clear }

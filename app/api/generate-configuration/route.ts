@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { withDebugMeta } from '@/lib/ai-log-storage'
+import { withDebugMeta, withUsageMeta } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
@@ -180,7 +180,7 @@ Generate a complete configuration.`
       output: Output.object({ schema: configSchema }),
     })
 
-    return Response.json(withDebugMeta({ configuration: result.output }, [prompt]))
+    return Response.json(withUsageMeta(withDebugMeta({ configuration: result.output }, [prompt]), result.usage))
   } catch (error) {
     console.error('[generate-configuration] Error:', error)
     return Response.json(
