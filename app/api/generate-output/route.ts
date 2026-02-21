@@ -1,116 +1,126 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
-import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { SEED_OUTPUT_TYPES } from '@/lib/output-type-definitions'
+import { BUILTIN_INSTRUCTION_DIRECTIVES, BUILTIN_SECTION_DRIVERS } from '@/lib/output-type-directives'
+import { BUILTIN_PROMPT_METADATA } from '@/lib/output-type-prompt-metadata'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
+type FieldDef = { key: string; label: string; [k: string]: unknown }
+type DriverDef = { name: string; description: string; fields?: FieldDef[] }
+type DirectiveDef = { label: string; content: string }
+
+function resolveDefaults(outputTypeId?: string) {
+  if (!outputTypeId) return {}
+
+  const seed = SEED_OUTPUT_TYPES.find((t) => t.id === outputTypeId)
+  return {
+    fields: seed?.fields?.map((f) => ({ key: f.key, label: f.label })),
+    sectionLabel: seed?.sectionLabel,
+    elementLabel: seed?.elementLabel,
+    prompt: seed?.prompt,
+    sectionDrivers: seed?.defaultSectionDrivers ?? BUILTIN_SECTION_DRIVERS[outputTypeId],
+    instructionDirectives: BUILTIN_INSTRUCTION_DIRECTIVES[outputTypeId],
+    promptOptions: BUILTIN_PROMPT_METADATA[outputTypeId] ?? (seed ? { elementLabel: seed.elementLabel } : undefined),
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const { prompt, context, sectionLabel, elementLabel, fields, sectionDrivers, instructionDirectives, promptOptions, outputTypeId } = await req.json()
+    const body = await req.json()
+    const {
+      outputTypeId,
+      context,
+      prompt: reqPrompt,
+      fields: reqFields,
+      sectionDrivers: reqDrivers,
+      instructionDirectives: reqDirectives,
+      sectionLabel: reqSectionLabel,
+      elementLabel: reqElementLabel,
+      promptOptions: reqPromptOptions,
+    } = body
 
-    if (!prompt || !fields || !Array.isArray(fields)) {
-      return Response.json({ error: 'Missing prompt or fields' }, { status: 400 })
+    const defaults = resolveDefaults(outputTypeId)
+
+    const fields: FieldDef[] | undefined = reqFields ?? defaults.fields
+    const sectionLabel = reqSectionLabel || defaults.sectionLabel || 'section'
+    const elementLabel = reqElementLabel || defaults.elementLabel || 'item'
+    const prompt: string | undefined = reqPrompt ?? defaults.prompt
+    const drivers: DriverDef[] | undefined =
+      (Array.isArray(reqDrivers) && reqDrivers.length > 0 ? reqDrivers : undefined) ?? defaults.sectionDrivers
+    const directives: DirectiveDef[] | undefined =
+      (Array.isArray(reqDirectives) && reqDirectives.length > 0 ? reqDirectives : undefined) ?? defaults.instructionDirectives
+    const promptOpts: PromptAssemblyOptions = reqPromptOptions ?? defaults.promptOptions ?? { elementLabel }
+
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      return Response.json({ error: 'Missing fields — provide fields or a valid outputTypeId' }, { status: 400 })
+    }
+    if (!context || typeof context !== 'object') {
+      return Response.json({ error: 'Missing context object' }, { status: 400 })
     }
 
-    const label = sectionLabel || 'section'
-    const elLabel = elementLabel || 'item'
-    const promptOpts: PromptAssemblyOptions = promptOptions ?? (outputTypeId ? getPromptAssemblyOptionsById(outputTypeId, elLabel) : { elementLabel: elLabel })
+    const hasDrivers = Array.isArray(drivers) && drivers.length > 0
 
-    const contextBlock = context && typeof context === 'object' && Object.keys(context).length > 0
-      ? `\n\nCONTEXT:\n${formatContext(context)}`
-      : ''
+    if (!hasDrivers) {
+      return Response.json({ error: 'No section drivers available — provide sectionDrivers or a valid outputTypeId with defaults' }, { status: 400 })
+    }
 
-    const hasDrivers = Array.isArray(sectionDrivers) && sectionDrivers.length > 0
-    const hasPerDriverFields = hasDrivers && sectionDrivers.some((d: { fields?: unknown[] }) => d.fields?.length)
-    const hasDirectives = Array.isArray(instructionDirectives) && instructionDirectives.length > 0
+    console.log(`[generate-output] outputTypeId=${outputTypeId || 'custom'}, drivers=${drivers.length}, directives=${directives?.length ?? 0}`)
+    const startTime = Date.now()
+    const debugPrompts: string[] | undefined = isDebugMode() ? [] : undefined
 
-    if (hasPerDriverFields) {
-      const debugPrompts: string[] = isDebugMode() ? [] : undefined as any
-      const startTime = Date.now()
-
-      const promises = sectionDrivers.map((driver: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }) => {
-        const driverFields = driver.fields || fields
-        const elementSchema = buildElementSchema(driverFields)
-        const schema = z.object({
-          sectionName: z.string(),
-          sectionDescription: z.string(),
-          elements: z.array(elementSchema),
-        })
-
-        const driverPrompt = (hasDirectives
-          ? assembleDirectivesPrompt(context, driver, label, instructionDirectives, promptOpts)
-          : `${prompt}${contextBlock}\n\n${label.toUpperCase()} DEFINITION:\n${driver.name}: ${driver.description}\nBe specific, practical, and tailored to the context provided.`)
-          + buildFieldOverrideBlock(driverFields)
-
-        if (debugPrompts) debugPrompts.push(driverPrompt)
-
-        return generateText({ model: 'openai/gpt-5.2', prompt: driverPrompt, output: Output.object({ schema }) })
-          .then((r) => ({
-            ...(r.output as object),
-            resolvedFields: driver.fields ? driverFields : undefined,
-          }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: typeof driverFields })
-          .catch((err) => {
-            console.error(`[generate-output] Error for ${driver.name}:`, err)
-            return {
-              sectionName: driver.name,
-              sectionDescription: driver.description,
-              elements: [] as Record<string, string>[],
-              resolvedFields: driver.fields ? driverFields : undefined,
-            }
-          })
+    const promises = drivers.map((driver) => {
+      const driverFields = driver.fields || fields
+      const elementSchema = buildElementSchema(driverFields)
+      const schema = z.object({
+        sectionName: z.string(),
+        sectionDescription: z.string(),
+        elements: z.array(elementSchema),
       })
 
-      const allSections = await Promise.all(promises)
-      const relevant = allSections.filter((s) => s.elements.length > 0)
-
-      console.log(`[generate-output] ${relevant.length}/${sectionDrivers.length} sections in ${Date.now() - startTime}ms (per-driver fields)`)
-
-      return Response.json(withDebugMeta({ sections: relevant, _perDriverFields: true }, debugPrompts ?? []))
-    }
-
-    const fieldSchemaEntries: Record<string, z.ZodTypeAny> = {}
-    for (const f of fields) {
-      fieldSchemaEntries[f.key] = z.string().describe(f.label)
-    }
-
-    const elementSchema = z.object(fieldSchemaEntries)
-
-    const sectionSchema = z.object({
-      name: z.string().describe(`The ${label} name`),
-      description: z.string().describe(`A brief description of this ${label}`),
-      elements: z.array(elementSchema).describe(`The ${elLabel}s in this ${label}`),
-    })
-
-    const outputSchema = z.object({
-      sections: z.array(sectionSchema),
-    })
-
-    const fieldSpec = fields.map((f: { key: string; label: string }) => `"${f.key}" (${f.label})`).join(', ')
-
-    let finalPrompt: string
-    if (hasDirectives) {
-      const directivesList = instructionDirectives.map((d: { label: string; content: string }, i: number) => `${i + 1}. [${d.label}] ${d.content}`).join('\n')
-      finalPrompt = `${prompt}${contextBlock}\n\nINSTRUCTIONS:\n${directivesList}`
-      if (hasDrivers) {
-        finalPrompt += `\n\nSECTION STRUCTURE:\nGenerate exactly these ${label}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}`
+      let driverPrompt: string
+      if (directives?.length) {
+        driverPrompt = assembleDirectivesPrompt(context, driver, sectionLabel, directives, promptOpts)
+      } else if (prompt) {
+        const contextLines = Object.entries(context)
+          .filter(([, v]) => v?.trim())
+          .map(([k, v]) => `- ${k}: ${v}`)
+          .join('\n')
+        driverPrompt = `${prompt}\n\nCONTEXT:\n${contextLines}\n\n${sectionLabel.toUpperCase()}: "${driver.name}"\n${driver.description}\n\nGenerate 3-6 ${elementLabel.toLowerCase()}s. Be specific, practical, and tailored to the context.`
+      } else {
+        driverPrompt = assembleDirectivesPrompt(context, driver, sectionLabel, [], promptOpts)
       }
-      finalPrompt += `\nEach ${elLabel} must have these fields: ${fieldSpec}.`
-    } else {
-      const driverBlock = hasDrivers
-        ? `\n\nSECTION STRUCTURE:\nGenerate exactly these ${label}s (one per driver):\n${sectionDrivers.map((d: { name: string; description: string }, i: number) => `${i + 1}. "${d.name}" — ${d.description}`).join('\n')}\nEach ${label} should contain 3-6 ${elLabel}s.`
-        : `\n\nOUTPUT FORMAT:\nGenerate 4-8 ${label}s, each containing 3-6 ${elLabel}s.\nEach ${label} should have a clear name and description.`
-      finalPrompt = `${prompt}${contextBlock}${driverBlock}\nEach ${elLabel} must have these fields: ${fieldSpec}.\nBe specific, practical, and tailored to the context provided.`
-    }
 
-    const result = await generateText({
-      model: 'openai/gpt-5.2',
-      prompt: finalPrompt,
-      output: Output.object({ schema: outputSchema }),
+      if (driver.fields) {
+        driverPrompt += buildFieldOverrideBlock(driverFields)
+      }
+
+      if (debugPrompts) debugPrompts.push(driverPrompt)
+
+      return generateText({ model: 'openai/gpt-5.2', prompt: driverPrompt, output: Output.object({ schema }) })
+        .then((r) => ({
+          ...(r.output as object),
+          resolvedFields: driver.fields ? driverFields : undefined,
+        }) as { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: FieldDef[] })
+        .catch((err) => {
+          console.error(`[generate-output] Error for ${driver.name}:`, err)
+          return {
+            sectionName: driver.name,
+            sectionDescription: driver.description,
+            elements: [] as Record<string, string>[],
+            resolvedFields: driver.fields ? driverFields : undefined,
+          }
+        })
     })
 
-    return Response.json(withDebugMeta(result.output as object, [finalPrompt]))
+    const allSections = await Promise.all(promises)
+    const relevant = allSections.filter((s) => s.elements.length > 0)
+
+    console.log(`[generate-output] ${relevant.length}/${drivers.length} sections in ${Date.now() - startTime}ms`)
+
+    return Response.json(withDebugMeta({ sections: relevant }, debugPrompts ?? []))
   } catch (error) {
     console.error('[generate-output] Error:', error)
     return Response.json(
