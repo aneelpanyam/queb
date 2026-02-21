@@ -9,6 +9,9 @@ import { QuestionAnswer } from '@/components/question-answer'
 import { ElementDetail } from '@/components/element-detail'
 import { MarkdownProse } from '@/components/markdown-prose'
 import { ChecklistSectionDetail } from '@/components/checklist-section-detail'
+import { CrosswordPuzzleView } from '@/components/crossword-grid'
+import { WorkbookSectionView } from '@/components/workbook-view'
+import { reconstructGridFromSection } from '@/lib/crossword-layout'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Loader2, Microscope, Layers, Sparkles, Globe, RefreshCw } from 'lucide-react'
@@ -92,22 +95,59 @@ export function ProductDetailPanel({
   const currentAnswer = currentDKey ? answerMap[currentDKey] : undefined
   const currentAnnotations = product.annotations[currentAKey] || []
   const isQuestionBook = product.outputType === 'questions'
+  const isCrossword = product.outputType === 'crossword-puzzles'
+  const isWorkbook = product.outputType === 'workbook'
+
+  const crosswordGrid = isCrossword && selectedSection
+    ? reconstructGridFromSection(selectedSection)
+    : null
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      {/*<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/95 px-8 py-3 backdrop-blur-sm">
-        {getContextEntries(product).map((e) => (
-          <span key={e.label} className="inline-flex items-center gap-1.5 rounded-full bg-muted/80 px-2.5 py-1 text-[11px]">
-            <span className="font-medium text-muted-foreground">{e.label}</span>
-            <span className="font-semibold text-foreground">{e.value}</span>
-          </span>
-        ))}
-      </div>*/}
-
       <div className="min-h-0 flex-1 overflow-y-auto bg-background">
         {!selectedNode || !selectedSection ? (
           <div className="flex flex-1 items-center justify-center p-12">
             <p className="text-sm text-muted-foreground">Select an item from the sidebar to view and edit.</p>
+          </div>
+        ) : isCrossword && crosswordGrid ? (
+          <div className="mx-auto w-full max-w-4xl px-8 py-6 pb-16">
+            <CrosswordPuzzleView
+              rows={crosswordGrid.rows}
+              cols={crosswordGrid.cols}
+              table={crosswordGrid.table}
+              words={crosswordGrid.words}
+              showAnswers={false}
+              title={stripLeadingNumber(selectedSection.name)}
+            />
+            <div className="mt-8 border-t border-border pt-6">
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-semibold text-primary hover:underline">
+                  Show Answer Key
+                </summary>
+                <div className="mt-4">
+                  <CrosswordPuzzleView
+                    rows={crosswordGrid.rows}
+                    cols={crosswordGrid.cols}
+                    table={crosswordGrid.table}
+                    words={crosswordGrid.words}
+                    showAnswers={true}
+                    cellSize={28}
+                  />
+                </div>
+              </details>
+            </div>
+          </div>
+        ) : isWorkbook && selectedNode.type === 'section' && selectedSection ? (
+          <div className="mx-auto w-full max-w-4xl px-8 py-6 pb-16">
+            <WorkbookSectionView
+              section={selectedSection}
+              sectionIndex={selectedNode.sIndex}
+              globalStartNumber={
+                product.sections
+                  .slice(0, selectedNode.sIndex)
+                  .reduce((sum, s) => sum + (s.hidden ? 0 : s.elements.filter((e) => !e.hidden).length), 0) + 1
+              }
+            />
           </div>
         ) : selectedNode.type === 'section' ? (
           <div className="mx-auto w-full px-8 py-6 pb-16">

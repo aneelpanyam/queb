@@ -1,7 +1,11 @@
 import type { SetupConfiguration } from './setup-config-types'
 import type { Product } from './product-types'
+import { CROSSWORD_SEED_CONFIG } from './seed-crossword-config'
+import { WORKBOOK_SEED_CONFIG } from './seed-workbook-config'
 
 const SEED_FLAG_KEY = 'queb-seed-data-installed'
+const CROSSWORD_SEED_FLAG = 'queb-crossword-seed-installed'
+const WORKBOOK_SEED_FLAG = 'queb-workbook-seed-installed'
 const SEED_TS = '2025-06-01T00:00:00.000Z'
 
 const CTX = {
@@ -1188,5 +1192,35 @@ export function installSeedData(): void {
     localStorage.setItem(SEED_FLAG_KEY, '1')
   } catch {
     // Silently fail — seed data is non-critical
+  }
+
+  try {
+    if (!localStorage.getItem(CROSSWORD_SEED_FLAG)) {
+      const configKey = 'queb-setup-configurations'
+      const rawConfigs = localStorage.getItem(configKey)
+      const configs: SetupConfiguration[] = rawConfigs ? JSON.parse(rawConfigs) : []
+      if (!configs.find((c) => c.id === CROSSWORD_SEED_CONFIG.id)) {
+        configs.unshift(CROSSWORD_SEED_CONFIG)
+        localStorage.setItem(configKey, JSON.stringify(configs.slice(0, 200)))
+      }
+      localStorage.setItem(CROSSWORD_SEED_FLAG, '1')
+    }
+  } catch {
+    // Silently fail
+  }
+
+  try {
+    if (!localStorage.getItem(WORKBOOK_SEED_FLAG)) {
+      const configKey = 'queb-setup-configurations'
+      const rawConfigs = localStorage.getItem(configKey)
+      const configs: SetupConfiguration[] = rawConfigs ? JSON.parse(rawConfigs) : []
+      if (!configs.find((c) => c.id === WORKBOOK_SEED_CONFIG.id)) {
+        configs.unshift(WORKBOOK_SEED_CONFIG)
+        localStorage.setItem(configKey, JSON.stringify(configs.slice(0, 200)))
+      }
+      localStorage.setItem(WORKBOOK_SEED_FLAG, '1')
+    }
+  } catch {
+    // Silently fail
   }
 }

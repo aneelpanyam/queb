@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   ArrowLeft, Save, CheckCircle2, Download, Loader2,
-  LogOut, Pencil, X, Check, Sparkles, FileJson, Coins,
+  LogOut, Pencil, X, Check, Sparkles, FileJson, Coins, FileText,
 } from 'lucide-react'
 
 interface ProductEditorHeaderProps {
@@ -21,10 +21,12 @@ interface ProductEditorHeaderProps {
   assistantLoading: boolean
   editingName: boolean
   nameValue: string
+  pdfExportLoading?: boolean
   onBack: () => void
   onSave: () => void
   onExportHtml: () => void
   onExportJson: () => void
+  onExportPdf?: () => void
   onAssistant: () => void
   onLogout: () => void
   onStartEditName: () => void
@@ -37,8 +39,9 @@ interface ProductEditorHeaderProps {
 export function ProductEditorHeader({
   product, outputTypeDef, costData,
   hasUnsavedChanges, saveStatus, exportLoading, assistantLoading,
+  pdfExportLoading,
   editingName, nameValue,
-  onBack, onSave, onExportHtml, onExportJson, onAssistant, onLogout,
+  onBack, onSave, onExportHtml, onExportJson, onExportPdf, onAssistant, onLogout,
   onStartEditName, onSaveEditName, onCancelEditName, onNameValueChange, onUpdateName,
 }: ProductEditorHeaderProps) {
   const TypeIcon = getOutputTypeIcon(product.outputType)
@@ -92,6 +95,12 @@ export function ProductEditorHeader({
           {exportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Export HTML
         </Button>
+        {onExportPdf && (
+          <Button variant="outline" size="sm" onClick={onExportPdf} disabled={pdfExportLoading} className="gap-1.5">
+            {pdfExportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            Export PDF
+          </Button>
+        )}
         <div className="h-5 w-px bg-border" />
         <Button size="sm" onClick={onSave} disabled={!hasUnsavedChanges && saveStatus !== 'idle'} className="gap-1.5">
           {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveStatus === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}

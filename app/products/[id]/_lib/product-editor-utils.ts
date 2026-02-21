@@ -3,7 +3,7 @@ import type { OutputTypeDefinition } from '@/lib/output-types'
 import { getPrimaryField } from '@/lib/output-types'
 import {
   BookOpen, CheckSquare, Mail, Sparkles, Swords, Scale,
-  FileSearch, BookMarked, Zap, Bot, BookText, FileOutput,
+  FileSearch, BookMarked, Zap, Bot, BookText, Grid3X3, ClipboardList, FileOutput,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -19,6 +19,8 @@ export const OUTPUT_TYPE_ICONS: Record<string, LucideIcon> = {
   'cheat-sheets': Zap,
   'agent-book': Bot,
   ebook: BookText,
+  'crossword-puzzles': Grid3X3,
+  workbook: ClipboardList,
 }
 
 export function getOutputTypeIcon(outputType: string): LucideIcon {
@@ -36,7 +38,7 @@ export type AssistantScope =
   | { level: 'section'; sectionName: string }
   | { level: 'element'; sectionName: string; sIndex: number; eIndex: number }
 
-export const SECTION_NAV_TYPES = new Set(['checklist'])
+export const SECTION_NAV_TYPES = new Set(['checklist', 'crossword-puzzles', 'workbook'])
 
 export function dissectionKey(node: SelectedNode): string {
   switch (node.type) {

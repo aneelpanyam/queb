@@ -5,6 +5,9 @@ import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { buildDirectoryProduct } from '@/lib/export-import'
+import { generateCrosswordPdf } from '@/lib/crossword-pdf-export'
+import { generateWorkbookPdf, type WorkbookPdfSettings } from '@/lib/workbook-pdf-export'
+import { WorkbookPdfSettingsDialog } from '@/components/workbook-pdf-settings-dialog'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
@@ -48,6 +51,62 @@ export default function ProductEditorPage() {
   const inlineEdit = useInlineEditing(editor.updateElementField)
 
   const [exportLoading, setExportLoading] = useState(false)
+  const [pdfExportLoading, setPdfExportLoading] = useState(false)
+  const [pdfSettingsOpen, setPdfSettingsOpen] = useState(false)
+
+  const handleExportPdfDirect = useCallback(async () => {
+    if (!product) return
+    setPdfExportLoading(true)
+    toast.info('Generating KDP-ready PDF...')
+    try {
+      const blob = await generateCrosswordPdf(product)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${product.name.toLowerCase().replace(/\s+/g, '-')}-kdp.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('PDF exported!')
+    } catch (err) {
+      toast.error('PDF export failed', { description: err instanceof Error ? err.message : 'Please try again' })
+    } finally {
+      setPdfExportLoading(false)
+    }
+  }, [product])
+
+  const handleWorkbookPdfExport = useCallback(async (settings: WorkbookPdfSettings) => {
+    if (!product) return
+    setPdfExportLoading(true)
+    toast.info('Generating KDP-ready PDF...')
+    try {
+      const blob = await generateWorkbookPdf(product, settings)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${product.name.toLowerCase().replace(/\s+/g, '-')}-kdp.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('PDF exported!')
+      setPdfSettingsOpen(false)
+    } catch (err) {
+      toast.error('PDF export failed', { description: err instanceof Error ? err.message : 'Please try again' })
+    } finally {
+      setPdfExportLoading(false)
+    }
+  }, [product])
+
+  const handleExportPdfClick = useCallback(() => {
+    if (!product) return
+    if (product.outputType === 'workbook') {
+      setPdfSettingsOpen(true)
+    } else {
+      handleExportPdfDirect()
+    }
+  }, [product, handleExportPdfDirect])
 
   const handleExport = useCallback(async () => {
     if (!product || !outputTypeDef) return
@@ -189,8 +248,10 @@ export default function ProductEditorPage() {
         nameValue={inlineEdit.nameValue}
         onBack={() => router.push('/products')}
         onSave={editor.handleSave}
+        pdfExportLoading={pdfExportLoading}
         onExportHtml={handleExport}
         onExportJson={handleExportJson}
+        onExportPdf={product?.outputType === 'crossword-puzzles' || product?.outputType === 'workbook' ? handleExportPdfClick : undefined}
         onAssistant={assistant.handleAssistant}
         onLogout={handleLogout}
         onStartEditName={() => { inlineEdit.setNameValue(product.name); inlineEdit.setEditingName(true) }}
@@ -262,6 +323,15 @@ export default function ProductEditorPage() {
         data={assistant.assistantData}
         onRunAnalysis={assistant.runAssistantAnalysis}
       />
+
+      {product.outputType === 'workbook' && (
+        <WorkbookPdfSettingsDialog
+          open={pdfSettingsOpen}
+          onOpenChange={setPdfSettingsOpen}
+          onExport={handleWorkbookPdfExport}
+          loading={pdfExportLoading}
+        />
+      )}
     </div>
   )
 }

@@ -296,6 +296,31 @@ export const BUILTIN_PROMPT_METADATA: Record<string, PromptAssemblyOptions> = {
   // ──────────────────────────────────────────────
   // E-BOOK
   // ──────────────────────────────────────────────
+  'crossword-puzzles': {
+    elementLabel: 'word',
+    preamble:
+      'You are generating a crossword puzzle word list for a children\'s activity book. Each theme produces one crossword puzzle. Your job is to generate the best possible vocabulary with fun, educational clues — a separate algorithm will handle arranging words into the grid.',
+    generationProcess: [
+      '1. ANALYZE — Read every context field. Identify the place, the target age group, and the difficulty level. Research what makes this place unique, memorable, and educational for young visitors.',
+      '2. SCOPE — For this theme, brainstorm 15-20 candidate words, then select the best 10-15. Prioritize words that: (a) are specifically tied to this place, (b) a child visiting would actually encounter, (c) teach something educational, and (d) work well in a crossword grid (good letter variety, intersecting potential).',
+      '3. DRAFT — For each word, write a clue that is fun, educational, and age-appropriate. The clue should teach the child something they would discover during a real visit. Include difficulty rating and a short hint.',
+      '4. VERIFY — Check every word: (a) Is it a single word with no spaces or special characters? (b) Is it uppercase A-Z only? (c) Is it specifically connected to this place? (d) Is the clue fun and informative, not dry? (e) Is there good variety in word lengths?',
+    ].join('\n'),
+    qualityBar: [
+      'Place specificity — Would this word list only make sense for this particular place? If the same words could describe any city or park, they are too generic.',
+      'Age appropriateness — Could a child in the target age group realistically know or learn these words during a visit? No obscure academic vocabulary.',
+      'Clue quality — Are the clues fun and educational? Each clue should make the child say "Oh, cool!" not "This is boring."',
+      'Grid compatibility — Is there good variety in word lengths (mix of short and long)? Do many words share common letters (E, S, T, R, A, N) that enable crossword intersections?',
+    ],
+    antiPatterns: [
+      'Multi-word answers or words with spaces/hyphens — every answer must be exactly one word, uppercase A-Z only.',
+      'Generic travel vocabulary (HOTEL, AIRPORT, TOURIST) that applies to any destination — every word must be place-specific.',
+      'Dry, dictionary-style clues ("A large mammal") — clues should be enthusiastic, kid-friendly, and teach something about the place.',
+      'All words the same length — include a deliberate mix from 3 to 10 letters for grid layout variety.',
+      'Words that are too obscure for children — if a word requires adult-level domain knowledge, replace it with something a child could learn during their visit.',
+    ],
+  },
+
   ebook: {
     elementLabel: 'section',
     preamble:
@@ -318,6 +343,31 @@ export const BUILTIN_PROMPT_METADATA: Record<string, PromptAssemblyOptions> = {
       'Sub-sections that rehash the chapter introduction — each sub-section must advance the reader\'s understanding, not restate what they already know.',
       'Action items that are just "reflect on what you learned" — action items must be specific tasks with clear deliverables.',
       'Corporate-textbook tone — write as an experienced practitioner sharing knowledge with a respected peer, not as a professor lecturing students.',
+    ],
+  },
+
+  workbook: {
+    elementLabel: 'question',
+    preamble:
+      'You are generating workbook questions — engaging, clearly-worded exercises with short write-in answers. Each topic section produces a set of questions that readers answer in blank boxes on the page. The answer key at the back rewards them with fun facts. Your job is to make learning feel like a game, not a test.',
+    generationProcess: [
+      '1. ANALYZE — Read every context field. Identify the subject, audience age/level, and what the workbook is trying to teach. Understand what the reader already knows vs. what they should learn.',
+      '2. SCOPE — For this topic, brainstorm 12-15 candidate questions, then select the best 6-10. Prioritize questions that: (a) teach something specific, (b) have a clear short answer, (c) vary in difficulty and format, and (d) would genuinely engage the target audience.',
+      '3. DRAFT — Write each question clearly and directly. Craft the answer to be 1-15 words. Write a fun fact (1-2 sentences) that adds surprising bonus knowledge related to the answer. Rate difficulty as easy/medium/hard.',
+      '4. VERIFY — For each question: (a) Is the question unambiguous? Could it have only one reasonable answer? (b) Is the answer genuinely short enough for a write-in box? (c) Is the fun fact actually surprising and educational? (d) Is there good variety across question types and difficulty levels?',
+    ].join('\n'),
+    qualityBar: [
+      'Answer brevity — Every answer must fit in a small write-in box (1-15 words). If you need a longer answer, rephrase the question to ask for a specific fact, name, or number.',
+      'Question clarity — A reader should understand exactly what is being asked on the first read. No ambiguous phrasing, double negatives, or overly complex sentence structure.',
+      'Engagement variety — The set should mix formats: direct factual questions, true/false, fill-in-the-blank, estimation, comparison, and creative thinking. Monotony kills motivation.',
+      'Fun fact quality — Each fun fact should make the reader say "Wow, I didn\'t know that!" Generic statements ("This is interesting because…") are not fun facts.',
+    ],
+    antiPatterns: [
+      'Long answers that won\'t fit in a write-in box — if the natural answer is a paragraph, rephrase the question to target a specific short fact.',
+      'Ambiguous questions with multiple valid answers — unless intentionally open-ended, each question should have one clear correct answer.',
+      'All questions at the same difficulty — include a deliberate mix of easy recall, medium understanding, and hard critical-thinking questions.',
+      'Boring fun facts that just restate the answer ("The answer is X because X is important") — fun facts should add genuinely new and surprising information.',
+      'Test-like tone ("Which of the following…") — this is an activity book, not a standardized exam. Questions should feel fun and curious.',
     ],
   },
 }

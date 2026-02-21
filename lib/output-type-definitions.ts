@@ -14,6 +14,8 @@ import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
 import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
 import { AGENT_OPPORTUNITY_AREAS } from '@/lib/agent-opportunity-areas'
 import { EBOOK_CHAPTERS } from '@/lib/ebook-chapters'
+import { CROSSWORD_THEMES } from '@/lib/crossword-themes'
+import { WORKBOOK_TOPICS } from '@/lib/workbook-topics'
 import type { OutputTypeDefinition } from '@/lib/output-type-library'
 
 export const SEED_OUTPUT_TYPES: Omit<OutputTypeDefinition, 'createdAt' | 'updatedAt'>[] = [
@@ -360,6 +362,67 @@ GUIDELINES:
     ],
     supportsDeepDive: true,
     defaultSectionDrivers: EBOOK_CHAPTERS.map((c) => ({ name: c.name, description: c.description })),
+    isBuiltIn: true,
+  },
+  {
+    id: 'crossword-puzzles',
+    name: 'Crossword Puzzles',
+    description: 'Place-themed crossword puzzle books for kids — AI generates vocabulary and clues, then an algorithm builds the grid layout',
+    icon: 'Grid3X3',
+    prompt: `You are an expert children's educational puzzle designer.
+
+TASK:
+Generate a crossword puzzle word list with kid-friendly clues themed around a specific place.
+
+GUIDELINES:
+- Generate 10-15 words per theme relevant to the given place
+- Every word must be a single word (no spaces, hyphens, or special characters), uppercase A-Z only
+- Include a mix of easy (3-5 letters), medium (5-7 letters), and hard (7-10 letter) words
+- Clues should be fun, educational, and teach kids something about the place
+- Each word must be specifically connected to the place, not generic vocabulary
+- Tailor difficulty to the age group provided in context`,
+    sectionLabel: 'Theme',
+    elementLabel: 'Word',
+    fields: [
+      { key: 'word', label: 'Word', type: 'short-text', primary: true },
+      { key: 'clue', label: 'Clue', type: 'long-text', color: 'blue', icon: 'HelpCircle' },
+      { key: 'difficulty', label: 'Difficulty', type: 'short-text', color: 'amber', icon: 'Gauge' },
+      { key: 'hint', label: 'Hint', type: 'short-text', color: 'emerald', icon: 'Lightbulb' },
+    ],
+    supportsDeepDive: false,
+    supportsDeeperQuestions: false,
+    defaultSectionDrivers: CROSSWORD_THEMES.map((t) => ({ name: t.name, description: t.description })),
+    isBuiltIn: true,
+  },
+  {
+    id: 'workbook',
+    name: 'Workbook',
+    description: 'Activity workbook with write-in questions — generates topic-based questions with short answers, exports to KDP-ready PDF with blank answer boxes and an answer key',
+    icon: 'ClipboardList',
+    prompt: `You are an expert educational content designer who creates engaging workbook exercises.
+
+TASK:
+Generate a set of workbook questions on this topic. Each question should have a clear, short answer (1-15 words) that fits in a write-in box.
+
+GUIDELINES:
+- Generate 6-10 questions per topic
+- Mix question types: recall, understanding, application, creative thinking
+- Use direct, clear language appropriate for the target audience
+- Every answer must be SHORT (1-15 words) — rephrase if needed
+- Include a fun fact for each question to appear in the answer key
+- Vary formats: what/where/when/who/why/how, true-false, fill-in-the-blank, estimation
+- Tailor vocabulary and complexity to the context and audience provided`,
+    sectionLabel: 'Topic',
+    elementLabel: 'Question',
+    fields: [
+      { key: 'question', label: 'Question', type: 'long-text', primary: true },
+      { key: 'answer', label: 'Answer', type: 'short-text', color: 'emerald', icon: 'CheckCircle' },
+      { key: 'difficulty', label: 'Difficulty', type: 'short-text', color: 'amber', icon: 'Gauge' },
+      { key: 'funFact', label: 'Fun Fact', type: 'long-text', color: 'violet', icon: 'Sparkles' },
+    ],
+    supportsDeepDive: false,
+    supportsDeeperQuestions: false,
+    defaultSectionDrivers: WORKBOOK_TOPICS.map((t) => ({ name: t.name, description: t.description })),
     isBuiltIn: true,
   },
 ]

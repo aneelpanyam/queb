@@ -54,7 +54,7 @@ export interface OutputTypeDefinition {
 // ============================================================
 
 const STORAGE_KEY = 'queb-output-type-library'
-const SEED_VERSION = 5
+const SEED_VERSION = 7
 const VERSION_KEY = STORAGE_KEY + '-version'
 
 function ensureSeeded(): OutputTypeDefinition[] {

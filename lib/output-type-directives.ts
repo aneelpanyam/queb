@@ -16,6 +16,8 @@ import * as playbook from '@/lib/directives/playbook'
 import * as cheatSheets from '@/lib/directives/cheat-sheets'
 import * as agentBook from '@/lib/directives/agent-book'
 import * as ebook from '@/lib/directives/ebook'
+import * as crosswordPuzzles from '@/lib/directives/crossword-puzzles'
+import * as workbook from '@/lib/directives/workbook'
 
 export const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
   questions: questions.directives,
@@ -29,6 +31,8 @@ export const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective
   'cheat-sheets': cheatSheets.directives,
   'agent-book': agentBook.directives,
   ebook: ebook.directives,
+  'crossword-puzzles': crosswordPuzzles.directives,
+  workbook: workbook.directives,
 }
 
 export const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
@@ -43,4 +47,6 @@ export const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
   'cheat-sheets': cheatSheets.sectionDrivers,
   'agent-book': agentBook.sectionDrivers,
   ebook: ebook.sectionDrivers,
+  'crossword-puzzles': crosswordPuzzles.sectionDrivers,
+  workbook: workbook.sectionDrivers,
 }

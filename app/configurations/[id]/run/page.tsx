@@ -12,6 +12,7 @@ import { outputTypeStorage, type OutputTypeDefinition, getPromptAssemblyOptions 
 import { productStorage } from '@/lib/product-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import type { ProductSection } from '@/lib/product-types'
+import { generateCrosswordGrid, serializeGridMeta } from '@/lib/crossword-layout'
 import { calculateCost, emptyCostData, addCostEntry } from '@/lib/ai-pricing'
 import { SmartField } from '@/components/smart-field'
 import { LoginScreen } from '@/components/login-screen'
@@ -122,12 +123,40 @@ export default function RunConfigPage() {
         const { _usage, ...cleanData } = data as any
         if (!cleanData.sections?.length) throw new Error(`${otDef.name}: no content generated`)
 
-        const sections: ProductSection[] = cleanData.sections.map((s: UnifiedSection) => ({
+        let sections: ProductSection[] = cleanData.sections.map((s: UnifiedSection) => ({
           name: s.sectionName,
           description: s.sectionDescription,
           elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
           resolvedFields: s.resolvedFields,
         }))
+
+        if (co.outputTypeId === 'crossword-puzzles') {
+          sections = sections.map((section) => {
+            const words = section.elements.map((el) => ({
+              word: el.fields.word || '',
+              clue: el.fields.clue || '',
+              difficulty: el.fields.difficulty,
+              hint: el.fields.hint,
+            }))
+            const grid = generateCrosswordGrid(words)
+            return {
+              ...section,
+              description: serializeGridMeta(grid),
+              elements: grid.words.map((w) => ({
+                fields: {
+                  word: w.word,
+                  clue: w.clue,
+                  difficulty: w.difficulty,
+                  hint: w.hint,
+                  number: String(w.number),
+                  direction: w.direction,
+                  startX: String(w.startX),
+                  startY: String(w.startY),
+                },
+              })),
+            }
+          })
+        }
 
         let costData = emptyCostData()
         if (_usage) {
