@@ -99,7 +99,7 @@ export async function POST(req: Request) {
 
       if (debugPrompts) debugPrompts.push(driverPrompt)
 
-      return generateText({ model: 'openai/gpt-5.2', prompt: driverPrompt, output: Output.object({ schema }) })
+      return generateText({ model: 'openai/gpt-5.2', providerOptions: { reasoning: { effort: "high" }}, temperature: 0.2, prompt: driverPrompt, output: Output.object({ schema }) })
         .then((r) => {
           const out = r.output as { sectionName: string; sectionDescription: string; elements: Record<string, string>[] }
           return { ...out, resolvedFields: driver.fields ? driverFields : undefined, _partialUsage: r.usage }

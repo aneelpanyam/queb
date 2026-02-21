@@ -1,6 +1,6 @@
 'use client'
 
-import { FRAMEWORK_DEFINITIONS, type IdeaFramework } from '@/lib/idea-types'
+import { FRAMEWORK_DEFINITIONS, IDEATION_STRATEGIES, type IdeaFramework, type IdeationStrategy } from '@/lib/idea-types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -79,6 +79,8 @@ interface AIGenerateDialogProps {
   onTopicChange: (v: string) => void
   framework: IdeaFramework
   onFrameworkChange: (v: IdeaFramework) => void
+  strategy: IdeationStrategy
+  onStrategyChange: (v: IdeationStrategy) => void
   count: number
   onCountChange: (v: number) => void
   generating: boolean
@@ -87,8 +89,10 @@ interface AIGenerateDialogProps {
 
 export function AIGenerateDialog({
   open, onOpenChange, topic, onTopicChange, framework, onFrameworkChange,
-  count, onCountChange, generating, onGenerate,
+  strategy, onStrategyChange, count, onCountChange, generating, onGenerate,
 }: AIGenerateDialogProps) {
+  const selectedStrategy = IDEATION_STRATEGIES.find((s) => s.id === strategy)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
@@ -112,7 +116,22 @@ export function AIGenerateDialog({
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Framework</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Ideation Strategy</label>
+            <select
+              value={strategy}
+              onChange={(e) => onStrategyChange(e.target.value as IdeationStrategy)}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {IDEATION_STRATEGIES.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            {selectedStrategy && (
+              <p className="mt-1 text-xs text-muted-foreground">{selectedStrategy.description}</p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Presentation Framework</label>
             <select
               value={framework}
               onChange={(e) => onFrameworkChange(e.target.value as IdeaFramework)}

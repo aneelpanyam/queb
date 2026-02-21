@@ -12,6 +12,7 @@ import {
   assembleIdeaDescription,
   type Idea,
   type IdeaFramework,
+  type IdeationStrategy,
   type ImplementationHint,
 } from '@/lib/idea-types'
 
@@ -27,6 +28,7 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
   const [showAIDialog, setShowAIDialog] = useState(false)
   const [aiTopic, setAiTopic] = useState('')
   const [aiFramework, setAiFramework] = useState<IdeaFramework>('problem-solution')
+  const [aiStrategy, setAiStrategy] = useState<IdeationStrategy>('balanced')
   const [aiCount, setAiCount] = useState(5)
   const [aiGenerating, setAiGenerating] = useState(false)
 
@@ -66,11 +68,18 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     }
     setAiGenerating(true)
     try {
+      const allOutputTypes = outputTypeStorage.getAll()
       const data = await aiFetch('/api/generate-ideas', {
         topic: aiTopic.trim(),
         framework: aiFramework,
+        strategy: aiStrategy,
         count: aiCount,
         existingIdeas: ideas.map((i) => i.title),
+        outputTypes: allOutputTypes.map((ot) => ({
+          id: ot.id,
+          name: ot.name,
+          description: ot.description,
+        })),
       }, { action: 'Generate Ideas' })
       const generated = data.ideas || []
       let saved = 0
@@ -175,6 +184,7 @@ export function useIdeaGeneration(reload: () => void, ideas: Idea[]) {
     showAIDialog, setShowAIDialog,
     aiTopic, setAiTopic,
     aiFramework, setAiFramework,
+    aiStrategy, setAiStrategy,
     aiCount, setAiCount,
     aiGenerating,
     handleAIGenerate,

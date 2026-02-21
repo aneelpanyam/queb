@@ -211,6 +211,8 @@ export default function IdeasPage() {
         onTopicChange={gen.setAiTopic}
         framework={gen.aiFramework}
         onFrameworkChange={gen.setAiFramework}
+        strategy={gen.aiStrategy}
+        onStrategyChange={gen.setAiStrategy}
         count={gen.aiCount}
         onCountChange={gen.setAiCount}
         generating={gen.aiGenerating}
