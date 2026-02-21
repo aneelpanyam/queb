@@ -91,13 +91,51 @@ export function useLegacyWizard(
     '/api/generate-activities', postFetcher
   )
 
-  const {
-    data: questionsData,
-    trigger: triggerQuestions,
-    isMutating: questionsLoading,
-  } = useSWRMutation<{ perspectives: Perspective[] }, Error, string, {
+  const [questionsData, setQuestionsData] = useState<{ perspectives: Perspective[] } | undefined>(undefined)
+  const [questionsLoading, setQuestionsLoading] = useState(false)
+
+  const triggerQuestions = useCallback(async (args: {
     role: string; activity: string; situation: string; additionalContext: AdditionalContextItem[]; industry: string; service: string
-  }>('/api/generate-questions', postFetcher)
+  }) => {
+    setQuestionsLoading(true)
+    try {
+      const contextEntries = [
+        ['industry', args.industry],
+        ['service', args.service],
+        ['role', args.role],
+        ['activity', args.activity],
+        ['situation', args.situation],
+        ...args.additionalContext
+          .filter((c) => c.label.trim() && c.value.trim())
+          .map((c) => [c.label, c.value]),
+      ]
+      const context: Record<string, string> = {}
+      for (const [k, v] of contextEntries) if (v?.trim()) context[k] = v
+
+      const res = await fetch('/api/generate-output', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outputTypeId: 'questions', context }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Request failed')
+      }
+      const data = await res.json()
+      const perspectives: Perspective[] = (data.sections || []).map(
+        (s: { sectionName: string; sectionDescription: string; elements: Record<string, string>[] }) => ({
+          perspectiveName: s.sectionName,
+          perspectiveDescription: s.sectionDescription,
+          questions: s.elements,
+        }),
+      )
+      const result = { perspectives }
+      setQuestionsData(result)
+      return result
+    } finally {
+      setQuestionsLoading(false)
+    }
+  }, [])
 
   const reachableSteps = useMemo(() => {
     const s = new Set<number>([1])
@@ -239,6 +277,7 @@ export function useLegacyWizard(
     setSelectedActivity(null)
     setSituation('')
     setAdditionalContext([])
+    setQuestionsData(undefined)
     dissectionsRef.current = {}
     deeperRef.current = {}
   }, [])

@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       if (directives?.length) {
         driverPrompt = assembleDirectivesPrompt(context, driver, sectionLabel, directives, promptOpts)
       } else if (prompt) {
-        const contextLines = Object.entries(context)
+        const contextLines = Object.entries(context as Record<string, string>)
           .filter(([, v]) => v?.trim())
           .map(([k, v]) => `- ${k}: ${v}`)
           .join('\n')

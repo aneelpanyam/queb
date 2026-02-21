@@ -34,166 +34,11 @@ import {
   Play,
 } from 'lucide-react'
 
-interface ApiPerspective {
-  perspectiveName: string
-  perspectiveDescription: string
-  questions: Record<string, string>[]
-}
-
-interface ApiChecklistDimension {
-  dimensionName: string
-  dimensionDescription: string
-  items: Record<string, string>[]
-}
-
-interface ApiEmailModule {
-  moduleName: string
-  moduleDescription: string
-  emails: Record<string, string>[]
-}
-
-interface ApiPromptCategory {
-  categoryName: string
-  categoryDescription: string
-  prompts: Record<string, string>[]
-}
-
-interface ApiBattleCardSection {
+interface UnifiedSection {
   sectionName: string
   sectionDescription: string
-  cards: Record<string, string>[]
-}
-
-interface ApiDecisionDomain {
-  domainName: string
-  domainDescription: string
-  decisions: Record<string, string>[]
-}
-
-interface ApiDossierSection {
-  sectionName: string
-  sectionDescription: string
-  briefings: Record<string, string>[]
-}
-
-interface ApiPlaybookPhase {
-  phaseName: string
-  phaseDescription: string
-  plays: Record<string, string>[]
-}
-
-interface ApiCheatSheetCategory {
-  categoryName: string
-  categoryDescription: string
-  entries: Record<string, string>[]
-}
-
-interface ApiAgentOpportunity {
-  opportunityName: string
-  opportunityDescription: string
-  agents: Record<string, string>[]
-}
-
-interface ApiEbookChapter {
-  chapterName: string
-  chapterDescription: string
-  sections: Record<string, string>[]
-}
-
-function toFields(obj: Record<string, string>): Record<string, string> {
-  const fields: Record<string, string> = {}
-  for (const [k, v] of Object.entries(obj)) {
-    if (v) fields[k] = v
-  }
-  return fields
-}
-
-function perspectivesToSections(perspectives: ApiPerspective[]): ProductSection[] {
-  return perspectives.map((p) => ({
-    name: p.perspectiveName,
-    description: p.perspectiveDescription,
-    elements: p.questions.map((q) => ({ fields: toFields(q) })),
-  }))
-}
-
-function checklistToSections(dimensions: ApiChecklistDimension[]): ProductSection[] {
-  return dimensions.map((d) => ({
-    name: d.dimensionName,
-    description: d.dimensionDescription,
-    elements: d.items.map((i) => ({ fields: toFields(i) })),
-  }))
-}
-
-function emailCourseToSections(modules: ApiEmailModule[]): ProductSection[] {
-  return modules.map((m) => ({
-    name: m.moduleName,
-    description: m.moduleDescription,
-    elements: m.emails.map((e) => ({ fields: toFields(e) })),
-  }))
-}
-
-function promptsToSections(categories: ApiPromptCategory[]): ProductSection[] {
-  return categories.map((c) => ({
-    name: c.categoryName,
-    description: c.categoryDescription,
-    elements: c.prompts.map((p) => ({ fields: toFields(p) })),
-  }))
-}
-
-function battleCardsToSections(sections: ApiBattleCardSection[]): ProductSection[] {
-  return sections.map((s) => ({
-    name: s.sectionName,
-    description: s.sectionDescription,
-    elements: s.cards.map((c) => ({ fields: toFields(c) })),
-  }))
-}
-
-function decisionDomainsToSections(domains: ApiDecisionDomain[]): ProductSection[] {
-  return domains.map((d) => ({
-    name: d.domainName,
-    description: d.domainDescription,
-    elements: d.decisions.map((dec) => ({ fields: toFields(dec) })),
-  }))
-}
-
-function dossierToSections(sections: ApiDossierSection[]): ProductSection[] {
-  return sections.map((s) => ({
-    name: s.sectionName,
-    description: s.sectionDescription,
-    elements: s.briefings.map((b) => ({ fields: toFields(b) })),
-  }))
-}
-
-function playbookToSections(phases: ApiPlaybookPhase[]): ProductSection[] {
-  return phases.map((p) => ({
-    name: p.phaseName,
-    description: p.phaseDescription,
-    elements: p.plays.map((pl) => ({ fields: toFields(pl) })),
-  }))
-}
-
-function cheatSheetsToSections(categories: ApiCheatSheetCategory[]): ProductSection[] {
-  return categories.map((c) => ({
-    name: c.categoryName,
-    description: c.categoryDescription,
-    elements: c.entries.map((e) => ({ fields: toFields(e) })),
-  }))
-}
-
-function agentBookToSections(opportunities: ApiAgentOpportunity[]): ProductSection[] {
-  return opportunities.map((o) => ({
-    name: o.opportunityName,
-    description: o.opportunityDescription,
-    elements: o.agents.map((a) => ({ fields: toFields(a) })),
-  }))
-}
-
-function ebookToSections(chapters: ApiEbookChapter[]): ProductSection[] {
-  return chapters.map((c) => ({
-    name: c.chapterName,
-    description: c.chapterDescription,
-    elements: c.sections.map((s) => ({ fields: toFields(s) })),
-  }))
+  elements: Record<string, string>[]
+  resolvedFields?: { key: string; label: string }[]
 }
 
 export default function RunConfigPage() {
@@ -260,106 +105,27 @@ export default function RunConfigPage() {
         const directives = co.instructionDirectives?.length ? co.instructionDirectives : undefined
         const resolvedFields = co.fieldOverrides ?? otDef.fields
         const promptOpts = getPromptAssemblyOptions(otDef)
-        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives, sectionLabel, promptOptions: promptOpts }
 
-        let sections: ProductSection[]
+        const data = await aiFetch('/api/generate-output', {
+          outputTypeId: co.outputTypeId,
+          context: flat,
+          sectionLabel,
+          elementLabel: otDef.elementLabel,
+          fields: resolvedFields,
+          sectionDrivers: drivers,
+          instructionDirectives: directives,
+          prompt: resolvedPrompt,
+          promptOptions: promptOpts,
+        }, { action: `Generate ${otDef.name}` })
 
-        const aiFetchMeta = { action: `Generate ${otDef.name}` }
+        if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        type AnyData = any
-
-        // Determine route
-        const routeMap: Record<string, string> = {
-          questions: '/api/generate-questions',
-          checklist: '/api/generate-checklist',
-          'email-course': '/api/generate-email-course',
-          prompts: '/api/generate-prompts',
-          'battle-cards': '/api/generate-battle-cards',
-          'decision-books': '/api/generate-decision-books',
-          dossier: '/api/generate-dossier',
-          playbook: '/api/generate-playbook',
-          'cheat-sheets': '/api/generate-cheat-sheets',
-          'agent-book': '/api/generate-agent-book',
-          ebook: '/api/generate-ebook',
-        }
-
-        const route = routeMap[co.outputTypeId]
-
-        if (route) {
-          const data: AnyData = await aiFetch(route, contextPayload, aiFetchMeta)
-
-          if (data._perDriverFields && Array.isArray(data.sections)) {
-            if (!data.sections.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = data.sections.map((s: { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: import('@/lib/output-type-library').OutputTypeField[] }) => ({
-              name: s.sectionName,
-              description: s.sectionDescription,
-              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
-              resolvedFields: s.resolvedFields,
-            }))
-          } else if (co.outputTypeId === 'questions') {
-            if (!data.perspectives?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = perspectivesToSections(data.perspectives)
-          } else if (co.outputTypeId === 'checklist') {
-            if (!data.dimensions?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = checklistToSections(data.dimensions)
-          } else if (co.outputTypeId === 'email-course') {
-            if (!data.modules?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = emailCourseToSections(data.modules)
-          } else if (co.outputTypeId === 'prompts') {
-            if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = promptsToSections(data.categories)
-          } else if (co.outputTypeId === 'battle-cards') {
-            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = battleCardsToSections(data.sections)
-          } else if (co.outputTypeId === 'decision-books') {
-            if (!data.domains?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = decisionDomainsToSections(data.domains)
-          } else if (co.outputTypeId === 'dossier') {
-            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = dossierToSections(data.sections)
-          } else if (co.outputTypeId === 'playbook') {
-            if (!data.phases?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = playbookToSections(data.phases)
-          } else if (co.outputTypeId === 'agent-book') {
-            if (!data.opportunities?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = agentBookToSections(data.opportunities)
-          } else if (co.outputTypeId === 'ebook') {
-            if (!data.chapters?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = ebookToSections(data.chapters)
-          } else {
-            if (!data.categories?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = cheatSheetsToSections(data.categories)
-          }
-        } else {
-          const data: AnyData = await aiFetch('/api/generate-output', {
-              prompt: resolvedPrompt,
-              context: flat,
-              sectionLabel,
-              elementLabel: otDef.elementLabel,
-              fields: resolvedFields,
-              sectionDrivers: drivers,
-              instructionDirectives: directives,
-              promptOptions: promptOpts,
-              outputTypeId: co.outputTypeId,
-            }, aiFetchMeta)
-          if (data._perDriverFields && Array.isArray(data.sections)) {
-            if (!data.sections.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = data.sections.map((s: { sectionName: string; sectionDescription: string; elements: Record<string, string>[]; resolvedFields?: import('@/lib/output-type-library').OutputTypeField[] }) => ({
-              name: s.sectionName,
-              description: s.sectionDescription,
-              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
-              resolvedFields: s.resolvedFields,
-            }))
-          } else {
-            if (!data.sections?.length) throw new Error(`${otDef.name}: no content generated`)
-            sections = data.sections.map((s: { name: string; description: string; elements: Record<string, string>[] }) => ({
-              name: s.name,
-              description: s.description,
-              elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
-            }))
-          }
-        }
+        const sections: ProductSection[] = data.sections.map((s: UnifiedSection) => ({
+          name: s.sectionName,
+          description: s.sectionDescription,
+          elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
+          resolvedFields: s.resolvedFields,
+        }))
 
         const product = productStorage.save({
           name,
@@ -381,7 +147,6 @@ export default function RunConfigPage() {
         return product.id
       }
 
-      // Run all outputs in parallel
       const results = await Promise.allSettled(config.outputs.map(generateOne))
       const createdIds = results
         .filter((r): r is PromiseFulfilledResult<string | null> => r.status === 'fulfilled')
@@ -564,7 +329,6 @@ export default function RunConfigPage() {
 
               return (
                 <div key={key}>
-                  {/* Text inputs for unmapped prompt references */}
                   {textInputRefs.map((ref) => (
                     <div key={ref} className="mb-3">
                       <label className="mb-1 block text-sm font-medium text-foreground capitalize">{ref}</label>
