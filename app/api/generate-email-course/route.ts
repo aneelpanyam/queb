@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -23,44 +25,15 @@ const singleStageSchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  stage: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  const label = sectionLabel.toLowerCase()
-  return `You are an expert email course creator and instructional designer.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 2-4 emails for the "${stage.name}" ${label} of an email course.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${stage.name}: ${stage.description}
-
-GUIDELINES:
-- Each email should be self-contained but build on the overall ${label} theme.
-- Subject lines must be compelling and specific — avoid generic titles.
-- Email bodies should be 150-300 words: educational, conversational, and packed with actionable insight.
-- Include specific examples, frameworks, or tips relevant to the provided context.
-- Each email must end with a clear, specific call to action.
-- Write as an expert peer, not a lecturer.
-- If this stage is not very relevant to the context, still include at least 1 email.`
-}
-
 async function generateForStage(
   stage: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, stage, sectionLabel, directives)
-    : buildDefaultPrompt(stage, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, stage, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -75,14 +48,17 @@ async function generateForStage(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('email-course', 'email')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['email-course'] ?? []
     const stages = sectionDrivers?.length ? sectionDrivers : EMAIL_COURSE_STAGES
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -102,9 +78,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, stage, label, instructionDirectives)
-            : buildDefaultPrompt(stage, context, label))
+          const prompt = assembleDirectivesPrompt(context, stage, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -114,7 +88,7 @@ export async function POST(req: Request) {
               return { sectionName: stage.name, sectionDescription: stage.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForStage(stage, context, label, instructionDirectives, debugPrompts)
+        return generateForStage(stage, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.moduleName,
             sectionDescription: r.moduleDescription,
@@ -133,7 +107,7 @@ export async function POST(req: Request) {
     }
 
     const promises = stages.map((stage) =>
-      generateForStage(stage, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForStage(stage, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-email-course] Error for ${stage.name}:`, err)
         return { moduleName: stage.name, moduleDescription: stage.description, emails: [] }
       })

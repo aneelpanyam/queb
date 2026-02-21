@@ -8,7 +8,7 @@ import { configStorage } from '@/lib/setup-config-storage'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
 import { valuesToLegacyContext, getFieldKey } from '@/lib/setup-config-types'
 import { fieldStorage, type FieldDefinition, sortFieldsByDependency } from '@/lib/field-library'
-import { outputTypeStorage, type OutputTypeDefinition } from '@/lib/output-type-library'
+import { outputTypeStorage, type OutputTypeDefinition, getPromptAssemblyOptions } from '@/lib/output-type-library'
 import { productStorage } from '@/lib/product-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import type { ProductSection } from '@/lib/product-types'
@@ -259,7 +259,8 @@ export default function RunConfigPage() {
         const drivers = co.sectionDrivers?.length ? co.sectionDrivers : undefined
         const directives = co.instructionDirectives?.length ? co.instructionDirectives : undefined
         const resolvedFields = co.fieldOverrides ?? otDef.fields
-        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives, sectionLabel }
+        const promptOpts = getPromptAssemblyOptions(otDef)
+        const contextPayload = { context: flat, sectionDrivers: drivers, instructionDirectives: directives, sectionLabel, promptOptions: promptOpts }
 
         let sections: ProductSection[]
 
@@ -339,6 +340,8 @@ export default function RunConfigPage() {
               fields: resolvedFields,
               sectionDrivers: drivers,
               instructionDirectives: directives,
+              promptOptions: promptOpts,
+              outputTypeId: co.outputTypeId,
             }, aiFetchMeta)
           if (data._perDriverFields && Array.isArray(data.sections)) {
             if (!data.sections.length) throw new Error(`${otDef.name}: no content generated`)

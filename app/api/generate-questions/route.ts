@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -42,43 +44,15 @@ export const questionsSchema = z.object({
   perspectives: z.array(singlePerspectiveSchema),
 })
 
-function buildDefaultPrompt(
-  perspective: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  return `You are an expert thinking coach and organizational consultant.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 thoughtful, probing questions specifically from the "${perspective.name}" perspective.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${perspective.name}: ${perspective.description}
-
-GUIDELINES:
-- Only generate questions if this perspective is genuinely relevant to the given context. If not relevant, return an empty questions array.
-- Every question must be specific to the described context, not generic.
-- Actively incorporate all context provided to make questions sharper and more actionable.
-- Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.
-- Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").
-- Questions should provoke deep thinking and help uncover blind spots.
-- Tailor questions to the specific context fields provided.`
-}
-
 async function generateQuestionsForPerspective(
   perspective: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, perspective, sectionLabel, directives)
-    : buildDefaultPrompt(perspective, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, perspective, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -93,14 +67,17 @@ async function generateQuestionsForPerspective(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('questions', 'question')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['questions'] ?? []
     const perspectives = sectionDrivers?.length ? sectionDrivers : BUSINESS_PERSPECTIVES
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -121,9 +98,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, perspective, label, instructionDirectives)
-            : buildDefaultPrompt(perspective, context, label))
+          const prompt = assembleDirectivesPrompt(context, perspective, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -133,7 +108,7 @@ export async function POST(req: Request) {
               return { sectionName: perspective.name, sectionDescription: perspective.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateQuestionsForPerspective(perspective, context, label, instructionDirectives, debugPrompts)
+        return generateQuestionsForPerspective(perspective, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.perspectiveName,
             sectionDescription: r.perspectiveDescription,
@@ -154,7 +129,7 @@ export async function POST(req: Request) {
     }
 
     const perspectivePromises = perspectives.map((perspective) =>
-      generateQuestionsForPerspective(perspective, context, label, instructionDirectives, debugPrompts).catch((error) => {
+      generateQuestionsForPerspective(perspective, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((error) => {
         console.error(`[generate-questions] Error for perspective ${perspective.name}:`, error)
         return {
           perspectiveName: perspective.name,

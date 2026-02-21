@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -25,44 +27,15 @@ const singlePhaseSchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  phase: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  const label = sectionLabel.toLowerCase()
-  return `You are a senior operations strategist and execution expert who creates practical, field-tested playbooks.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 actionable plays for the "${phase.name}" ${label}.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${phase.name}: ${phase.description}
-
-GUIDELINES:
-- Only generate plays if this phase is genuinely relevant to the given context. If not relevant, return an empty plays array.
-- Every play must be specific to the described context — not generic process advice.
-- Instructions must be step-by-step and concrete enough to follow without additional research.
-- Decision criteria must describe key branching points — when to proceed, pivot, or escalate.
-- Expected outcomes must describe tangible deliverables or states that indicate success.
-- Include realistic time estimates that account for the specific context and constraints.
-- Tailor plays to the specific context, team size, resources, and constraints provided.`
-}
-
 async function generateForPhase(
   phase: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, phase, sectionLabel, directives)
-    : buildDefaultPrompt(phase, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, phase, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -77,15 +50,18 @@ async function generateForPhase(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
     const phases = sectionDrivers?.length ? sectionDrivers : PLAYBOOK_PHASES
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('playbook', 'play')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['playbook'] ?? []
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
     console.log(`[generate-playbook] Context keys: ${Object.keys(context).join(', ')}${sectionDrivers?.length ? ' (custom phases)' : ''}${instructionDirectives?.length ? ` (${instructionDirectives.length} directives)` : ''}${hasPerDriverFields ? ' (per-driver fields)' : ''}`)
@@ -104,9 +80,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, ph, label, instructionDirectives)
-            : buildDefaultPrompt(ph, context, label))
+          const prompt = assembleDirectivesPrompt(context, ph, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -116,7 +90,7 @@ export async function POST(req: Request) {
               return { sectionName: ph.name, sectionDescription: ph.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForPhase(ph, context, label, instructionDirectives, debugPrompts)
+        return generateForPhase(ph, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.phaseName,
             sectionDescription: r.phaseDescription,
@@ -135,7 +109,7 @@ export async function POST(req: Request) {
     }
 
     const promises = phases.map((phase) =>
-      generateForPhase(phase, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForPhase(phase, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-playbook] Error for ${phase.name}:`, err)
         return { phaseName: phase.name, phaseDescription: phase.description, plays: [] }
       })

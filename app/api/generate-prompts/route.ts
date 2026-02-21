@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -23,44 +25,15 @@ const singleUseCaseSchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  useCase: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  const label = sectionLabel.toLowerCase()
-  return `You are an expert AI prompt engineer who creates highly effective prompt templates.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 ready-to-use AI prompt templates for the "${useCase.name}" ${label}.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${useCase.name}: ${useCase.description}
-
-GUIDELINES:
-- Each prompt must be complete and copy-paste ready — a user should be able to use it immediately.
-- Include [bracketed placeholders] where the user needs to fill in specifics.
-- Prompts should leverage domain knowledge and terminology relevant to the provided context.
-- The "context" field should describe the specific trigger or situation when this prompt is most useful.
-- The "expectedOutput" should set realistic expectations for what the AI will produce.
-- Vary the complexity — include both quick tactical prompts and deeper strategic ones.
-- If this ${label} is not very relevant, still include at least 1 prompt.`
-}
-
 async function generateForUseCase(
   useCase: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, useCase, sectionLabel, directives)
-    : buildDefaultPrompt(useCase, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, useCase, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -75,14 +48,17 @@ async function generateForUseCase(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('prompts', 'prompt')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['prompts'] ?? []
     const useCases = sectionDrivers?.length ? sectionDrivers : PROMPT_USE_CASES
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -102,9 +78,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, uc, label, instructionDirectives)
-            : buildDefaultPrompt(uc, context, label))
+          const prompt = assembleDirectivesPrompt(context, uc, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -114,7 +88,7 @@ export async function POST(req: Request) {
               return { sectionName: uc.name, sectionDescription: uc.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForUseCase(uc, context, label, instructionDirectives, debugPrompts)
+        return generateForUseCase(uc, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.categoryName,
             sectionDescription: r.categoryDescription,
@@ -133,7 +107,7 @@ export async function POST(req: Request) {
     }
 
     const promises = useCases.map((uc) =>
-      generateForUseCase(uc, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForUseCase(uc, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-prompts] Error for ${uc.name}:`, err)
         return { categoryName: uc.name, categoryDescription: uc.description, prompts: [] }
       })

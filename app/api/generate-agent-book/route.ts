@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { AGENT_OPPORTUNITY_AREAS } from '@/lib/agent-opportunity-areas'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -25,47 +27,15 @@ const singleOpportunitySchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  opportunity: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  const label = sectionLabel.toLowerCase()
-  return `You are an AI agent strategist who identifies high-impact opportunities to deploy AI agents across workflows.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 AI agent ideas for the "${opportunity.name}" ${label}.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${opportunity.name}: ${opportunity.description}
-
-GUIDELINES:
-- Only generate agents if this opportunity area is genuinely relevant to the given context. If not relevant, return an empty agents array.
-- Each agent must be specific to the described context — not a generic AI tool suggestion.
-- Agent names should be memorable and descriptive (e.g. "Lead Research Autopilot", "Deal Risk Scanner").
-- Describe how each agent actually works — trigger, data flow, actions, and output.
-- Be specific about what tools, APIs, and data sources the agent needs.
-- Rate implementation complexity honestly: Low (off-the-shelf or simple API chain), Medium (custom logic, some integration work), High (significant engineering, custom models, or complex orchestration).
-- Expected impact should be concrete and measurable where possible.
-- Quick-start hints must be actionable — the first real step, not "think about it".
-- Vary the complexity — include both quick-win agents and more ambitious ones.
-- Tailor all agents to the specific role, industry, and workflow context provided.`
-}
-
 async function generateForOpportunity(
   opportunity: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, opportunity, sectionLabel, directives)
-    : buildDefaultPrompt(opportunity, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, opportunity, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -80,14 +50,17 @@ async function generateForOpportunity(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('agent-book', 'agent')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['agent-book'] ?? []
     const opportunities = sectionDrivers?.length ? sectionDrivers : AGENT_OPPORTUNITY_AREAS
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -107,9 +80,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, opp, label, instructionDirectives)
-            : buildDefaultPrompt(opp, context, label))
+          const prompt = assembleDirectivesPrompt(context, opp, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -119,7 +90,7 @@ export async function POST(req: Request) {
               return { sectionName: opp.name, sectionDescription: opp.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForOpportunity(opp, context, label, instructionDirectives, debugPrompts)
+        return generateForOpportunity(opp, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.opportunityName,
             sectionDescription: r.opportunityDescription,
@@ -138,7 +109,7 @@ export async function POST(req: Request) {
     }
 
     const promises = opportunities.map((opportunity) =>
-      generateForOpportunity(opportunity, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForOpportunity(opportunity, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-agent-book] Error for ${opportunity.name}:`, err)
         return { opportunityName: opportunity.name, opportunityDescription: opportunity.description, agents: [] }
       })

@@ -1,13 +1,14 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
 export async function POST(req: Request) {
   try {
-    const { prompt, context, sectionLabel, elementLabel, fields, sectionDrivers, instructionDirectives } = await req.json()
+    const { prompt, context, sectionLabel, elementLabel, fields, sectionDrivers, instructionDirectives, promptOptions, outputTypeId } = await req.json()
 
     if (!prompt || !fields || !Array.isArray(fields)) {
       return Response.json({ error: 'Missing prompt or fields' }, { status: 400 })
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
 
     const label = sectionLabel || 'section'
     const elLabel = elementLabel || 'item'
+    const promptOpts: PromptAssemblyOptions = promptOptions ?? (outputTypeId ? getPromptAssemblyOptionsById(outputTypeId, elLabel) : { elementLabel: elLabel })
 
     const contextBlock = context && typeof context === 'object' && Object.keys(context).length > 0
       ? `\n\nCONTEXT:\n${formatContext(context)}`
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
         })
 
         const driverPrompt = (hasDirectives
-          ? assembleDirectivesPrompt(context, driver, label, instructionDirectives)
+          ? assembleDirectivesPrompt(context, driver, label, instructionDirectives, promptOpts)
           : `${prompt}${contextBlock}\n\n${label.toUpperCase()} DEFINITION:\n${driver.name}: ${driver.description}\nBe specific, practical, and tailored to the context provided.`)
           + buildFieldOverrideBlock(driverFields)
 

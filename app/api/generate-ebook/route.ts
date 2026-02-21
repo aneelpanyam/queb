@@ -1,7 +1,9 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { EBOOK_CHAPTERS } from '@/lib/ebook-chapters'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -22,48 +24,15 @@ const singleChapterSchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  chapter: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  const label = sectionLabel.toLowerCase()
-  return `You are an expert author and instructional designer who creates compelling, comprehensive guides that educate professionals.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 substantial sub-sections for the "${chapter.name}" ${label}.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${chapter.name}: ${chapter.description}
-
-GUIDELINES:
-- Only generate sub-sections if this chapter theme is genuinely relevant to the given context. If not relevant, return an empty sections array.
-- Every sub-section must be specific to the described context — not generic filler content.
-- The "content" field is the heart of the book. Write 400-800 words of rich, flowing prose per sub-section.
-- Teach, explain, and illustrate — the reader should walk away truly understanding the material.
-- Include concrete examples, scenarios, and practical illustrations throughout.
-- Key insights should distill the single most important takeaway from each sub-section.
-- Practical examples must be detailed and realistic, using names, numbers, and situations relevant to the reader.
-- Action items should be specific and immediately doable.
-- Build progressively within the chapter — start with context, move to core material, end with application.
-- Write as an authoritative but approachable expert — like a trusted mentor.
-- Tailor depth, terminology, and examples to the specific audience and context provided.`
-}
-
 async function generateForChapter(
   chapter: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, chapter, sectionLabel, directives)
-    : buildDefaultPrompt(chapter, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, chapter, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -78,14 +47,17 @@ async function generateForChapter(
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('ebook', 'section')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['ebook'] ?? []
     const chapters = sectionDrivers?.length ? sectionDrivers : EBOOK_CHAPTERS
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -105,9 +77,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, ch, label, instructionDirectives)
-            : buildDefaultPrompt(ch, context, label))
+          const prompt = assembleDirectivesPrompt(context, ch, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -117,7 +87,7 @@ export async function POST(req: Request) {
               return { sectionName: ch.name, sectionDescription: ch.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForChapter(ch, context, label, instructionDirectives, debugPrompts)
+        return generateForChapter(ch, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.chapterName,
             sectionDescription: r.chapterDescription,
@@ -136,7 +106,7 @@ export async function POST(req: Request) {
     }
 
     const promises = chapters.map((chapter) =>
-      generateForChapter(chapter, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForChapter(chapter, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-ebook] Error for ${chapter.name}:`, err)
         return { chapterName: chapter.name, chapterDescription: chapter.description, sections: [] }
       })

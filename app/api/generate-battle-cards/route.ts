@@ -1,6 +1,8 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { formatContext, assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock } from '@/lib/assemble-prompt'
+import { assembleDirectivesPrompt, buildElementSchema, buildFieldOverrideBlock, type PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { getPromptAssemblyOptionsById } from '@/lib/output-type-library'
+import { BUILTIN_INSTRUCTION_DIRECTIVES } from '@/lib/output-type-directives'
 import { withDebugMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
@@ -23,40 +25,15 @@ const singleSectionSchema = z.object({
   ),
 })
 
-function buildDefaultPrompt(
-  section: { name: string; description: string },
-  context: Record<string, string>,
-  sectionLabel: string,
-) {
-  const contextBlock = formatContext(context)
-  return `You are a structured analysis and strategic intelligence expert.
-
-CONTEXT:
-${contextBlock}
-
-TASK:
-Generate 3-5 battle cards for the "${section.name}" ${sectionLabel.toLowerCase()}.
-
-${sectionLabel.toUpperCase()} DEFINITION:
-${section.name}: ${section.description}
-
-GUIDELINES:
-- Only generate cards if this ${sectionLabel.toLowerCase()} is genuinely relevant to the given context. If not relevant, return an empty cards array.
-- Each card needs a clear title, honest analysis, and actionable insights.
-- Focus on intelligence the reader can use immediately.
-- Tailor everything to the specific context provided.`
-}
-
 async function generateForSection(
   section: { name: string; description: string },
   context: Record<string, string>,
   sectionLabel: string,
-  directives?: { label: string; content: string }[],
+  directives: { label: string; content: string }[],
+  promptOpts: PromptAssemblyOptions,
   collectedPrompts?: string[],
 ) {
-  const prompt = directives?.length
-    ? assembleDirectivesPrompt(context, section, sectionLabel, directives)
-    : buildDefaultPrompt(section, context, sectionLabel)
+  const prompt = assembleDirectivesPrompt(context, section, sectionLabel, directives, promptOpts)
 
   if (collectedPrompts) collectedPrompts.push(prompt)
 
@@ -79,14 +56,17 @@ const DEFAULT_SECTIONS = [
 
 export async function POST(req: Request) {
   try {
-    const { context, sectionDrivers, instructionDirectives, sectionLabel } = (await req.json()) as {
+    const { context, sectionDrivers, instructionDirectives, sectionLabel, promptOptions } = (await req.json()) as {
       context: Record<string, string>
       sectionDrivers?: { name: string; description: string; fields?: { key: string; label: string; [k: string]: unknown }[] }[]
       instructionDirectives?: { label: string; content: string }[]
       sectionLabel?: string
+      promptOptions?: PromptAssemblyOptions
     }
 
     const label = sectionLabel || DEFAULT_LABEL
+    const promptOpts = promptOptions ?? getPromptAssemblyOptionsById('battle-cards', 'card')
+    const effectiveDirectives = instructionDirectives?.length ? instructionDirectives : BUILTIN_INSTRUCTION_DIRECTIVES['battle-cards'] ?? []
     const sections = sectionDrivers?.length ? sectionDrivers : DEFAULT_SECTIONS
     const hasPerDriverFields = sectionDrivers?.some((s) => s.fields?.length) ?? false
 
@@ -106,9 +86,7 @@ export async function POST(req: Request) {
             sectionDescription: z.string(),
             elements: z.array(elementSchema),
           })
-          const prompt = (instructionDirectives?.length
-            ? assembleDirectivesPrompt(context, sec, label, instructionDirectives)
-            : buildDefaultPrompt(sec, context, label))
+          const prompt = assembleDirectivesPrompt(context, sec, label, effectiveDirectives, promptOpts)
             + buildFieldOverrideBlock(fields)
           if (debugPrompts) debugPrompts.push(prompt)
           return generateText({ model: 'openai/gpt-5.2', prompt, output: Output.object({ schema }) })
@@ -118,7 +96,7 @@ export async function POST(req: Request) {
               return { sectionName: sec.name, sectionDescription: sec.description, elements: [] as Record<string, string>[], resolvedFields: fields }
             })
         }
-        return generateForSection(sec, context, label, instructionDirectives, debugPrompts)
+        return generateForSection(sec, context, label, effectiveDirectives, promptOpts, debugPrompts)
           .then((r) => ({
             sectionName: r.sectionName,
             sectionDescription: r.sectionDescription,
@@ -137,7 +115,7 @@ export async function POST(req: Request) {
     }
 
     const promises = sections.map((sec) =>
-      generateForSection(sec, context, label, instructionDirectives, debugPrompts).catch((err) => {
+      generateForSection(sec, context, label, effectiveDirectives, promptOpts, debugPrompts).catch((err) => {
         console.error(`[generate-battle-cards] Error for ${sec.name}:`, err)
         return { sectionName: sec.name, sectionDescription: sec.description, cards: [] }
       })

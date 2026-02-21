@@ -1,20 +1,18 @@
 // ============================================================
-// Dynamic Output Type Library — each output type has a
-// generation prompt, schema of fields, and display config.
-// Prompts use {{fieldId}} placeholders resolved at generation time.
+// Dynamic Output Type Library — public API / barrel file.
+// Delegates to sub-modules for definitions, directives,
+// prompt metadata, and section drivers.
 // ============================================================
 
-import { BUSINESS_PERSPECTIVES } from '@/lib/perspectives'
-import { CHECKLIST_DIMENSIONS } from '@/lib/checklist-dimensions'
-import { EMAIL_COURSE_STAGES } from '@/lib/email-course-stages'
-import { PROMPT_USE_CASES } from '@/lib/prompt-use-cases'
-import { DECISION_DOMAINS } from '@/lib/decision-domains'
-import { DOSSIER_SECTIONS } from '@/lib/dossier-sections'
-import { PLAYBOOK_PHASES } from '@/lib/playbook-phases'
-import { CHEAT_SHEET_CATEGORIES } from '@/lib/cheat-sheet-categories'
-import { AGENT_OPPORTUNITY_AREAS } from '@/lib/agent-opportunity-areas'
-import { EBOOK_CHAPTERS } from '@/lib/ebook-chapters'
 import type { SectionDriver, InstructionDirective } from '@/lib/setup-config-types'
+import { SEED_OUTPUT_TYPES } from '@/lib/output-type-definitions'
+import { BUILTIN_INSTRUCTION_DIRECTIVES, BUILTIN_SECTION_DRIVERS } from '@/lib/output-type-directives'
+import type { PromptAssemblyOptions } from '@/lib/assemble-prompt'
+import { BUILTIN_PROMPT_METADATA } from '@/lib/output-type-prompt-metadata'
+
+// ============================================================
+// Types
+// ============================================================
 
 export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
 
@@ -40,360 +38,14 @@ export interface OutputTypeDefinition {
   supportsDeeperQuestions?: boolean
   defaultSectionDrivers?: SectionDriver[]
   defaultInstructionDirectives?: InstructionDirective[]
+  preamble?: string
+  generationProcess?: string
+  qualityBar?: string[]
+  antiPatterns?: string[]
   isBuiltIn: boolean
   createdAt: string
   updatedAt: string
 }
-
-const STORAGE_KEY = 'queb-output-type-library'
-
-const SEED_OUTPUT_TYPES: Omit<OutputTypeDefinition, 'createdAt' | 'updatedAt'>[] = [
-  {
-    id: 'questions',
-    name: 'Question Book',
-    description: 'Multi-perspective questions with thinking frameworks, checklists, and resources',
-    icon: 'BookOpen',
-    prompt: `You are an expert thinking coach and organizational consultant.
-
-TASK:
-Generate thoughtful, probing questions organized by business perspective.
-
-GUIDELINES:
-- Generate 3-5 questions per relevant perspective
-- Every question must be specific to the described context, not generic
-- Each question must include all requested element fields
-- Questions should provoke deep thinking and help uncover blind spots
-- Tailor questions to the specific context provided`,
-    sectionLabel: 'Perspective',
-    elementLabel: 'Question',
-    fields: [
-      { key: 'question', label: 'Question', type: 'long-text', primary: true },
-      { key: 'relevance', label: 'Why This Matters', type: 'long-text', color: 'amber', icon: 'Target' },
-      { key: 'infoPrompt', label: 'How to Find the Answer', type: 'long-text', color: 'blue', icon: 'ArrowUpRight' },
-      { key: 'actionSteps', label: 'What to Do With the Answer', type: 'long-text', color: 'emerald', icon: 'ListChecks' },
-      { key: 'redFlags', label: 'Red Flags to Watch For', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
-      { key: 'keyMetrics', label: 'Key Metrics to Track', type: 'short-text', color: 'violet', icon: 'BarChart3' },
-    ],
-    supportsDeepDive: true,
-    supportsDeeperQuestions: true,
-    defaultSectionDrivers: BUSINESS_PERSPECTIVES.map((p) => ({ name: p.name, description: p.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'checklist',
-    name: 'Checklist',
-    description: 'Actionable checklists organized by category with priority levels',
-    icon: 'CheckSquare',
-    prompt: `You are a process and operations expert.
-
-TASK:
-Generate a comprehensive, actionable checklist organized by category.
-
-GUIDELINES:
-- Create 4-6 categories relevant to the given context
-- Each category should have 5-8 specific, actionable items
-- Include priority levels (High, Medium, Low) for each item
-- Items should be concrete and verifiable, not vague
-- Consider compliance, best practices, and common pitfalls`,
-    sectionLabel: 'Category',
-    elementLabel: 'Item',
-    fields: [
-      { key: 'item', label: 'Checklist Item', type: 'short-text', primary: true },
-      { key: 'description', label: 'Description', type: 'long-text', color: 'blue', icon: 'Shield' },
-      { key: 'priority', label: 'Priority', type: 'short-text', color: 'amber', icon: 'Zap' },
-      { key: 'commonMistakes', label: 'Common Mistakes', type: 'long-text', color: 'red', icon: 'AlertOctagon' },
-      { key: 'tips', label: 'Pro Tips', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
-      { key: 'verificationMethod', label: 'How to Verify', type: 'short-text', color: 'emerald', icon: 'ClipboardCheck' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'email-course',
-    name: 'Email Course',
-    description: 'Multi-part email sequences for nurturing, onboarding, or education',
-    icon: 'Mail',
-    prompt: `You are an email marketing and education expert.
-
-TASK:
-Create a structured email course with modules and individual emails.
-
-GUIDELINES:
-- Create 3-5 modules, each representing a learning theme
-- Each module should have 3-5 emails
-- Each email needs a compelling subject line, educational body, and clear call to action
-- The course should build progressively from foundations to advanced concepts
-- Tailor content to the specific context and audience provided`,
-    sectionLabel: 'Module',
-    elementLabel: 'Email',
-    fields: [
-      { key: 'subject', label: 'Subject Line', type: 'short-text', primary: true },
-      { key: 'body', label: 'Email Body', type: 'long-text', color: 'none', icon: 'Mail' },
-      { key: 'callToAction', label: 'Call to Action', type: 'short-text', color: 'primary', icon: 'ArrowUpRight' },
-      { key: 'keyTakeaway', label: 'Key Takeaway', type: 'short-text', color: 'violet', icon: 'Bookmark' },
-      { key: 'subjectLineVariants', label: 'Subject Line Alternatives', type: 'long-text', color: 'amber', icon: 'Repeat' },
-      { key: 'sendTiming', label: 'Recommended Send Timing', type: 'short-text', color: 'blue', icon: 'CalendarClock' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'prompts',
-    name: 'Prompt Pack',
-    description: 'Curated AI prompt templates for specific roles and tasks',
-    icon: 'Sparkles',
-    prompt: `You are an AI prompt engineering expert.
-
-TASK:
-Create a collection of ready-to-use AI prompts organized by use-case category.
-
-GUIDELINES:
-- Create 4-6 categories of prompts relevant to the given context
-- Each category should have 3-5 specific prompts
-- Each prompt should be a complete, copy-paste-ready template
-- Include context about when to use each prompt and what output to expect
-- Prompts should leverage domain knowledge and terminology from the provided context`,
-    sectionLabel: 'Category',
-    elementLabel: 'Prompt',
-    fields: [
-      { key: 'prompt', label: 'Prompt', type: 'long-text', primary: true },
-      { key: 'context', label: 'When to Use', type: 'long-text', color: 'amber', icon: 'Target' },
-      { key: 'expectedOutput', label: 'Expected Output', type: 'long-text', color: 'emerald', icon: 'CheckCheck' },
-      { key: 'variations', label: 'Prompt Variations', type: 'long-text', color: 'violet', icon: 'Shuffle' },
-      { key: 'tips', label: 'Tips for Better Results', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
-      { key: 'exampleOutput', label: 'Example Output Snippet', type: 'long-text', color: 'emerald', icon: 'FileText' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'battle-cards',
-    name: 'Battle Cards',
-    description: 'Structured analysis cards organized by lens — for competitive intel, impact assessment, or any structured comparison',
-    icon: 'Swords',
-    prompt: `You are a structured analysis and strategic intelligence expert.
-
-TASK:
-Create battle cards organized by analytical lens or theme.
-
-GUIDELINES:
-- Create 4-6 thematic sections (lenses)
-- Each section should have 3-5 analysis cards
-- Each card needs a clear title and structured fields covering strengths, weaknesses, and strategic response
-- Focus on actionable intelligence the reader can use immediately
-- Tailor all analysis to the specific context provided`,
-    sectionLabel: 'Lens',
-    elementLabel: 'Card',
-    fields: [
-      { key: 'title', label: 'Card Title', type: 'short-text', primary: true },
-      { key: 'strengths', label: 'Strengths & Advantages', type: 'long-text', color: 'red', icon: 'ThumbsUp' },
-      { key: 'weaknesses', label: 'Weaknesses & Risks', type: 'long-text', color: 'green', icon: 'ThumbsDown' },
-      { key: 'talkingPoints', label: 'Key Talking Points', type: 'long-text', color: 'primary', icon: 'MessageSquare' },
-      { key: 'objectionHandling', label: 'Objection Handling', type: 'long-text', color: 'amber', icon: 'ShieldQuestion' },
-      { key: 'winStrategy', label: 'Strategic Response', type: 'long-text', color: 'primary', icon: 'Trophy' },
-      { key: 'pricingIntel', label: 'Pricing & Packaging Intel', type: 'long-text', color: 'emerald', icon: 'DollarSign' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: [
-      { name: 'Current Landscape', description: 'The state of play today — key players, dominant approaches, and the baseline the reader operates from' },
-      { name: 'Strengths & Advantages', description: 'What the reader (or their approach) does well — capabilities, differentiators, and leverage points' },
-      { name: 'Weaknesses & Risks', description: 'Vulnerabilities, blind spots, and areas where the reader is exposed or under-performing' },
-      { name: 'Emerging Forces', description: 'New trends, technologies, entrants, or shifts that will reshape the landscape' },
-      { name: 'Strategic Response', description: 'How to respond — positioning, actions, investments, and narrative to stay ahead' },
-    ],
-    isBuiltIn: true,
-  },
-  {
-    id: 'decision-books',
-    name: 'Decision Book',
-    description: 'Structured decision guides organized by domain with options, trade-offs, and decision criteria',
-    icon: 'Scale',
-    prompt: `You are a senior decision strategist and organizational advisor.
-
-TASK:
-Generate key decisions organized by decision domain that must be navigated in the given context.
-
-GUIDELINES:
-- Generate 3-5 decisions per relevant domain
-- Every decision must be specific to the described context, not generic
-- Each decision must include why it matters, what the realistic options and trade-offs are, and what criteria should guide the choice
-- Decisions should surface the hard choices that often go unexamined
-- Tailor decisions to the specific context, constraints, and authority level provided`,
-    sectionLabel: 'Decision Domain',
-    elementLabel: 'Decision',
-    fields: [
-      { key: 'decision', label: 'The Decision', type: 'long-text', primary: true },
-      { key: 'context', label: 'Why This Decision Matters', type: 'long-text', color: 'amber', icon: 'Info' },
-      { key: 'options', label: 'Key Options & Trade-offs', type: 'long-text', color: 'violet', icon: 'GitBranch' },
-      { key: 'criteria', label: 'Decision Criteria', type: 'long-text', color: 'emerald', icon: 'Target' },
-      { key: 'risks', label: 'Risks & Failure Modes', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
-      { key: 'stakeholders', label: 'Key Stakeholders & Impact', type: 'long-text', color: 'blue', icon: 'Users' },
-      { key: 'recommendation', label: 'Recommended Path', type: 'long-text', color: 'primary', icon: 'Compass' },
-    ],
-    supportsDeepDive: true,
-    supportsDeeperQuestions: true,
-    defaultSectionDrivers: DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'dossier',
-    name: 'Dossier',
-    description: 'Comprehensive intelligence briefings organized by research area with findings, implications, and evidence',
-    icon: 'FileSearch',
-    prompt: `You are a senior intelligence analyst and strategic research expert.
-
-TASK:
-Generate a comprehensive dossier organized by intelligence area.
-
-GUIDELINES:
-- Create thorough briefings for each intelligence area relevant to the context
-- Each briefing must include a clear title, summary, key findings, and strategic implications
-- Ground all analysis in evidence and observable signals, not speculation
-- Surface both risks and opportunities with equal rigor
-- Tailor the depth and focus to the specific context provided`,
-    sectionLabel: 'Intelligence Area',
-    elementLabel: 'Briefing',
-    fields: [
-      { key: 'title', label: 'Briefing Title', type: 'short-text', primary: true },
-      { key: 'summary', label: 'Executive Summary', type: 'long-text', color: 'blue', icon: 'FileText' },
-      { key: 'keyFindings', label: 'Key Findings', type: 'long-text', color: 'violet', icon: 'Search' },
-      { key: 'strategicImplications', label: 'Strategic Implications', type: 'long-text', color: 'amber', icon: 'Target' },
-      { key: 'evidence', label: 'Evidence & Sources', type: 'long-text', color: 'emerald', icon: 'BookOpen' },
-      { key: 'riskAssessment', label: 'Risk Assessment', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
-      { key: 'opportunities', label: 'Opportunities', type: 'long-text', color: 'green', icon: 'TrendingUp' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'playbook',
-    name: 'Playbook',
-    description: 'Step-by-step operational execution guides organized by phase with instructions, decision criteria, and tips',
-    icon: 'BookMarked',
-    prompt: `You are a senior operations strategist and execution expert.
-
-TASK:
-Generate a comprehensive playbook organized by execution phase.
-
-GUIDELINES:
-- Create 3-5 actionable plays per phase relevant to the context
-- Each play must include clear objectives, step-by-step instructions, and expected outcomes
-- Include decision criteria for key branching points
-- Surface common pitfalls and practical tips from experienced practitioners
-- Tailor everything to the specific context, constraints, and resources provided`,
-    sectionLabel: 'Phase',
-    elementLabel: 'Play',
-    fields: [
-      { key: 'title', label: 'Play Title', type: 'short-text', primary: true },
-      { key: 'objective', label: 'Objective', type: 'long-text', color: 'blue', icon: 'Target' },
-      { key: 'instructions', label: 'Step-by-Step Instructions', type: 'long-text', color: 'none', icon: 'ListOrdered' },
-      { key: 'decisionCriteria', label: 'Decision Criteria', type: 'long-text', color: 'violet', icon: 'GitBranch' },
-      { key: 'expectedOutcome', label: 'Expected Outcome', type: 'long-text', color: 'emerald', icon: 'CheckCircle' },
-      { key: 'commonPitfalls', label: 'Common Pitfalls', type: 'long-text', color: 'red', icon: 'AlertOctagon' },
-      { key: 'tips', label: 'Pro Tips', type: 'long-text', color: 'amber', icon: 'Lightbulb' },
-      { key: 'timeEstimate', label: 'Time Estimate', type: 'short-text', color: 'blue', icon: 'Clock' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'cheat-sheets',
-    name: 'Cheat Sheet',
-    description: 'Concise quick-reference cards organized by category with definitions, examples, and shortcuts',
-    icon: 'Zap',
-    prompt: `You are an expert educator and knowledge distiller.
-
-TASK:
-Generate a concise, scannable cheat sheet organized by reference category.
-
-GUIDELINES:
-- Create 4-8 entries per category, optimized for at-a-glance use
-- Each entry must be dense and practical — no fluff or filler
-- Include concrete examples and common mistakes for each entry
-- Prioritize the most important, most-referenced information
-- Tailor terminology and examples to the specific context provided`,
-    sectionLabel: 'Category',
-    elementLabel: 'Entry',
-    fields: [
-      { key: 'term', label: 'Term / Concept', type: 'short-text', primary: true },
-      { key: 'definition', label: 'Definition', type: 'long-text', color: 'blue', icon: 'BookOpen' },
-      { key: 'example', label: 'Example / Usage', type: 'long-text', color: 'emerald', icon: 'Code' },
-      { key: 'relatedConcepts', label: 'Related Concepts', type: 'short-text', color: 'violet', icon: 'Link' },
-      { key: 'commonMistakes', label: 'Common Mistakes', type: 'long-text', color: 'red', icon: 'AlertTriangle' },
-      { key: 'quickTip', label: 'Quick Tip', type: 'short-text', color: 'amber', icon: 'Lightbulb' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'agent-book',
-    name: 'Agent Book',
-    description: 'AI agent ideas organized by workflow opportunity — what to build, how it works, and how to get started',
-    icon: 'Bot',
-    prompt: `You are an AI agent strategist who identifies high-impact opportunities to deploy AI agents across workflows.
-
-TASK:
-Generate a catalog of AI agent ideas organized by workflow opportunity area.
-
-GUIDELINES:
-- Generate 3-5 agent ideas per relevant opportunity area
-- Every agent must be specific to the described context, not generic
-- Each agent must include a clear name, description, architecture, and implementation guidance
-- Agents should range from quick-win automations to ambitious multi-step orchestrations
-- Tailor agents to the specific role, industry, and workflow context provided`,
-    sectionLabel: 'Opportunity Area',
-    elementLabel: 'Agent',
-    fields: [
-      { key: 'agentName', label: 'Agent Name', type: 'short-text', primary: true },
-      { key: 'description', label: 'What It Does', type: 'long-text', color: 'blue', icon: 'FileText' },
-      { key: 'howItWorks', label: 'How It Works', type: 'long-text', color: 'none', icon: 'Workflow' },
-      { key: 'keyCapabilities', label: 'Key Capabilities', type: 'long-text', color: 'violet', icon: 'Sparkles' },
-      { key: 'dataAndTools', label: 'Data & Tools Needed', type: 'long-text', color: 'amber', icon: 'Wrench' },
-      { key: 'complexity', label: 'Implementation Complexity', type: 'short-text', color: 'red', icon: 'Gauge' },
-      { key: 'expectedImpact', label: 'Expected Impact', type: 'long-text', color: 'emerald', icon: 'TrendingUp' },
-      { key: 'quickStart', label: 'Quick-Start Hint', type: 'long-text', color: 'primary', icon: 'Rocket' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
-    isBuiltIn: true,
-  },
-  {
-    id: 'ebook',
-    name: 'e-Book',
-    description: 'Long-form guides organized into chapters — comprehensive knowledge products for education, training, and thought leadership',
-    icon: 'BookText',
-    prompt: `You are an expert author and instructional designer who creates compelling, comprehensive guides.
-
-TASK:
-Generate an e-Book organized into chapters, each containing detailed sub-sections with long-form educational content.
-
-GUIDELINES:
-- Create 3-5 substantial sub-sections per chapter
-- Each sub-section must contain rich, long-form prose (400-800 words) — not bullet points or summaries
-- Content should teach, explain, and illustrate — the reader should walk away truly understanding the material
-- Include concrete examples, scenarios, and practical illustrations throughout
-- Build progressively within each chapter from context-setting to actionable knowledge
-- Tailor depth, terminology, and examples to the specific audience and context provided`,
-    sectionLabel: 'Chapter',
-    elementLabel: 'Section',
-    fields: [
-      { key: 'title', label: 'Section Title', type: 'short-text', primary: true },
-      { key: 'content', label: 'Content', type: 'long-text', color: 'none', icon: 'FileText' },
-      { key: 'keyInsight', label: 'Key Insight', type: 'long-text', color: 'violet', icon: 'Lightbulb' },
-      { key: 'practicalExample', label: 'Practical Example', type: 'long-text', color: 'emerald', icon: 'FlaskConical' },
-      { key: 'actionItem', label: 'Reader Action Item', type: 'long-text', color: 'primary', icon: 'ListChecks' },
-    ],
-    supportsDeepDive: true,
-    defaultSectionDrivers: EBOOK_CHAPTERS.map((c) => ({ name: c.name, description: c.description })),
-    isBuiltIn: true,
-  },
-]
 
 // ============================================================
 // Storage with auto-seeding
@@ -401,7 +53,8 @@ GUIDELINES:
 // existing users get the updated defaults.
 // ============================================================
 
-const SEED_VERSION = 4
+const STORAGE_KEY = 'queb-output-type-library'
+const SEED_VERSION = 5
 const VERSION_KEY = STORAGE_KEY + '-version'
 
 function ensureSeeded(): OutputTypeDefinition[] {
@@ -493,195 +146,49 @@ export function getPrimaryField(ot: OutputTypeDefinition): OutputTypeField {
 }
 
 // ============================================================
-// Default instruction directives per built-in output type.
-// Each directive is a discrete, editable rule the AI follows.
+// Helpers — resolve defaults from definitions or built-in maps
 // ============================================================
-
-const BUILTIN_INSTRUCTION_DIRECTIVES: Record<string, InstructionDirective[]> = {
-  questions: [
-    { label: 'Role', content: 'You are an expert thinking coach and organizational consultant.' },
-    { label: 'Task', content: 'Generate 3-5 thoughtful, probing questions from this perspective.' },
-    { label: 'Relevance filter', content: 'Only generate questions if this perspective is genuinely relevant to the given context. If not relevant, return an empty questions array.' },
-    { label: 'Specificity', content: 'Every question must be specific to the described context, not generic.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make questions sharper and more actionable.' },
-    { label: 'Relevance notes', content: 'Each question must come with a relevance note explaining why this question matters for this specific context and what kind of insight it can unlock.' },
-    { label: 'Actionable info prompts', content: 'Each question must include an infoPrompt: a practical guidance note telling the user exactly what data sources, documents, people, metrics, tools, or analysis methods they should consult to answer the question well. Be highly specific (e.g., "Review your Q3 customer churn report and compare against industry benchmarks from Gartner" rather than "Look at your data").' },
-    { label: 'Action steps', content: 'Each question should include actionSteps: once the answer is known, what concrete actions should be taken. Bridge the gap between insight and action.' },
-    { label: 'Red flags', content: 'Each question should include redFlags: warning signs or problematic answers to watch for. What danger signals indicate a serious risk?' },
-    { label: 'Key metrics', content: 'Each question should include keyMetrics: specific KPIs, benchmarks, or numbers the user should reference when answering.' },
-    { label: 'Deep thinking', content: 'Questions should provoke deep thinking and help uncover blind spots.' },
-    { label: 'Tailoring', content: 'Tailor questions to the specific context fields provided.' },
-  ],
-  checklist: [
-    { label: 'Role', content: 'You are an expert process consultant and operations advisor.' },
-    { label: 'Task', content: 'Generate a thorough checklist for this dimension.' },
-    { label: 'Item count', content: 'Generate 4-8 specific, actionable checklist items relevant to the given context.' },
-    { label: 'Relevance filter', content: 'Only include items if this dimension is genuinely relevant. If not relevant, return an empty items array.' },
-    { label: 'Concreteness', content: 'Each item must be concrete and verifiable — not vague guidance.' },
-    { label: 'Priority levels', content: 'Assign priority: High (must-do, blocking), Medium (should-do, important), Low (nice-to-have, optimization).' },
-    { label: 'Descriptions', content: 'The description should explain WHY this matters and HOW to execute it well.' },
-    { label: 'Common mistakes', content: 'Each item should include commonMistakes: what people typically get wrong on this item, shortcuts that backfire, or pitfalls to avoid.' },
-    { label: 'Pro tips', content: 'Each item should include tips: practical advice from experienced practitioners on how to do this faster, better, or more reliably.' },
-    { label: 'Verification', content: 'Each item should include verificationMethod: what constitutes "done" — what artifact, test, or approval proves completion.' },
-    { label: 'Tailoring', content: 'Tailor everything to the specific context provided.' },
-  ],
-  'email-course': [
-    { label: 'Role', content: 'You are an expert email course creator and instructional designer.' },
-    { label: 'Task', content: 'Generate 2-4 emails for this module of an email course.' },
-    { label: 'Self-contained', content: 'Each email should be self-contained but build on the overall module theme.' },
-    { label: 'Subject lines', content: 'Subject lines must be compelling and specific — avoid generic titles.' },
-    { label: 'Email body length', content: 'Email bodies should be 150-300 words: educational, conversational, and packed with actionable insight.' },
-    { label: 'Examples', content: 'Include specific examples, frameworks, or tips relevant to the provided context.' },
-    { label: 'Call to action', content: 'Each email must end with a clear, specific call to action.' },
-    { label: 'Key takeaway', content: 'Each email should include keyTakeaway: the single most important lesson — a TL;DR the reader can remember.' },
-    { label: 'Subject alternatives', content: 'Each email should include subjectLineVariants: 2-3 alternative subject lines with different angles (curiosity, urgency, benefit-driven).' },
-    { label: 'Send timing', content: 'Each email should include sendTiming: when in the sequence this email should go out (e.g., "Day 3" or "2 days after previous").' },
-    { label: 'Tone', content: 'Write as an expert peer, not a lecturer.' },
-    { label: 'Minimum output', content: 'If this module is not very relevant to the context, still include at least 1 email.' },
-  ],
-  prompts: [
-    { label: 'Role', content: 'You are an expert AI prompt engineer who creates highly effective prompt templates.' },
-    { label: 'Task', content: 'Generate 3-5 ready-to-use AI prompt templates for this use case.' },
-    { label: 'Copy-paste ready', content: 'Each prompt must be complete and copy-paste ready — a user should be able to use it immediately.' },
-    { label: 'Placeholders', content: 'Include [bracketed placeholders] where the user needs to fill in specifics.' },
-    { label: 'Domain knowledge', content: 'Prompts should leverage domain knowledge and terminology relevant to the provided context.' },
-    { label: 'Context field', content: 'The "context" field should describe the specific trigger or situation when this prompt is most useful.' },
-    { label: 'Expected output', content: 'The "expectedOutput" should set realistic expectations for what the AI will produce.' },
-    { label: 'Variations', content: 'Each prompt should include variations: 2-3 alternative versions for different scenarios (quick vs. deep, formal vs. casual).' },
-    { label: 'Tips', content: 'Each prompt should include tips: practical advice for getting better results (e.g., "Add your company name for specificity").' },
-    { label: 'Example output', content: 'Each prompt should include exampleOutput: a short sample of what good output looks like to set expectations.' },
-    { label: 'Complexity range', content: 'Vary the complexity — include both quick tactical prompts and deeper strategic ones.' },
-    { label: 'Minimum output', content: 'If this use case is not very relevant, still include at least 1 prompt.' },
-  ],
-  'battle-cards': [
-    { label: 'Role', content: 'You are a structured analysis and strategic intelligence expert.' },
-    { label: 'Task', content: 'Generate 3-5 battle cards for this analytical lens.' },
-    { label: 'Relevance filter', content: 'Only generate cards if this lens is genuinely relevant to the given context. If not relevant, return an empty cards array.' },
-    { label: 'Strengths', content: 'Identify real strengths and advantages — be specific about what works well, why, and what leverage it provides.' },
-    { label: 'Weaknesses', content: 'Identify real weaknesses, risks, and vulnerabilities — backed by evidence, patterns, or structural limitations. No straw-man arguments.' },
-    { label: 'Talking points', content: 'Key talking points must be specific, conversational, and immediately usable — not generic marketing copy.' },
-    { label: 'Objection handling', content: 'Each card should include objectionHandling: anticipated pushback or objections with concrete responses. Format as "When they say X, you say Y." Empty string if not applicable.' },
-    { label: 'Strategic response', content: 'Each card should include winStrategy: given the strengths and weaknesses, what is the strategic game plan or recommended response?' },
-    { label: 'Pricing intel', content: 'Each card should include pricingIntel: relevant pricing, cost, or resource implications. Empty string if not applicable.' },
-    { label: 'Tailoring', content: 'Tailor all analysis to the specific context provided.' },
-  ],
-  'decision-books': [
-    { label: 'Role', content: 'You are a senior decision strategist and organizational advisor who helps leaders navigate complex choices.' },
-    { label: 'Task', content: 'Generate 3-5 key decisions that must be made within this decision domain.' },
-    { label: 'Relevance filter', content: 'Only generate decisions if this domain is genuinely relevant to the given context. If not relevant, return an empty elements array.' },
-    { label: 'Specificity', content: 'Every decision must be specific to the described context — not a generic management question.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make decisions sharper and more grounded in the real situation.' },
-    { label: 'Stakes', content: 'The "context" field must explain what is at stake — why this decision matters now, what happens if it is delayed or made poorly, and who is affected.' },
-    { label: 'Options & trade-offs', content: 'The "options" field must present realistic alternatives (at least 2-3), including the status quo, with honest trade-offs for each. Avoid false dichotomies.' },
-    { label: 'Decision criteria', content: 'The "criteria" field must specify what factors should guide the choice — cost, speed, risk tolerance, strategic alignment, stakeholder impact, reversibility, etc. Be specific to this decision.' },
-    { label: 'Risks', content: 'Each decision should include risks: what goes wrong if you choose poorly — worst-case scenarios and failure modes to anticipate.' },
-    { label: 'Stakeholders', content: 'Each decision should include stakeholders: who is affected, who needs to be consulted, and who has veto power.' },
-    { label: 'Recommendation', content: 'Each decision should include recommendation: a synthesized recommended path given the options and criteria, as a reasoned starting point.' },
-    { label: 'Hard choices', content: 'Surface decisions that are genuinely difficult — where reasonable people could disagree, where trade-offs are real, and where the "right" answer depends on priorities and constraints.' },
-    { label: 'Tailoring', content: 'Tailor decisions to the specific role, their authority level, and organizational context.' },
-  ],
-  dossier: [
-    { label: 'Role', content: 'You are a senior intelligence analyst and strategic research expert who produces rigorous, evidence-based briefings.' },
-    { label: 'Task', content: 'Generate 3-5 intelligence briefings for this research area.' },
-    { label: 'Relevance filter', content: 'Only generate briefings if this intelligence area is genuinely relevant to the given context. If not relevant, return an empty briefings array.' },
-    { label: 'Specificity', content: 'Every briefing must be specific to the described context — not a generic industry overview.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make the intelligence sharper and more actionable.' },
-    { label: 'Executive summary', content: 'The "summary" field must provide a concise executive summary — the key takeaway a busy decision-maker needs in 2-3 sentences.' },
-    { label: 'Key findings', content: 'The "keyFindings" field must present specific, concrete findings backed by observable signals, data points, or patterns — not vague generalizations.' },
-    { label: 'Strategic implications', content: 'The "strategicImplications" field must explain what these findings mean for the reader — how should they change their thinking, strategy, or actions?' },
-    { label: 'Evidence', content: 'The "evidence" field must cite the types of evidence, data sources, reports, or observable signals that support the findings. Be specific about what to look for.' },
-    { label: 'Risk assessment', content: 'Each briefing should include riskAssessment: what threats or vulnerabilities does this area reveal? What could go wrong and what is the likelihood?' },
-    { label: 'Opportunities', content: 'Each briefing should include opportunities: what openings, advantages, or leverage points does this intelligence reveal?' },
-    { label: 'Analytical rigor', content: 'Maintain analytical rigor — distinguish between confirmed facts, strong indicators, and speculative assessments. Flag confidence levels where appropriate.' },
-    { label: 'Tailoring', content: 'Tailor the intelligence to the specific context, industry, and decision-making needs provided.' },
-  ],
-  playbook: [
-    { label: 'Role', content: 'You are a senior operations strategist and execution expert who creates practical, field-tested playbooks.' },
-    { label: 'Task', content: 'Generate 3-5 actionable plays for this execution phase.' },
-    { label: 'Relevance filter', content: 'Only generate plays if this phase is genuinely relevant to the given context. If not relevant, return an empty plays array.' },
-    { label: 'Specificity', content: 'Every play must be specific to the described context — not generic process advice.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make plays more practical and grounded.' },
-    { label: 'Objective', content: 'The "objective" field must clearly state what this play accomplishes — the specific outcome or deliverable expected upon completion.' },
-    { label: 'Instructions', content: 'The "instructions" field must provide concrete, step-by-step guidance that someone could follow without additional research. Number the steps. Be specific about tools, methods, and sequences.' },
-    { label: 'Decision criteria', content: 'The "decisionCriteria" field must describe the key decision points within this play — when to proceed, when to pivot, and what signals to watch for. Use "If X, then Y" format where applicable.' },
-    { label: 'Expected outcome', content: 'The "expectedOutcome" field must describe what success looks like — the tangible deliverable, state, or result when this play is executed well.' },
-    { label: 'Common pitfalls', content: 'Each play should include commonPitfalls: the most frequent mistakes, shortcuts that backfire, and traps that derail execution.' },
-    { label: 'Pro tips', content: 'Each play should include tips: practical advice from experienced practitioners — insider knowledge that accelerates execution or improves quality.' },
-    { label: 'Time estimate', content: 'Each play should include timeEstimate: a realistic time range for completion (e.g., "2-4 hours", "1-2 weeks") accounting for the given context.' },
-    { label: 'Tailoring', content: 'Tailor plays to the specific context, team size, resources, and constraints provided.' },
-  ],
-  'cheat-sheets': [
-    { label: 'Role', content: 'You are an expert educator and knowledge distiller who creates scannable, high-density reference materials.' },
-    { label: 'Task', content: 'Generate 4-8 quick-reference entries for this category.' },
-    { label: 'Relevance filter', content: 'Only generate entries if this category is genuinely relevant to the given context. If not relevant, return an empty entries array.' },
-    { label: 'Density', content: 'Every entry must be concise and information-dense — optimize for scannability, not completeness. This is a cheat sheet, not a textbook.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make entries specific and immediately useful.' },
-    { label: 'Definition', content: 'The "definition" field must provide a clear, jargon-free explanation in 1-3 sentences. Lead with the most important information.' },
-    { label: 'Example', content: 'The "example" field must include a concrete, practical example showing the concept in action within the given context. Show, don\'t just tell.' },
-    { label: 'Related concepts', content: 'The "relatedConcepts" field should list 2-4 closely related terms or concepts — helping the reader build a mental map of the domain.' },
-    { label: 'Common mistakes', content: 'Each entry should include commonMistakes: the most frequent misunderstandings, misapplications, or errors people make with this concept.' },
-    { label: 'Quick tip', content: 'Each entry should include quickTip: a single, memorable piece of practical advice — the one thing an expert would tell a colleague in passing.' },
-    { label: 'Prioritization', content: 'Prioritize entries by how frequently they are referenced in practice — the most-used terms and concepts should come first.' },
-    { label: 'Tailoring', content: 'Tailor all entries to the specific context, industry terminology, and audience level provided.' },
-  ],
-  'agent-book': [
-    { label: 'Role', content: 'You are an AI agent strategist who identifies high-impact opportunities to deploy AI agents across workflows.' },
-    { label: 'Task', content: 'Generate 3-5 AI agent ideas for this opportunity area.' },
-    { label: 'Relevance filter', content: 'Only generate agents if this opportunity area is genuinely relevant to the given context. If not relevant, return an empty agents array.' },
-    { label: 'Specificity', content: 'Every agent must be specific to the described context — not a generic AI tool suggestion.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make agent recommendations sharper and more grounded in the real workflow.' },
-    { label: 'Agent naming', content: 'Agent names should be memorable and descriptive (e.g., "Lead Research Autopilot", "Deal Risk Scanner") — not generic labels like "Email Agent".' },
-    { label: 'How it works', content: 'The "howItWorks" field must describe the agent architecture: what triggers it, what data it consumes, what steps it takes, what tools it calls, and what output it produces.' },
-    { label: 'Key capabilities', content: 'The "keyCapabilities" field must list the specific tasks this agent automates or augments, and what manual work it replaces.' },
-    { label: 'Data & tools', content: 'The "dataAndTools" field must be specific about integrations, APIs, data sources, and platforms the agent needs — not vague references to "your CRM".' },
-    { label: 'Complexity rating', content: 'The "complexity" field must rate as Low (off-the-shelf or simple API chain), Medium (custom logic, some integration work), or High (significant engineering, custom models, or complex orchestration) — with a brief justification.' },
-    { label: 'Expected impact', content: 'The "expectedImpact" field should quantify the benefit where possible — hours saved per week, error reduction percentage, revenue impact, or speed improvement.' },
-    { label: 'Quick start', content: 'The "quickStart" field must be a concrete, actionable first step — not "think about it" but "sign up for X and connect Y".' },
-    { label: 'Complexity range', content: 'Vary the complexity across agents — include both quick-win automations and more ambitious multi-step orchestrations.' },
-    { label: 'Tailoring', content: 'Tailor all agent recommendations to the specific role, industry, workflow, and constraints provided.' },
-  ],
-  ebook: [
-    { label: 'Role', content: 'You are an expert author and instructional designer who creates compelling, comprehensive guides that educate professionals.' },
-    { label: 'Task', content: 'Generate 3-5 substantial sub-sections for this chapter of the e-Book.' },
-    { label: 'Relevance filter', content: 'Only generate sub-sections if this chapter theme is genuinely relevant to the given context. If not relevant, return an empty sections array.' },
-    { label: 'Specificity', content: 'Every sub-section must be specific to the described context — not generic filler content.' },
-    { label: 'Context integration', content: 'Actively incorporate all context provided to make the content sharper, more relevant, and more actionable for the target audience.' },
-    { label: 'Long-form prose', content: 'The "content" field is the heart of the book. Write 400-800 words of rich, flowing prose per sub-section — teach, explain, and illustrate. This is a book, not a cheat sheet. Use paragraphs, transitions, and narrative structure.' },
-    { label: 'Key insight', content: 'The "keyInsight" field should distill the single most important takeaway from this sub-section — the idea the reader should remember even if they forget everything else.' },
-    { label: 'Practical examples', content: 'The "practicalExample" field must include a concrete, detailed example or scenario that makes the abstract tangible. Use realistic names, numbers, and situations relevant to the reader\'s context.' },
-    { label: 'Action items', content: 'The "actionItem" field should give the reader something specific to do after reading this sub-section — a task, exercise, or reflection that helps them apply the knowledge immediately.' },
-    { label: 'Progressive depth', content: 'Within each chapter, sub-sections should build on each other — start with context-setting, move to core material, and end with application or synthesis.' },
-    { label: 'Tone', content: 'Write as an authoritative but approachable expert — like a trusted mentor sharing hard-won knowledge. Avoid academic dryness and marketing fluff.' },
-    { label: 'Tailoring', content: 'Tailor all content to the specific audience, their knowledge level, their industry context, and their daily challenges.' },
-  ],
-}
 
 /** Returns default instruction directives for an output type, from definition or built-in fallback */
 export function getDefaultInstructionDirectives(ot: OutputTypeDefinition): InstructionDirective[] {
   return ot.defaultInstructionDirectives ?? BUILTIN_INSTRUCTION_DIRECTIVES[ot.id] ?? []
 }
 
-const BUILTIN_SECTION_DRIVERS: Record<string, SectionDriver[]> = {
-  questions: BUSINESS_PERSPECTIVES.map((p) => ({ name: p.name, description: p.description })),
-  checklist: CHECKLIST_DIMENSIONS.map((d) => ({ name: d.name, description: d.description })),
-  'email-course': EMAIL_COURSE_STAGES.map((s) => ({ name: s.name, description: s.description })),
-  prompts: PROMPT_USE_CASES.map((u) => ({ name: u.name, description: u.description })),
-  'battle-cards': [
-    { name: 'Current Landscape', description: 'The state of play today — key players, dominant approaches, and the baseline the reader operates from' },
-    { name: 'Strengths & Advantages', description: 'What the reader (or their approach) does well — capabilities, differentiators, and leverage points' },
-    { name: 'Weaknesses & Risks', description: 'Vulnerabilities, blind spots, and areas where the reader is exposed or under-performing' },
-    { name: 'Emerging Forces', description: 'New trends, technologies, entrants, or shifts that will reshape the landscape' },
-    { name: 'Strategic Response', description: 'How to respond — positioning, actions, investments, and narrative to stay ahead' },
-  ],
-  'decision-books': DECISION_DOMAINS.map((d) => ({ name: d.name, description: d.description })),
-  dossier: DOSSIER_SECTIONS.map((s) => ({ name: s.name, description: s.description })),
-  playbook: PLAYBOOK_PHASES.map((p) => ({ name: p.name, description: p.description })),
-  'cheat-sheets': CHEAT_SHEET_CATEGORIES.map((c) => ({ name: c.name, description: c.description })),
-  'agent-book': AGENT_OPPORTUNITY_AREAS.map((a) => ({ name: a.name, description: a.description })),
-  ebook: EBOOK_CHAPTERS.map((c) => ({ name: c.name, description: c.description })),
-}
-
 /** Returns default section drivers for an output type, from definition or built-in fallback */
 export function getDefaultSectionDrivers(ot: OutputTypeDefinition): SectionDriver[] {
   return ot.defaultSectionDrivers ?? BUILTIN_SECTION_DRIVERS[ot.id] ?? []
+}
+
+// ============================================================
+// Prompt metadata — resolves PromptAssemblyOptions for an
+// output type from its definition or the built-in lookup.
+// ============================================================
+
+/**
+ * Returns PromptAssemblyOptions for an output type.
+ * Checks the definition's own fields first, then falls back
+ * to the built-in metadata map, then returns a minimal default.
+ */
+export function getPromptAssemblyOptions(ot: OutputTypeDefinition): PromptAssemblyOptions {
+  const hasOwn = ot.preamble || ot.generationProcess || ot.qualityBar || ot.antiPatterns
+
+  if (hasOwn) {
+    return {
+      preamble: ot.preamble,
+      generationProcess: ot.generationProcess,
+      qualityBar: ot.qualityBar,
+      antiPatterns: ot.antiPatterns,
+      elementLabel: ot.elementLabel,
+    }
+  }
+
+  return BUILTIN_PROMPT_METADATA[ot.id] ?? { elementLabel: ot.elementLabel }
+}
+
+/**
+ * Convenience version that takes just an ID and element label.
+ * Used by API routes that don't have the full definition loaded.
+ */
+export function getPromptAssemblyOptionsById(outputTypeId: string, elementLabel: string): PromptAssemblyOptions {
+  return BUILTIN_PROMPT_METADATA[outputTypeId] ?? { elementLabel }
 }

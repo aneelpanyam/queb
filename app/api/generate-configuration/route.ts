@@ -50,8 +50,8 @@ const configSchema = z.object({
       ),
       instructionDirectives: z.array(
         z.object({
-          label: z.string().describe('Short label (e.g. "Role", "Task", "Tone")'),
-          content: z.string().describe('The instruction content for the AI'),
+          label: z.string().describe('Directive category label. MUST include "Role", "Task", "Process", and "Verification". Additional labels: "Tone", "Format", "Depth", "Field Guidance", etc.'),
+          content: z.string().describe('The full instruction content. For Role: include specific credibility markers. For Task: include a quality clause. For Process: describe how to reason through the context. For Verification: describe a self-check. For field guidance: include Good/Bad examples.'),
         })
       ),
       fields: z.array(elementFieldSchema)
@@ -148,12 +148,21 @@ Section drivers (4-8 entries):
   - The first field in each driver should be the primary/title field (set primary: true).
   - Reuse the same key across drivers when the concept is truly the same, but don't force-fit — use distinct keys when the angle demands different detail sections.
 
-Instruction directives (4-8 entries):
-- Tell the AI exactly how to generate content for this topic. Typically include:
-  - A "Role" directive: who the AI should act as (domain expert persona)
-  - A "Task" directive: what to generate and to what standard
-  - Directives for tone, specificity, depth, format, constraints, etc.
-  - Directives describing what each element field should contain
+Instruction directives (6-10 entries):
+- These are the MOST IMPORTANT part — they directly control how the AI generates content.
+- Required directive categories (include ALL of these):
+  1. "Role" — A specific expert persona with credibility markers. Not just "expert" but "senior practitioner who has [concrete achievement relevant to the topic]".
+     Example: { label: "Role", content: "You are a cybersecurity strategist who has designed zero-trust architectures for 50+ enterprise deployments across regulated industries including healthcare and financial services." }
+  2. "Task" — What to generate and to what quality bar. Always include a quality clause that anchors expectations.
+     Example: { label: "Task", content: "Generate 3-5 actionable security controls that a CISO would implement this quarter — not textbook theory they already know." }
+  3. "Process" — HOW the AI should reason before generating. Forces deeper thinking and context-grounding.
+     Example: { label: "Process", content: "Before generating, identify the 2-3 context constraints that most affect what controls are practical (e.g., team size, budget, regulatory requirements). Then for this focus area, find angles that go beyond standard compliance checklists." }
+  4. "Verification" — A self-check the AI runs before finalizing output. Catches generic or shallow content.
+     Example: { label: "Verification", content: "Before finalizing, re-read each control and ask: would this recommendation change if the organization were in a different industry or had a different team size? If not, rewrite it with more context-specific detail." }
+- Additional directives for tone, depth, format, or domain-specific constraints.
+- For critical fields (the ones most likely to be generic), add a directive with concrete Good/Bad examples:
+  Example: { label: "Content Depth", content: "The 'implementation' field must contain step-by-step guidance with named tools and realistic timelines. Good: 'Deploy CrowdStrike Falcon on all endpoints in weeks 1-2, configure EDR policies for the manufacturing OT network in week 3, run a purple-team exercise in week 4.' Bad: 'Implement endpoint protection across the organization using appropriate tools.'" }
+  This dramatically improves output quality by anchoring the specificity bar.
 
 Default element fields (3-7 per output):
 - Define fallback detail sections used when a driver doesn't specify its own fields.
