@@ -1,9 +1,65 @@
 'use client'
 
+import { useState } from 'react'
 import type { SetupConfiguration } from '@/lib/setup-config-types'
 import type { OutputTypeDefinition } from '@/lib/output-type-library'
+import { FRAMEWORK_DEFINITIONS } from '@/lib/idea-types'
 import { Button } from '@/components/ui/button'
-import { Check, Copy, Pencil as PencilSmall, Trash2, Play } from 'lucide-react'
+import { Check, Copy, Pencil as PencilSmall, Trash2, Play, Sparkles, ChevronDown } from 'lucide-react'
+
+function GenerationInputsSection({ config, allOutputTypes }: { config: SetupConfiguration; allOutputTypes: OutputTypeDefinition[] }) {
+  const [open, setOpen] = useState(false)
+  const gi = config.generationInputs
+  if (!gi) return null
+
+  const fwDef = FRAMEWORK_DEFINITIONS.find((f) => f.id === gi.framework)
+  const fwName = fwDef?.name || gi.framework
+
+  const filledFields = fwDef?.fields
+    .map((f) => ({ label: f.label, value: gi.frameworkData[f.key]?.trim() }))
+    .filter((f) => f.value)
+    ?? Object.entries(gi.frameworkData)
+      .filter(([, v]) => v?.trim())
+      .map(([k, v]) => ({ label: k, value: v }))
+
+  const outputTypeNames = gi.suggestedOutputTypes
+    ?.map((id) => allOutputTypes.find((ot) => ot.id === id)?.name || id)
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Sparkles className="h-3 w-3" />
+        <span>AI generated from {fwName}</span>
+        <ChevronDown className={`ml-auto h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2 text-xs">
+          {filledFields.map((f) => (
+            <div key={f.label}>
+              <span className="font-medium text-muted-foreground">{f.label}:</span>{' '}
+              <span className="text-foreground/80">{f.value}</span>
+            </div>
+          ))}
+          {gi.notes && (
+            <div>
+              <span className="font-medium text-muted-foreground">Notes:</span>{' '}
+              <span className="text-foreground/80">{gi.notes}</span>
+            </div>
+          )}
+          {outputTypeNames && outputTypeNames.length > 0 && (
+            <div>
+              <span className="font-medium text-muted-foreground">Suggested outputs:</span>{' '}
+              <span className="text-foreground/80">{outputTypeNames.join(', ')}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ConfigurationsListProps {
   configs: SetupConfiguration[]
@@ -58,6 +114,7 @@ export function ConfigurationsList({
                     </span>
                   ))}
                 </div>
+                <GenerationInputsSection config={config} allOutputTypes={allOutputTypes} />
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button variant="default" size="sm" onClick={() => onRun(config.id)} className="h-8 gap-1.5 text-xs" title="Run">
