@@ -19,26 +19,35 @@ export const BUILTIN_PROMPT_METADATA: Record<string, PromptAssemblyOptions> = {
   questions: {
     elementLabel: 'question',
     preamble:
-      'You are generating a Question Book — a strategic thinking tool that helps professionals uncover blind spots, challenge assumptions, and discover the questions they should be asking but are not. Each question should change how the reader thinks about their situation.',
+      'You are generating a Question Book — a Thinking Companion that helps someone explore a topic deeply through multiple lenses. The purpose is to uncover blind spots, challenge assumptions, and reveal the questions a thoughtful person should be asking but often is not. Each question should help the reader see the topic differently and think more rigorously about it.',
     generationProcess: [
-      '1. ANALYZE — Read every context field. Identify the reader\'s role, domain, and constraints. Determine what assumptions someone in this position likely holds unchallenged.',
-      '2. SCOPE — For this perspective, identify 3-5 angles that go beyond surface-level inquiry. Prioritize questions that expose hidden dependencies, second-order effects, or uncomfortable trade-offs the reader has not confronted.',
-      '3. DRAFT — Write each question as a single, precise inquiry. Avoid compound questions (no "and/or"). Each supporting field must add independent value — the relevance note explains WHY, the infoPrompt explains WHERE to look, the actionSteps explain WHAT to do next.',
-      '4. VERIFY — For each question, apply this test: "If I asked a senior practitioner in this exact context this question, would they pause and think — or would they have an instant answer?" If the answer is instant, the question is too shallow. Replace it.',
+      '1. CONTEXT ANALYSIS — Read every context field carefully. Identify the topic, environment, stakeholders, constraints, and implied goals. Infer what someone engaging with this topic likely assumes or overlooks.',
+      '2. SYSTEM MAPPING — Identify the important forces shaping this topic: actors, incentives, dependencies, risks, trade-offs, time horizons, and uncertainties. Determine what makes this situation complex.',
+      '3. LENS INTERPRETATION — For the given perspective, determine how the topic should be examined through that lens. Clarify what becomes visible from this angle that may be invisible from others.',     
+      '4. INSIGHT TARGETING — Identify 3–5 angles that go beyond surface-level inquiry. Prioritize questions that expose hidden dependencies, second-order effects, competing incentives, or uncomfortable trade-offs.',
+      '5. DRAFT — Write each question as a single, precise inquiry. Avoid compound questions. Each supporting field must add independent value: the relevance explains WHY the question matters, the infoPrompt explains WHERE to look for evidence, and the actionSteps explain WHAT to do next.',
+      '6. DEPTH TEST — Ask: "Would someone seriously engaged with this topic need to stop and think before answering?" If the answer is immediate, the question is too shallow. Replace it.',
+      '7. LENS DISTINCTIVENESS TEST — Ask: "Could this question belong equally under another perspective?" If yes, it is too generic. Strengthen the lens specificity.',
     ].join('\n'),
+  
     qualityBar: [
-      'Pause test — Would a senior practitioner in this exact role need to stop and think before answering? If the answer is obvious, the question is too shallow.',
-      'Specificity — Does the question reference concepts, constraints, or dynamics specific to the provided context? A question that works equally well for any industry or role is too generic.',
-      'Independence — Does each supporting field (relevance, infoPrompt, actionSteps, redFlags, keyMetrics) provide distinct, non-overlapping value? No field should restate another in different words.',
-      'Actionable infoPrompt — Does the infoPrompt name specific data sources, reports, tools, or people to consult? "Look at your data" is a failure; "Pull your Q3 pipeline report from Salesforce and compare close rates by segment" is the standard.',
+      'Depth — A thoughtful reader would need reflection, analysis, or investigation to answer.',
+      'Lens Clarity — The question clearly reflects the assigned perspective and would not fit equally well elsewhere.',
+      'Specificity — The question references dynamics relevant to the provided context. Questions that work for any topic are failures.',
+      'Insight Potential — The question has the potential to change how the reader understands the situation.',
+      'Independence — Supporting fields (relevance, infoPrompt, actionSteps, redFlags, keyMetrics) provide distinct value without repetition.',
+      'Actionable infoPrompt — Names specific sources, data, tools, or stakeholders to consult.',
+      'Lens Coverage — Across the full Question Book, ensure that different perspectives illuminate meaningfully different aspects of the topic. Avoid repeating the same underlying question with different wording.',
     ],
+  
     antiPatterns: [
-      'Yes/no questions — every question must require analysis, judgment, or investigation to answer properly.',
-      'Generic management consulting questions ("How aligned is your strategy?" "What are your key risks?") — these could apply to anyone. Ground every question in the specific context.',
-      'Compound questions joined by "and" or "or" — split them. Each question must have exactly one focus.',
-      'Restating context as a question — "Given that you work in X, how do you handle X?" adds no value. The question must push beyond what the context already states.',
-      'Vague infoPrompts like "consult relevant stakeholders" or "review your metrics" — always name the specific stakeholder role, metric, or data source.',
-    ],
+      'Yes/no questions — every question must require reasoning or investigation.',
+      'Generic questions ("What are the challenges?" "What are the opportunities?") that apply universally.',
+      'Compound questions joined by "and" or "or". Each question must have one focus.',
+      'Restating the topic as a question.',
+      'Questions disconnected from implications, decisions, or consequences.',
+      'Vague infoPrompts such as "look at your data" or "consult stakeholders". Always specify.',
+    ]
   },
 
   // ──────────────────────────────────────────────
