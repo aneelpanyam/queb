@@ -123,33 +123,86 @@ export function SectionDriversEditor({
                 {driver.fields && driver.fields.length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     {driver.fields.map((field, fIdx) => (
-                      <div key={fIdx} className="flex items-center gap-1.5">
-                        <input
-                          value={field.key}
-                          onChange={(e) => onUpdateField(otId, idx, fIdx, { key: e.target.value.replace(/\s/g, '') })}
-                          placeholder="key"
-                          className="w-16 border-none bg-transparent px-0 text-[10px] font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
-                        />
-                        <input
-                          value={field.label}
-                          onChange={(e) => onUpdateField(otId, idx, fIdx, { label: e.target.value })}
-                          placeholder="Label"
-                          className="min-w-0 flex-1 border-none bg-transparent px-0 text-[10px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
-                        />
-                        <select
-                          value={field.type}
-                          onChange={(e) => onUpdateField(otId, idx, fIdx, { type: e.target.value as 'short-text' | 'long-text' })}
-                          className="h-4 rounded border border-border bg-background px-0.5 text-[8px]"
-                        >
-                          <option value="short-text">Short</option>
-                          <option value="long-text">Long</option>
-                        </select>
-                        <button
-                          onClick={() => onRemoveField(otId, idx, fIdx)}
-                          className="rounded p-0.5 text-muted-foreground/30 hover:text-destructive"
-                        >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
+                      <div key={fIdx}>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            value={field.key}
+                            onChange={(e) => onUpdateField(otId, idx, fIdx, { key: e.target.value.replace(/\s/g, '') })}
+                            placeholder="key"
+                            className="w-16 border-none bg-transparent px-0 text-[10px] font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                          />
+                          <input
+                            value={field.label}
+                            onChange={(e) => onUpdateField(otId, idx, fIdx, { label: e.target.value })}
+                            placeholder="Label"
+                            className="min-w-0 flex-1 border-none bg-transparent px-0 text-[10px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                          />
+                          <select
+                            value={field.type}
+                            onChange={(e) => {
+                              const newType = e.target.value as OutputTypeField['type']
+                              const updates: Partial<OutputTypeField> = { type: newType }
+                              if (newType === 'table' && !field.columns?.length) {
+                                updates.columns = [{ key: 'col1', label: 'Column 1' }, { key: 'col2', label: 'Column 2' }]
+                              }
+                              if (newType !== 'table') updates.columns = undefined
+                              onUpdateField(otId, idx, fIdx, updates)
+                            }}
+                            className="h-4 rounded border border-border bg-background px-0.5 text-[8px]"
+                          >
+                            <option value="short-text">Short</option>
+                            <option value="long-text">Long</option>
+                            <option value="table">Table</option>
+                          </select>
+                          <button
+                            onClick={() => onRemoveField(otId, idx, fIdx)}
+                            className="rounded p-0.5 text-muted-foreground/30 hover:text-destructive"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                        {field.type === 'table' && (
+                          <div className="ml-4 mt-0.5 space-y-0.5 rounded border border-dashed border-border/50 bg-muted/20 p-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-semibold text-muted-foreground">Columns</span>
+                              <button type="button" onClick={() => {
+                                const cols = [...(field.columns || [])]
+                                cols.push({ key: `col${cols.length + 1}`, label: `Column ${cols.length + 1}` })
+                                onUpdateField(otId, idx, fIdx, { columns: cols })
+                              }} className="text-[8px] font-medium text-primary hover:underline">+ Add</button>
+                            </div>
+                            {(field.columns || []).map((col, ci) => (
+                              <div key={ci} className="flex items-center gap-1">
+                                <input
+                                  value={col.key}
+                                  onChange={(e) => {
+                                    const cols = [...(field.columns || [])]
+                                    cols[ci] = { ...cols[ci], key: e.target.value.replace(/\s/g, '') }
+                                    onUpdateField(otId, idx, fIdx, { columns: cols })
+                                  }}
+                                  placeholder="key"
+                                  className="w-14 border-none bg-transparent px-0 text-[8px] font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                                />
+                                <input
+                                  value={col.label}
+                                  onChange={(e) => {
+                                    const cols = [...(field.columns || [])]
+                                    cols[ci] = { ...cols[ci], label: e.target.value }
+                                    onUpdateField(otId, idx, fIdx, { columns: cols })
+                                  }}
+                                  placeholder="Label"
+                                  className="min-w-0 flex-1 border-none bg-transparent px-0 text-[8px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                                />
+                                <button onClick={() => {
+                                  const cols = (field.columns || []).filter((_, i) => i !== ci)
+                                  onUpdateField(otId, idx, fIdx, { columns: cols })
+                                }} className="p-0.5 text-muted-foreground/30 hover:text-destructive" disabled={(field.columns || []).length <= 1}>
+                                  <X className="h-2 w-2" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -14,11 +14,17 @@ const newFieldSchema = z.object({
   category: z.string().describe('Category grouping (e.g. "Core", "Context", "Audience", "Topic-Specific")'),
 })
 
+const tableColumnSchema = z.object({
+  key: z.string().describe('camelCase column key (e.g. "option", "pros", "cons")'),
+  label: z.string().describe('Column header label (e.g. "Option", "Pros", "Cons")'),
+})
+
 const elementFieldSchema = z.object({
   key: z.string().describe('camelCase field key (e.g. "relevance", "actionSteps")'),
   label: z.string().describe('Human-readable label shown in the UI (e.g. "Why This Matters")'),
-  type: z.enum(['short-text', 'long-text']).describe('short-text for brief values, long-text for paragraphs'),
-  primary: z.boolean().describe('True for the main/title field (exactly one per output), false for all others'),
+  type: z.enum(['short-text', 'long-text', 'table']).describe('short-text for brief values, long-text for paragraphs, table for structured rows with columns (e.g. comparison matrices, option lists with multiple attributes)'),
+  primary: z.boolean().describe('True for the main/title field (exactly one per output, must NOT be table type), false for all others'),
+  columns: z.array(tableColumnSchema).optional().describe('Column definitions — required when type is "table". Define 2-5 columns that capture the structured attributes. Omit for short-text and long-text fields.'),
 })
 
 const configSchema = z.object({
@@ -98,7 +104,7 @@ export async function POST(req: Request) {
       notes?: string
       suggestedOutputTypes?: string[]
       availableFields: { id: string; name: string; description: string; category: string }[]
-      availableOutputTypes: { id: string; name: string; description: string; sectionLabel?: string; elementLabel?: string; defaultFields?: { key: string; label: string; type: string }[] }[]
+      availableOutputTypes: { id: string; name: string; description: string; sectionLabel?: string; elementLabel?: string; defaultFields?: { key: string; label: string; type: string; columns?: { key: string; label: string }[] }[] }[]
     }
 
     const hasContent = Object.values(body.frameworkData || {}).some((v) => v?.trim())
@@ -114,7 +120,14 @@ export async function POST(req: Request) {
       .map((ot) => {
         let line = `  - "${ot.id}" (${ot.name}): ${ot.description}${ot.sectionLabel ? ` — sections called "${ot.sectionLabel}s"` : ''}`
         if (ot.defaultFields?.length) {
-          line += `\n    Default fields: ${ot.defaultFields.map((f) => `${f.key} (${f.label})`).join(', ')}`
+          const fieldDescs = ot.defaultFields.map((f) => {
+            let desc = `${f.key} (${f.label}, ${f.type})`
+            if (f.type === 'table' && f.columns?.length) {
+              desc += ` [cols: ${f.columns.map((c) => c.key).join(', ')}]`
+            }
+            return desc
+          })
+          line += `\n    Default fields: ${fieldDescs.join(', ')}`
         }
         return line
       })
@@ -200,7 +213,16 @@ Required directive categories (include ALL of these):
 Additional directives for tone, depth, format, or domain-specific constraints. For critical fields (the ones most likely to be generic), add a "Field Guidance" directive with concrete Good/Bad examples to anchor the specificity bar.
 
 STEP 5 — DEFINE THE INFORMATION SCHEMA (Element Fields)
-Define default element fields (3-7 per output) used when a driver does not define its own. The first field should be primary (set primary: true). Customize them for the topic — do not just copy the output type's defaults. Use "long-text" for paragraph content and "short-text" for brief values.
+Define default element fields (3-7 per output) used when a driver does not define its own. The first field should be primary (set primary: true). Customize them for the topic — do not just copy the output type's defaults.
+
+Field types:
+  - "short-text" — Brief values (a phrase, a label, a metric).
+  - "long-text" — Paragraph content rendered as markdown.
+  - "table" — Structured rows with named columns. Use when the information is naturally a comparison matrix, an option list with multiple attributes, a scoring rubric, or any data that has repeated rows sharing the same column structure. When type is "table", you MUST include a "columns" array with 2-5 column definitions (each with a camelCase "key" and a human-readable "label"). The primary field must NOT be a table.
+
+When to use "table" vs "long-text":
+  - Use "table" when content has parallel structure — e.g., comparing 3+ options across the same 3+ dimensions, listing stakeholders with their roles and responsibilities, scoring criteria with weights and thresholds.
+  - Use "long-text" when content is narrative, analytical, or doesn't have a repeating columnar structure.
 
 STEP 6 — ORGANIZE & STRESS-TEST
 - Group fields into 1-3 wizard steps. Broad context first, specific/dependent context later.
@@ -237,8 +259,10 @@ INSTRUCTION DIRECTIVES:
 PER-DRIVER ELEMENT FIELDS:
   Good: A "Legal & Regulatory" driver uses fields like "regulatoryDeadline" (short-text), "reportingObligation" (long-text), "evidencePreservation" (long-text) — tailored to the legal angle.
   A "Technical Containment" driver uses fields like "containmentAction" (short-text), "forensicSteps" (long-text), "toolsRequired" (short-text) — tailored to the technical angle.
+  A "Vendor Comparison" driver uses a table field: { key: "vendorMatrix", label: "Vendor Comparison Matrix", type: "table", columns: [{ key: "vendor", label: "Vendor" }, { key: "strengths", label: "Strengths" }, { key: "weaknesses", label: "Weaknesses" }, { key: "cost", label: "Cost Range" }] } — structured data that naturally fits rows and columns.
   — Different drivers, different fields, each matched to the analytical lens.
   Bad: Every driver uses the same generic fields ("description", "actions", "notes") regardless of angle.
+  Bad: Using a table field as the primary field — primary must always be short-text.
 
 ═══════════════════════════════════════════════
 QUALITY BAR

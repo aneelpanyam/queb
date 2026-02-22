@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       elementCount: number
       hiddenCount: number
       focusSection?: string
-      focusElement?: { sectionName: string; content: string; fields: Record<string, string> }
+      focusElement?: { sectionName: string; content: string; fields: Record<string, unknown> }
     }
 
     const sectionsBlock = sections
@@ -61,7 +61,15 @@ export async function POST(req: Request) {
 
     if (focusElement) {
       const fieldsBlock = Object.entries(focusElement.fields)
-        .map(([k, v]) => `  - ${k}: "${v}"`)
+        .map(([k, v]) => {
+          if (Array.isArray(v)) {
+            if (v.length === 0) return `  - ${k}: (empty table)`
+            const cols = Object.keys(v[0])
+            const rows = v.map((row: Record<string, string>) => cols.map((c) => row[c] || '').join(' | ')).join('\n    ')
+            return `  - ${k} (table):\n    ${cols.join(' | ')}\n    ${rows}`
+          }
+          return `  - ${k}: "${v}"`
+        })
         .join('\n')
 
       prompt = `You are a product quality advisor analyzing a SPECIFIC ELEMENT within a digital product.

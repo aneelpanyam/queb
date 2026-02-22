@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { Product, AssistantData, DeeperData, DissectionData } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { formatCost, formatTokenCount, type ProductCostData } from '@/lib/ai-pricing'
 import {
@@ -201,7 +202,7 @@ export function ProductEditorSidebar({
                   const elAnnotations = product.annotations[`${sIndex}-${eIndex}`]?.length || 0
                   const hasDissection = !!dissectionMap[`${sIndex}-${eIndex}`]
                   const sectionPK = getSectionPrimaryKey(product, outputTypeDef, sIndex)
-                  const rawLabel = el.fields[sectionPK] || Object.values(el.fields)[0] || '(empty)'
+                  const rawLabel = fieldAsString(el.fields[sectionPK]) || fieldAsString(Object.values(el.fields)[0]) || '(empty)'
                   const label = stripLeadingNumber(rawLabel)
                   const short = label.length > 55 ? label.slice(0, 52) + '...' : label
 

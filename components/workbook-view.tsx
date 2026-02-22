@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { ProductSection } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Eye, EyeOff, CheckCircle, Sparkles, Gauge } from 'lucide-react'
@@ -50,7 +51,7 @@ export function WorkbookSectionView({
       <div className="space-y-4">
         {visibleElements.map((el, idx) => {
           const qNum = globalStartNumber + idx
-          const difficulty = (el.fields.difficulty || 'medium').toLowerCase()
+          const difficulty = (fieldAsString(el.fields.difficulty) || 'medium').toLowerCase()
           return (
             <div
               key={idx}
@@ -62,7 +63,7 @@ export function WorkbookSectionView({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] leading-relaxed text-foreground">
-                    {el.fields.question}
+                    {fieldAsString(el.fields.question)}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <Badge variant="secondary" className={cn('text-[10px]', DIFFICULTY_COLORS[difficulty])}>
@@ -78,14 +79,14 @@ export function WorkbookSectionView({
                   <div className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                     <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                      {el.fields.answer}
+                      {fieldAsString(el.fields.answer)}
                     </p>
                   </div>
-                  {el.fields.funFact && (
+                  {fieldAsString(el.fields.funFact) && (
                     <div className="flex items-start gap-2">
                       <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
                       <p className="text-xs italic text-muted-foreground">
-                        {el.fields.funFact}
+                        {fieldAsString(el.fields.funFact)}
                       </p>
                     </div>
                   )}

@@ -16,13 +16,20 @@ import { BUILTIN_PROMPT_METADATA } from '@/lib/output-type-prompt-metadata'
 
 export type FieldColor = 'amber' | 'blue' | 'red' | 'green' | 'emerald' | 'violet' | 'primary' | 'none'
 
+export interface TableColumn {
+  key: string
+  label: string
+}
+
 export interface OutputTypeField {
   key: string
   label: string
-  type: 'short-text' | 'long-text'
+  type: 'short-text' | 'long-text' | 'table'
   primary?: boolean
   color?: FieldColor
   icon?: string
+  /** Column definitions — required when type is 'table' */
+  columns?: TableColumn[]
 }
 
 export interface OutputTypeDefinition {

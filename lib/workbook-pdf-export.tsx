@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactPDF from '@react-pdf/renderer'
 import type { Product } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 
 const { Document, Page, Text, View, StyleSheet, Font, pdf } = ReactPDF
 
@@ -110,10 +111,10 @@ function extractSections(product: Product): SectionData[] {
     for (const el of section.elements) {
       if (el.hidden) continue
       questions.push({
-        question: sanitize(el.fields.question || ''),
-        answer: sanitize(el.fields.answer || ''),
-        difficulty: sanitize(el.fields.difficulty || 'medium'),
-        funFact: sanitize(el.fields.funFact || ''),
+        question: sanitize(fieldAsString(el.fields.question)),
+        answer: sanitize(fieldAsString(el.fields.answer)),
+        difficulty: sanitize(fieldAsString(el.fields.difficulty) || 'medium'),
+        funFact: sanitize(fieldAsString(el.fields.funFact)),
         globalNumber: globalQ++,
       })
     }

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { aiFetch } from '@/lib/ai-fetch'
 import { getPrimaryField, type OutputTypeDefinition } from '@/lib/output-types'
 import type { Product, AssistantData, AssistantSuggestion } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import { calculateCost, type CostEntry } from '@/lib/ai-pricing'
 import { type AssistantScope, getContextEntries, getElementPrimary, matchesElement } from '../_lib/product-editor-utils'
 
@@ -32,7 +33,7 @@ export function useProductAssistant(
         elementCount: visibleEls.length,
         annotationCount: sectionAnnCount,
         sampleElements: visibleEls.map(
-          (el) => el.fields[pk] || Object.values(el.fields)[0] || ''
+          (el) => fieldAsString(el.fields[pk]) || fieldAsString(Object.values(el.fields)[0]) || ''
         ),
       }
     })
@@ -69,7 +70,7 @@ export function useProductAssistant(
         if (el) {
           payload.focusElement = {
             sectionName: scope.sectionName,
-            content: Object.values(el.fields)[0] || '',
+            content: fieldAsString(Object.values(el.fields)[0]),
             fields: el.fields,
           }
         }

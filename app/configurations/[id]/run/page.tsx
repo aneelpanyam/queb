@@ -12,6 +12,7 @@ import { outputTypeStorage, type OutputTypeDefinition, getPromptAssemblyOptions 
 import { productStorage } from '@/lib/product-storage'
 import { aiFetch } from '@/lib/ai-fetch'
 import type { ProductSection } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import { generateCrosswordGrid, serializeGridMeta } from '@/lib/crossword-layout'
 import { calculateCost, emptyCostData, addCostEntry } from '@/lib/ai-pricing'
 import { SmartField } from '@/components/smart-field'
@@ -126,17 +127,17 @@ export default function RunConfigPage() {
         let sections: ProductSection[] = cleanData.sections.map((s: UnifiedSection) => ({
           name: s.sectionName,
           description: s.sectionDescription,
-          elements: s.elements.map((el: Record<string, string>) => ({ fields: el })),
+          elements: s.elements.map((el: Record<string, unknown>) => ({ fields: el as Record<string, import('@/lib/product-types').FieldValue> })),
           resolvedFields: s.resolvedFields,
         }))
 
         if (co.outputTypeId === 'crossword-puzzles') {
           sections = sections.map((section) => {
             const words = section.elements.map((el) => ({
-              word: el.fields.word || '',
-              clue: el.fields.clue || '',
-              difficulty: el.fields.difficulty,
-              hint: el.fields.hint,
+              word: fieldAsString(el.fields.word),
+              clue: fieldAsString(el.fields.clue),
+              difficulty: fieldAsString(el.fields.difficulty),
+              hint: fieldAsString(el.fields.hint),
             }))
             const grid = generateCrosswordGrid(words)
             return {

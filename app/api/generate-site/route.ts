@@ -10,8 +10,9 @@ function md(str: string): string {
 interface FieldDef {
   key: string
   label: string
-  type: 'short-text' | 'long-text'
+  type: 'short-text' | 'long-text' | 'table'
   primary?: boolean
+  columns?: { key: string; label: string }[]
 }
 
 interface OutputTypeDef {
@@ -35,8 +36,10 @@ interface DeeperData {
   thirdOrder: { question: string; reasoning: string }[]
 }
 
+type FieldValue = string | Record<string, string>[]
+
 interface ElementData {
-  fields: Record<string, string>
+  fields: Record<string, FieldValue>
   dissection?: DissectionData
   deeperQuestions?: DeeperData
 }
@@ -79,6 +82,20 @@ export async function POST(req: Request) {
       { status: 500 },
     )
   }
+}
+
+function fStr(val: FieldValue | undefined): string {
+  if (val == null) return ''
+  if (typeof val === 'string') return val
+  return ''
+}
+
+function renderTableHtml(val: FieldValue, columns?: { key: string; label: string }[]): string {
+  if (!Array.isArray(val) || val.length === 0) return ''
+  const cols = columns || Object.keys(val[0]).map((k) => ({ key: k, label: k }))
+  const header = cols.map((c) => `<th>${esc(c.label)}</th>`).join('')
+  const rows = val.map((row) => `<tr>${cols.map((c) => `<td>${esc(row[c.key] || '')}</td>`).join('')}</tr>`).join('')
+  return `<table class="field-table"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`
 }
 
 function esc(str: string): string {
@@ -153,9 +170,9 @@ function buildDeeperHtml(dq: DeeperData): string {
 // ── Per-output-type element renderers ──────────────────────────
 
 function renderQuestionElement(el: ElementData): string {
-  const question = el.fields.question || ''
-  const relevance = el.fields.relevance || ''
-  const infoPrompt = el.fields.infoPrompt || ''
+  const question = fStr(el.fields.question)
+  const relevance = fStr(el.fields.relevance)
+  const infoPrompt = fStr(el.fields.infoPrompt)
 
   let html = `<h2 class="el-title">${esc(question)}</h2>`
 
@@ -180,9 +197,9 @@ function renderQuestionElement(el: ElementData): string {
 }
 
 function renderChecklistElement(el: ElementData): string {
-  const item = el.fields.item || ''
-  const description = el.fields.description || ''
-  const priority = el.fields.priority || 'Medium'
+  const item = fStr(el.fields.item)
+  const description = fStr(el.fields.description)
+  const priority = fStr(el.fields.priority) || 'Medium'
   const pClass = priority === 'High' ? 'pri-high' : priority === 'Low' ? 'pri-low' : 'pri-med'
 
   let html = `
@@ -204,9 +221,9 @@ function renderChecklistElement(el: ElementData): string {
 }
 
 function renderEmailCourseElement(el: ElementData): string {
-  const subject = el.fields.subject || ''
-  const body = el.fields.body || ''
-  const cta = el.fields.callToAction || ''
+  const subject = fStr(el.fields.subject)
+  const body = fStr(el.fields.body)
+  const cta = fStr(el.fields.callToAction)
 
   let html = `
     <div class="el-header-row">
@@ -233,9 +250,9 @@ function renderEmailCourseElement(el: ElementData): string {
 }
 
 function renderPromptElement(el: ElementData, elId: string): string {
-  const prompt = el.fields.prompt || ''
-  const context = el.fields.context || ''
-  const expectedOutput = el.fields.expectedOutput || ''
+  const prompt = fStr(el.fields.prompt)
+  const context = fStr(el.fields.context)
+  const expectedOutput = fStr(el.fields.expectedOutput)
 
   let html = `
     <div class="prompt-label">AI Prompt Template</div>
@@ -264,10 +281,10 @@ function renderPromptElement(el: ElementData, elId: string): string {
 }
 
 function renderBattleCardElement(el: ElementData): string {
-  const title = el.fields.title || ''
-  const strengths = el.fields.strengths || ''
-  const weaknesses = el.fields.weaknesses || ''
-  const talkingPoints = el.fields.talkingPoints || ''
+  const title = fStr(el.fields.title)
+  const strengths = fStr(el.fields.strengths)
+  const weaknesses = fStr(el.fields.weaknesses)
+  const talkingPoints = fStr(el.fields.talkingPoints)
 
   let html = `
     <div class="el-header-row">
@@ -309,19 +326,30 @@ function renderBattleCardElement(el: ElementData): string {
 function renderGenericElement(el: ElementData, def: OutputTypeDef, sectionFields?: FieldDef[]): string {
   const fields = sectionFields ?? def.fields
   const primaryField = fields.find((f) => f.primary) || fields[0]
-  const primaryVal = el.fields[primaryField.key] || ''
+  const primaryVal = fStr(el.fields[primaryField.key])
   const nonPrimary = fields.filter((f) => !f.primary)
 
   let html = `<h2 class="el-title">${esc(primaryVal)}</h2>`
 
   for (const field of nonPrimary) {
-    const value = el.fields[field.key]
-    if (!value) continue
-    html += `
+    const rawValue = el.fields[field.key]
+    if (!rawValue) continue
+
+    if (field.type === 'table' && Array.isArray(rawValue)) {
+      html += `
+      <div class="meta-card plain">
+        <div class="meta-label">${esc(field.label)}</div>
+        ${renderTableHtml(rawValue, field.columns)}
+      </div>`
+    } else {
+      const value = fStr(rawValue)
+      if (!value) continue
+      html += `
       <div class="meta-card plain">
         <div class="meta-label">${esc(field.label)}</div>
         ${field.type === 'long-text' ? `<div class="md-content">${md(value)}</div>` : `<p>${esc(value)}</p>`}
       </div>`
+    }
   }
 
   if (el.dissection) html += buildDissectionHtml(el.dissection)
@@ -376,7 +404,7 @@ function buildSiteHtml(data: {
       prevSection = el.sectionName
     }
     const elPrimary = el.sectionFields?.find((f) => f.primary) || el.sectionFields?.[0] || primaryField
-    const primaryVal = el.data.fields[elPrimary.key] || Object.values(el.data.fields)[0] || ''
+    const primaryVal = fStr(el.data.fields[elPrimary.key]) || fStr(Object.values(el.data.fields)[0]) || ''
     const short = primaryVal.length > 65 ? primaryVal.slice(0, 62) + '...' : primaryVal
     sidebarHtml.push(
       `<button class="nav-btn" data-id="${el.id}" onclick="showEl('${el.id}')">${esc(short)}</button>`,
@@ -544,6 +572,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe
 .md-content hr{margin:16px 0;border:none;border-top:1px solid #e2e6ea}
 .md-content h1,.md-content h2,.md-content h3{font-weight:700;color:#27313a;margin:16px 0 8px}
 .md-content h1{font-size:18px}.md-content h2{font-size:16px}.md-content h3{font-size:15px}
+
+/* Table fields */
+.field-table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.6}
+.field-table th{text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7684;padding:8px 12px;border-bottom:2px solid #e2e6ea;background:#f7f9fb}
+.field-table td{padding:8px 12px;border-bottom:1px solid #e2e6ea;color:#27313a}
+.field-table tr:last-child td{border-bottom:none}
+.field-table tr:hover td{background:#f7f9fb}
 
 /* Deep dive sections */
 .section-block{margin-top:40px;padding-top:8px}

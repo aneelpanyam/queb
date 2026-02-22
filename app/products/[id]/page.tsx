@@ -305,6 +305,7 @@ export default function ProductEditorPage() {
           onToggleHiddenAnswer={(key) => enrichments.setHiddenAnswers((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })}
           onToggleElementVisibility={editor.toggleElementVisibility}
           onUpdateElementField={editor.updateElementField}
+          onUpdateTableField={editor.updateTableField}
           onAddAnnotation={editor.addAnnotation}
           onUpdateAnnotation={editor.updateAnnotation}
           onDeleteAnnotation={editor.deleteAnnotation}

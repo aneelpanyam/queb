@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { productStorage } from '@/lib/product-storage'
 import { getOutputType, type OutputTypeDefinition } from '@/lib/output-types'
-import type { Product, Annotation, DissectionData, DeeperData, AnswerData, AssistantData } from '@/lib/product-types'
+import type { Product, Annotation, DissectionData, DeeperData, AnswerData, AssistantData, TableRow } from '@/lib/product-types'
 import { emptyCostData, addCostEntry, type CostEntry, type ProductCostData } from '@/lib/ai-pricing'
 import { SECTION_NAV_TYPES, type SelectedNode } from '../_lib/product-editor-utils'
 
@@ -85,6 +85,22 @@ export function useProductEditor(productId: string) {
         elements[eIndex] = {
           ...elements[eIndex],
           fields: { ...elements[eIndex].fields, [fieldKey]: value },
+        }
+        sections[sIndex] = { ...sections[sIndex], elements }
+        return { sections }
+      })
+    },
+    [updateProduct]
+  )
+
+  const updateTableField = useCallback(
+    (sIndex: number, eIndex: number, fieldKey: string, rows: TableRow[]) => {
+      updateProduct((prev) => {
+        const sections = [...prev.sections]
+        const elements = [...sections[sIndex].elements]
+        elements[eIndex] = {
+          ...elements[eIndex],
+          fields: { ...elements[eIndex].fields, [fieldKey]: rows },
         }
         sections[sIndex] = { ...sections[sIndex], elements }
         return { sections }
@@ -186,7 +202,7 @@ export function useProductEditor(productId: string) {
     assistantData, setAssistantData,
     costData, addCost,
     updateProduct, handleSave,
-    updateElementField, toggleElementVisibility, toggleSectionVisibility,
+    updateElementField, updateTableField, toggleElementVisibility, toggleSectionVisibility,
     addAnnotation, updateAnnotation, deleteAnnotation,
   }
 }

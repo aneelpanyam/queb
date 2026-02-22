@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { fieldStorage, type FieldDefinition } from '@/lib/field-library'
-import { outputTypeStorage, getDefaultSectionDrivers, getDefaultInstructionDirectives, type OutputTypeDefinition, type OutputTypeField, type FieldColor } from '@/lib/output-type-library'
+import { outputTypeStorage, getDefaultSectionDrivers, getDefaultInstructionDirectives, type OutputTypeDefinition, type OutputTypeField, type FieldColor, type TableColumn } from '@/lib/output-type-library'
 import { LoginScreen } from '@/components/login-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -252,9 +252,18 @@ function OutputTypeForm({
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2 py-1.5">
                   <Input value={sf.key} onChange={(e) => updateSchemaField(idx, { key: e.target.value.replace(/\s/g, '') })} placeholder="key" className="h-7 w-24 text-xs" />
                   <Input value={sf.label} onChange={(e) => updateSchemaField(idx, { label: e.target.value })} placeholder="Label" className="h-7 flex-1 text-xs" />
-                  <select value={sf.type} onChange={(e) => updateSchemaField(idx, { type: e.target.value as OutputTypeField['type'] })} className="h-7 rounded border border-border bg-background px-2 text-xs">
+                  <select value={sf.type} onChange={(e) => {
+                    const newType = e.target.value as OutputTypeField['type']
+                    const updates: Partial<OutputTypeField> = { type: newType }
+                    if (newType === 'table' && !sf.columns?.length) {
+                      updates.columns = [{ key: 'col1', label: 'Column 1' }, { key: 'col2', label: 'Column 2' }]
+                    }
+                    if (newType !== 'table') updates.columns = undefined
+                    updateSchemaField(idx, updates)
+                  }} className="h-7 rounded border border-border bg-background px-2 text-xs">
                     <option value="short-text">Short</option>
                     <option value="long-text">Long</option>
+                    <option value="table">Table</option>
                   </select>
                   <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <input type="radio" name={`primary-${idx}`} checked={!!sf.primary} onChange={() => {
@@ -275,6 +284,38 @@ function OutputTypeForm({
                     <select value={sf.icon || ''} onChange={(e) => updateSchemaField(idx, { icon: e.target.value || undefined })} className="h-6 rounded border border-border bg-background px-1.5 text-[10px]">
                       {FIELD_ICON_OPTIONS.map((i) => <option key={i} value={i}>{i || '— Icon —'}</option>)}
                     </select>
+                  </div>
+                )}
+                {sf.type === 'table' && (
+                  <div className="ml-2 mt-1 space-y-1 rounded border border-dashed border-border/60 bg-muted/30 p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold text-muted-foreground">Table Columns</span>
+                      <button type="button" onClick={() => {
+                        const cols = [...(sf.columns || [])]
+                        cols.push({ key: `col${cols.length + 1}`, label: `Column ${cols.length + 1}` })
+                        updateSchemaField(idx, { columns: cols })
+                      }} className="text-[10px] font-medium text-primary hover:underline">+ Add Column</button>
+                    </div>
+                    {(sf.columns || []).map((col, ci) => (
+                      <div key={ci} className="flex items-center gap-1.5">
+                        <Input value={col.key} onChange={(e) => {
+                          const cols = [...(sf.columns || [])]
+                          cols[ci] = { ...cols[ci], key: e.target.value.replace(/\s/g, '') }
+                          updateSchemaField(idx, { columns: cols })
+                        }} placeholder="key" className="h-6 w-20 text-[10px] font-mono" />
+                        <Input value={col.label} onChange={(e) => {
+                          const cols = [...(sf.columns || [])]
+                          cols[ci] = { ...cols[ci], label: e.target.value }
+                          updateSchemaField(idx, { columns: cols })
+                        }} placeholder="Label" className="h-6 flex-1 text-[10px]" />
+                        <button onClick={() => {
+                          const cols = (sf.columns || []).filter((_, i) => i !== ci)
+                          updateSchemaField(idx, { columns: cols })
+                        }} className="p-0.5 text-muted-foreground/50 hover:text-destructive" disabled={(sf.columns || []).length <= 1}>
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

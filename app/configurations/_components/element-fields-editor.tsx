@@ -103,11 +103,20 @@ export function ElementFieldsEditor({
                   />
                   <select
                     value={field.type}
-                    onChange={(e) => onUpdate(otId, idx, { type: e.target.value as 'short-text' | 'long-text' })}
+                    onChange={(e) => {
+                      const newType = e.target.value as OutputTypeField['type']
+                      const updates: Partial<OutputTypeField> = { type: newType }
+                      if (newType === 'table' && !field.columns?.length) {
+                        updates.columns = [{ key: 'col1', label: 'Column 1' }, { key: 'col2', label: 'Column 2' }]
+                      }
+                      if (newType !== 'table') updates.columns = undefined
+                      onUpdate(otId, idx, updates)
+                    }}
                     className="h-5 rounded border border-border bg-background px-1 text-[9px]"
                   >
                     <option value="short-text">Short</option>
                     <option value="long-text">Long</option>
+                    <option value="table">Table</option>
                   </select>
                   <label className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
                     <input
@@ -141,6 +150,48 @@ export function ElementFieldsEditor({
                     >
                       {FIELD_ICON_OPTIONS.map((i) => <option key={i} value={i}>{i || '— Icon —'}</option>)}
                     </select>
+                  </div>
+                )}
+                {field.type === 'table' && (
+                  <div className="ml-6 mt-1 space-y-1 rounded border border-dashed border-border/60 bg-muted/20 p-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-semibold text-muted-foreground">Columns</span>
+                      <button type="button" onClick={() => {
+                        const cols = [...(field.columns || [])]
+                        cols.push({ key: `col${cols.length + 1}`, label: `Column ${cols.length + 1}` })
+                        onUpdate(otId, idx, { columns: cols })
+                      }} className="text-[9px] font-medium text-primary hover:underline">+ Add</button>
+                    </div>
+                    {(field.columns || []).map((col, ci) => (
+                      <div key={ci} className="flex items-center gap-1">
+                        <input
+                          value={col.key}
+                          onChange={(e) => {
+                            const cols = [...(field.columns || [])]
+                            cols[ci] = { ...cols[ci], key: e.target.value.replace(/\s/g, '') }
+                            onUpdate(otId, idx, { columns: cols })
+                          }}
+                          placeholder="key"
+                          className="w-16 border-none bg-transparent px-0 text-[9px] font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        />
+                        <input
+                          value={col.label}
+                          onChange={(e) => {
+                            const cols = [...(field.columns || [])]
+                            cols[ci] = { ...cols[ci], label: e.target.value }
+                            onUpdate(otId, idx, { columns: cols })
+                          }}
+                          placeholder="Label"
+                          className="min-w-0 flex-1 border-none bg-transparent px-0 text-[9px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        />
+                        <button onClick={() => {
+                          const cols = (field.columns || []).filter((_, i) => i !== ci)
+                          onUpdate(otId, idx, { columns: cols })
+                        }} className="p-0.5 text-muted-foreground/40 hover:text-destructive" disabled={(field.columns || []).length <= 1}>
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

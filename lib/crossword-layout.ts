@@ -110,7 +110,7 @@ export function deserializeGridMeta(
  */
 export function reconstructGridFromSection(section: {
   description: string
-  elements: { fields: Record<string, string> }[]
+  elements: { fields: Record<string, unknown> }[]
 }): CrosswordGrid | null {
   const meta = deserializeGridMeta(section.description)
   if (!meta) return null
@@ -118,14 +118,14 @@ export function reconstructGridFromSection(section: {
   const words: PositionedWord[] = section.elements
     .filter((el) => el.fields.word && el.fields.direction)
     .map((el) => ({
-      word: el.fields.word,
-      clue: el.fields.clue || '',
-      difficulty: el.fields.difficulty || 'medium',
-      hint: el.fields.hint || '',
-      number: parseInt(el.fields.number, 10) || 0,
-      direction: el.fields.direction as 'across' | 'down',
-      startX: parseInt(el.fields.startX, 10) || 0,
-      startY: parseInt(el.fields.startY, 10) || 0,
+      word: String(el.fields.word || ''),
+      clue: String(el.fields.clue || ''),
+      difficulty: String(el.fields.difficulty || 'medium'),
+      hint: String(el.fields.hint || ''),
+      number: parseInt(String(el.fields.number), 10) || 0,
+      direction: String(el.fields.direction) as 'across' | 'down',
+      startX: parseInt(String(el.fields.startX), 10) || 0,
+      startY: parseInt(String(el.fields.startY), 10) || 0,
     }))
 
   words.sort((a, b) => a.number - b.number)

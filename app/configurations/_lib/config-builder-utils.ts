@@ -66,8 +66,9 @@ export interface AIStep {
 export interface AIDriverField {
   key: string
   label: string
-  type: 'short-text' | 'long-text'
+  type: 'short-text' | 'long-text' | 'table'
   primary?: boolean
+  columns?: { key: string; label: string }[]
 }
 
 export interface AIOutput {

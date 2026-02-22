@@ -2,7 +2,7 @@
 // Shared export/import utilities for configurations and products
 // ============================================================
 
-import type { Product, DissectionData, DeeperData, AnswerData, Annotation } from '@/lib/product-types'
+import type { Product, DissectionData, DeeperData, AnswerData, Annotation, FieldValue } from '@/lib/product-types'
 import type { OutputTypeDefinition, OutputTypeField } from '@/lib/output-type-library'
 
 export interface ExportBundle<T> {
@@ -64,7 +64,7 @@ export async function readJsonFile<T>(file: File): Promise<ExportBundle<T>> {
 // ============================================================
 
 export interface DirectoryElement {
-  fields: Record<string, string>
+  fields: Record<string, FieldValue>
   dissection?: DissectionData
   deeperQuestions?: DeeperData
   answer?: AnswerData

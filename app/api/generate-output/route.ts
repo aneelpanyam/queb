@@ -8,7 +8,7 @@ import { withDebugMeta, withUsageMeta, isDebugMode } from '@/lib/ai-log-storage'
 
 export const maxDuration = 120
 
-type FieldDef = { key: string; label: string; [k: string]: unknown }
+type FieldDef = { key: string; label: string; type?: string; columns?: { key: string; label: string }[]; [k: string]: unknown }
 type DriverDef = { name: string; description: string; fields?: FieldDef[] }
 type DirectiveDef = { label: string; content: string }
 
@@ -17,7 +17,7 @@ function resolveDefaults(outputTypeId?: string) {
 
   const seed = SEED_OUTPUT_TYPES.find((t) => t.id === outputTypeId)
   return {
-    fields: seed?.fields?.map((f) => ({ key: f.key, label: f.label })),
+    fields: seed?.fields?.map((f) => ({ key: f.key, label: f.label, type: f.type, columns: f.columns })),
     sectionLabel: seed?.sectionLabel,
     elementLabel: seed?.elementLabel,
     prompt: seed?.prompt,
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
 
       return generateText({ model: 'openai/gpt-5.2', providerOptions: { reasoning: { effort: "medium" }}, temperature: 0.2, prompt: driverPrompt, output: Output.object({ schema }) })
         .then((r) => {
-          const out = r.output as { sectionName: string; sectionDescription: string; elements: Record<string, string>[] }
+          const out = r.output as { sectionName: string; sectionDescription: string; elements: Record<string, unknown>[] }
           return { ...out, resolvedFields: driver.fields ? driverFields : undefined, _partialUsage: r.usage }
         })
         .catch((err) => {
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
           return {
             sectionName: driver.name,
             sectionDescription: driver.description,
-            elements: [] as Record<string, string>[],
+            elements: [] as Record<string, unknown>[],
             resolvedFields: driver.fields ? driverFields : undefined,
             _partialUsage: undefined,
           }

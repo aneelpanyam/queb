@@ -7,11 +7,20 @@ import { z, type ZodTypeAny } from 'zod'
 
 /**
  * Builds a dynamic Zod element schema from field definitions.
- * Used when a section driver has custom per-driver fields.
+ * String fields become z.string(); table fields become z.array(z.object({...}))
+ * built from the columns definition.
  */
-export function buildElementSchema(fields: { key: string; label: string }[]) {
+export function buildElementSchema(fields: { key: string; label: string; type?: string; columns?: { key: string; label: string }[] }[]) {
   const entries: Record<string, ZodTypeAny> = {}
-  for (const f of fields) entries[f.key] = z.string().describe(f.label)
+  for (const f of fields) {
+    if (f.type === 'table' && f.columns?.length) {
+      const colEntries: Record<string, ZodTypeAny> = {}
+      for (const col of f.columns) colEntries[col.key] = z.string().describe(col.label)
+      entries[f.key] = z.array(z.object(colEntries)).describe(f.label)
+    } else {
+      entries[f.key] = z.string().describe(f.label)
+    }
+  }
   return z.object(entries)
 }
 
@@ -28,8 +37,14 @@ export function formatContext(context: Record<string, string>): string {
  * Placed at the end of the prompt so the AI ignores any conflicting
  * field guidance in instruction directives.
  */
-export function buildFieldOverrideBlock(fields: { key: string; label: string }[]): string {
-  const fieldLines = fields.map((f) => `- "${f.key}": ${f.label}`).join('\n')
+export function buildFieldOverrideBlock(fields: { key: string; label: string; type?: string; columns?: { key: string; label: string }[] }[]): string {
+  const fieldLines = fields.map((f) => {
+    if (f.type === 'table' && f.columns?.length) {
+      const colDesc = f.columns.map((c) => `"${c.key}"`).join(', ')
+      return `- "${f.key}": ${f.label} — an ARRAY of objects with keys: ${colDesc}. Provide 2-6 rows.`
+    }
+    return `- "${f.key}": ${f.label}`
+  }).join('\n')
   return `\n\nFIELD SCHEMA (use ONLY these fields for each element — ignore any conflicting field guidance above):\n${fieldLines}`
 }
 

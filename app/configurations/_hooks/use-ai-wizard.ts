@@ -92,8 +92,12 @@ export function useAIWizard(
         description: configuration.description || '',
         steps,
         outputs: (configuration.outputs || []).map((out: AIOutput) => {
-          const mapFields = (fields?: { key: string; label: string; type: 'short-text' | 'long-text'; primary?: boolean }[]) =>
-            fields?.length ? fields.map((f) => ({ key: f.key, label: f.label, type: f.type, primary: f.primary || undefined })) : undefined
+          const mapFields = (fields?: { key: string; label: string; type: 'short-text' | 'long-text' | 'table'; primary?: boolean; columns?: { key: string; label: string }[] }[]) =>
+            fields?.length ? fields.map((f) => ({
+              key: f.key, label: f.label, type: f.type,
+              primary: f.primary || undefined,
+              columns: f.type === 'table' && f.columns?.length ? f.columns : undefined,
+            })) : undefined
 
           return {
             outputTypeId: out.outputTypeId,
@@ -136,7 +140,10 @@ export function useAIWizard(
           description: ot.description,
           sectionLabel: ot.sectionLabel,
           elementLabel: ot.elementLabel,
-          defaultFields: ot.fields.map((f) => ({ key: f.key, label: f.label, type: f.type })),
+          defaultFields: ot.fields.map((f) => ({
+            key: f.key, label: f.label, type: f.type,
+            ...(f.type === 'table' && f.columns?.length ? { columns: f.columns } : {}),
+          })),
         })),
       }, { action: 'Generate Configuration' })
 

@@ -19,9 +19,37 @@ export interface Annotation {
   updatedAt: string
 }
 
+export type TableRow = Record<string, string>
+export type FieldValue = string | TableRow[]
+
+/** Safely extract a string from a FieldValue, returning '' for table data */
+export function fieldAsString(val: FieldValue | undefined): string {
+  if (val == null) return ''
+  if (typeof val === 'string') return val
+  return ''
+}
+
+/** Safely extract table rows from a FieldValue, returning [] for string data */
+export function fieldAsTable(val: FieldValue | undefined): TableRow[] {
+  if (Array.isArray(val)) return val
+  return []
+}
+
+/** Serialize a FieldValue to a human-readable string (for LLM prompts, exports, etc.) */
+export function fieldToText(val: FieldValue | undefined): string {
+  if (val == null) return ''
+  if (typeof val === 'string') return val
+  if (!Array.isArray(val) || val.length === 0) return ''
+  const cols = Object.keys(val[0])
+  const header = '| ' + cols.join(' | ') + ' |'
+  const sep = '| ' + cols.map(() => '---').join(' | ') + ' |'
+  const rows = val.map((row) => '| ' + cols.map((c) => row[c] || '').join(' | ') + ' |')
+  return [header, sep, ...rows].join('\n')
+}
+
 // Generic element — each output type defines its own field keys
 export interface ProductElement {
-  fields: Record<string, string>
+  fields: Record<string, FieldValue>
   hidden?: boolean
 }
 

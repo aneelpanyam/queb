@@ -1,7 +1,8 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import type { Product, Annotation, DissectionData, DeeperData, AnswerData, AssistantData } from '@/lib/product-types'
+import type { Product, Annotation, DissectionData, DeeperData, AnswerData, AssistantData, TableRow } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { ProductAnnotations } from '@/components/product-annotation'
 import { QuestionDissection } from '@/components/question-dissection'
@@ -50,6 +51,7 @@ interface ProductDetailPanelProps {
   onToggleHiddenAnswer: (key: string) => void
   onToggleElementVisibility: (sIndex: number, eIndex: number) => void
   onUpdateElementField: (sIndex: number, eIndex: number, fieldKey: string, value: string) => void
+  onUpdateTableField: (sIndex: number, eIndex: number, fieldKey: string, rows: TableRow[]) => void
   onAddAnnotation: (key: string, data: Omit<Annotation, 'id' | 'createdAt' | 'updatedAt'>) => void
   onUpdateAnnotation: (key: string, annotationId: string, data: Omit<Annotation, 'id' | 'createdAt' | 'updatedAt'>) => void
   onDeleteAnnotation: (key: string, annotationId: string) => void
@@ -65,7 +67,7 @@ export function ProductDetailPanel({
   onStartEdit, onSaveEdit, onCancelEdit, onEditValueChange,
   onDissect, onGoDeeper, onFindAnswer,
   onToggleHiddenDissection, onToggleHiddenAnswer,
-  onToggleElementVisibility, onUpdateElementField,
+  onToggleElementVisibility, onUpdateElementField, onUpdateTableField,
   onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation,
   onOpenAssistant,
 }: ProductDetailPanelProps) {
@@ -80,7 +82,7 @@ export function ProductDetailPanel({
 
   const displayPrimary =
     selectedNode?.type === 'element'
-      ? selectedElement?.fields[getSectionPrimaryKey(product, outputTypeDef, selectedNode.sIndex)] || (selectedElement ? Object.values(selectedElement.fields)[0] : undefined)
+      ? fieldAsString(selectedElement?.fields[getSectionPrimaryKey(product, outputTypeDef, selectedNode.sIndex)]) || (selectedElement ? fieldAsString(Object.values(selectedElement.fields)[0]) : undefined)
       : selectedNode?.type === 'second'
         ? secondQ?.question
         : thirdQ?.question
@@ -205,6 +207,7 @@ export function ProductDetailPanel({
                 onSaveEdit={onSaveEdit}
                 onCancelEdit={onCancelEdit}
                 onEditValueChange={onEditValueChange}
+                onUpdateTable={onUpdateTableField}
                 resolvedFields={product.resolvedFields}
                 sectionResolvedFields={selectedSection?.resolvedFields}
               />

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { ProductSection } from '@/lib/product-types'
 import type { DissectionData } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import { QuestionDissection } from '@/components/question-dissection'
 import { MarkdownProse } from '@/components/markdown-prose'
 import { MarkdownEditor } from '@/components/markdown-editor'
@@ -82,7 +83,7 @@ export function ChecklistSectionDetail({
 
   const visibleSteps = section.elements.filter((el) => !el.hidden)
   const totalSteps = section.elements.length
-  const highCount = section.elements.filter((el) => !el.hidden && el.fields.priority === 'High').length
+  const highCount = section.elements.filter((el) => !el.hidden && fieldAsString(el.fields.priority) === 'High').length
 
   const startEdit = (key: string, value: string) => {
     setEditingField(key)
@@ -168,7 +169,7 @@ export function ChecklistSectionDetail({
       {section.elements.map((el, eIndex) => {
         const isHidden = !!el.hidden
         const isExpanded = expandedSteps.has(eIndex)
-        const priority = el.fields.priority || 'Medium'
+        const priority = fieldAsString(el.fields.priority) || 'Medium'
         const pStyle = PRIORITY_STYLES[priority] || PRIORITY_STYLES.Medium
         const PIcon = pStyle.icon
         const stepDissectKey = `${sIndex}-${eIndex}`
@@ -203,9 +204,9 @@ export function ChecklistSectionDetail({
                     </div>
                   </div>
                 ) : (
-                  <div onClick={() => startEdit(itemEditKey, el.fields.item || '')}
+                  <div onClick={() => startEdit(itemEditKey, fieldAsString(el.fields.item))}
                     className="group cursor-text hover:text-primary" title="Click to edit">
-                    <MarkdownProse className="text-sm font-semibold leading-snug">{el.fields.item || '(empty)'}</MarkdownProse>
+                    <MarkdownProse className="text-sm font-semibold leading-snug">{fieldAsString(el.fields.item) || '(empty)'}</MarkdownProse>
                     <Pencil className="ml-1.5 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
                 )}
@@ -225,7 +226,7 @@ export function ChecklistSectionDetail({
 
             {isExpanded && !isHidden && (
               <div className="border-t border-border/50 px-4 pb-5 pt-4 space-y-4">
-                {el.fields.description && (
+                {fieldAsString(el.fields.description) && (
                   <div className={cn('rounded-xl border p-5', pStyle.bg, pStyle.border)}>
                     <div className={cn('mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide', pStyle.text)}>
                       <Shield className="h-3.5 w-3.5" /> What to Know
@@ -239,9 +240,9 @@ export function ChecklistSectionDetail({
                         minRows={4}
                       />
                     ) : (
-                      <div onClick={() => startEdit(descEditKey, el.fields.description)}
+                      <div onClick={() => startEdit(descEditKey, fieldAsString(el.fields.description))}
                         className="group cursor-text rounded-lg transition-colors hover:bg-background/30" title="Click to edit">
-                        <MarkdownProse className="text-[13.5px]">{el.fields.description}</MarkdownProse>
+                        <MarkdownProse className="text-[13.5px]">{fieldAsString(el.fields.description)}</MarkdownProse>
                         <Pencil className="ml-1.5 inline h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
                     )}
@@ -259,7 +260,7 @@ export function ChecklistSectionDetail({
                           return n
                         })
                       } else {
-                        onDissect(el.fields.item || '', section.name, stepDissectKey)
+                        onDissect(fieldAsString(el.fields.item), section.name, stepDissectKey)
                       }
                     }}
                     disabled={dissectionLoading && activeDissectKey === stepDissectKey}

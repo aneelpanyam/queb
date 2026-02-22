@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import type { Product } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, BookOpen, ChevronRight, Hash, MessageSquareText, Pencil } from 'lucide-react'
@@ -175,7 +176,7 @@ export function ProductCoverPage({ product, outputTypeDef, onOpenEditor, onSelec
                       <div className="ml-[52px] border-l border-border/40 pl-4 pb-2">
                         {visibleElements.slice(0, 5).map((el, eIndex) => {
                           const realEIndex = product.sections[sIndex].elements.indexOf(el)
-                          const label = stripLeadingNumber(el.fields[sectionPK] || Object.values(el.fields)[0] || '(empty)')
+                          const label = stripLeadingNumber(fieldAsString(el.fields[sectionPK]) || fieldAsString(Object.values(el.fields)[0]) || '(empty)')
                           return (
                             <button
                               key={eIndex}

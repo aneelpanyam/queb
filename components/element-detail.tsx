@@ -3,7 +3,16 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { OutputTypeDefinition, OutputTypeField } from '@/lib/output-type-library'
-import type { ProductSection } from '@/lib/product-types'
+import type { ProductSection, FieldValue, TableRow } from '@/lib/product-types'
+import { fieldAsString, fieldAsTable } from '@/lib/product-types'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow as UITableRow,
+  TableCell,
+} from '@/components/ui/table'
 import { MarkdownProse } from '@/components/markdown-prose'
 import { MarkdownEditor } from '@/components/markdown-editor'
 import { Textarea } from '@/components/ui/textarea'
@@ -62,6 +71,7 @@ export interface ElementDetailProps {
   onSaveEdit: (sIndex: number, eIndex: number, fieldKey: string) => void
   onCancelEdit: () => void
   onEditValueChange: (value: string) => void
+  onUpdateTable?: (sIndex: number, eIndex: number, fieldKey: string, rows: TableRow[]) => void
   resolvedFields?: OutputTypeField[]
   sectionResolvedFields?: OutputTypeField[]
 }
@@ -260,12 +270,133 @@ function FieldCard({
   )
 }
 
+function TableFieldCard({
+  fieldDef, rows, sIndex, eIndex, onUpdateTable,
+}: {
+  fieldDef: OutputTypeField; rows: TableRow[]; sIndex: number; eIndex: number
+  onUpdateTable?: (sIndex: number, eIndex: number, fieldKey: string, rows: TableRow[]) => void
+}) {
+  const colorKey = fieldDef.color || 'none'
+  const colors = COLOR_MAP[colorKey] || DEFAULT_COLOR
+  const IconComponent = fieldDef.icon ? ICON_MAP[fieldDef.icon] : null
+  const columns = fieldDef.columns || (rows.length > 0 ? Object.keys(rows[0]).map((k) => ({ key: k, label: k })) : [])
+
+  const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null)
+  const [cellValue, setCellValue] = useState('')
+
+  const startCellEdit = (rowIdx: number, colKey: string, current: string) => {
+    setEditingCell({ row: rowIdx, col: colKey })
+    setCellValue(current)
+  }
+
+  const saveCellEdit = () => {
+    if (!editingCell || !onUpdateTable) return
+    const updated = rows.map((r, i) =>
+      i === editingCell.row ? { ...r, [editingCell.col]: cellValue } : r,
+    )
+    onUpdateTable(sIndex, eIndex, fieldDef.key, updated)
+    setEditingCell(null)
+    setCellValue('')
+  }
+
+  const cancelCellEdit = () => {
+    setEditingCell(null)
+    setCellValue('')
+  }
+
+  const addRow = () => {
+    if (!onUpdateTable) return
+    const empty: TableRow = {}
+    for (const col of columns) empty[col.key] = ''
+    onUpdateTable(sIndex, eIndex, fieldDef.key, [...rows, empty])
+  }
+
+  const removeRow = (rowIdx: number) => {
+    if (!onUpdateTable) return
+    onUpdateTable(sIndex, eIndex, fieldDef.key, rows.filter((_, i) => i !== rowIdx))
+  }
+
+  return (
+    <div className={cn('rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md', colors.border, colors.bg)}>
+      <div className={cn('mb-1 flex items-center gap-2 border-b pb-3 text-xs font-bold uppercase tracking-wide', colors.text, colors.border)}>
+        {IconComponent && <IconComponent className="h-3.5 w-3.5" />}
+        {fieldDef.label}
+      </div>
+      <div className="pt-3 overflow-x-auto">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">No data</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <UITableRow>
+                {columns.map((col) => (
+                  <TableHead key={col.key} className="text-xs font-semibold">{col.label}</TableHead>
+                ))}
+                {onUpdateTable && <TableHead className="w-8" />}
+              </UITableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row, rowIdx) => (
+                <UITableRow key={rowIdx}>
+                  {columns.map((col) => {
+                    const isEditing = editingCell?.row === rowIdx && editingCell?.col === col.key
+                    return (
+                      <TableCell key={col.key} className="py-1.5">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={cellValue}
+                              onChange={(e) => setCellValue(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveCellEdit(); if (e.key === 'Escape') cancelCellEdit() }}
+                              className="h-7 min-w-[80px] flex-1 rounded border border-border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                              autoFocus
+                            />
+                            <button onClick={saveCellEdit} className="rounded p-0.5 text-primary hover:bg-primary/10"><Check className="h-3.5 w-3.5" /></button>
+                            <button onClick={cancelCellEdit} className="rounded p-0.5 text-muted-foreground hover:bg-muted"><span className="text-xs">✕</span></button>
+                          </div>
+                        ) : (
+                          <span
+                            className={cn('text-sm', onUpdateTable && 'cursor-text hover:text-primary')}
+                            onClick={onUpdateTable ? () => startCellEdit(rowIdx, col.key, row[col.key] || '') : undefined}
+                            title={onUpdateTable ? 'Click to edit' : undefined}
+                          >
+                            {row[col.key] || <span className="text-muted-foreground/50">—</span>}
+                          </span>
+                        )}
+                      </TableCell>
+                    )
+                  })}
+                  {onUpdateTable && (
+                    <TableCell className="w-8 py-1.5">
+                      <button onClick={() => removeRow(rowIdx)} className="rounded p-0.5 text-muted-foreground/40 hover:text-destructive" title="Remove row">
+                        <span className="text-xs">✕</span>
+                      </button>
+                    </TableCell>
+                  )}
+                </UITableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {onUpdateTable && (
+          <button
+            onClick={addRow}
+            className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+          >
+            + Add row
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function ElementDetail(props: ElementDetailProps) {
   const { element, sIndex, eIndex, outputTypeDef, outputType, resolvedFields, sectionResolvedFields } = props
   const fields = sectionResolvedFields ?? resolvedFields ?? outputTypeDef.fields
   const primaryField = fields.find((f) => f.primary)
   const primaryKey = primaryField?.key || Object.keys(element.fields)[0]
-  const primaryVal = element.fields[primaryKey] || ''
+  const primaryVal = fieldAsString(element.fields[primaryKey])
   const nonPrimaryFields = fields.filter((f) => !f.primary)
 
   const isPromptType = outputType === 'prompts'
@@ -285,7 +416,25 @@ export function ElementDetail(props: ElementDetailProps) {
       )}
 
       {nonPrimaryFields.map((fieldDef) => {
-        const value = element.fields[fieldDef.key]
+        const rawValue = element.fields[fieldDef.key]
+        if (!rawValue) return null
+
+        if (fieldDef.type === 'table') {
+          const rows = fieldAsTable(rawValue)
+          if (rows.length === 0) return null
+          return (
+            <TableFieldCard
+              key={fieldDef.key}
+              fieldDef={fieldDef}
+              rows={rows}
+              sIndex={sIndex}
+              eIndex={eIndex}
+              onUpdateTable={props.onUpdateTable}
+            />
+          )
+        }
+
+        const value = fieldAsString(rawValue)
         if (!value) return null
         return (
           <FieldCard

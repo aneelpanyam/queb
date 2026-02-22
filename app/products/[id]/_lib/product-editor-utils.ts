@@ -1,4 +1,5 @@
 import type { Product, AssistantSuggestion } from '@/lib/product-types'
+import { fieldAsString } from '@/lib/product-types'
 import type { OutputTypeDefinition } from '@/lib/output-types'
 import { getPrimaryField } from '@/lib/output-types'
 import {
@@ -124,7 +125,7 @@ export function getElementPrimary(
   const el = product.sections[sIdx]?.elements[eIdx]
   if (!el) return ''
   const key = getSectionPrimaryKey(product, outputTypeDef, sIdx)
-  return el.fields[key] || Object.values(el.fields)[0] || ''
+  return fieldAsString(el.fields[key]) || fieldAsString(Object.values(el.fields)[0]) || ''
 }
 
 export function matchesElement(suggestion: AssistantSuggestion, elementPrimary: string): boolean {
