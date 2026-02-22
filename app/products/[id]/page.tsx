@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/use-auth'
 import { buildDirectoryProduct } from '@/lib/export-import'
+import { buildMarkdown } from '@/lib/export-markdown'
 import { generateCrosswordPdf } from '@/lib/crossword-pdf-export'
 import { generateWorkbookPdf, type WorkbookPdfSettings } from '@/lib/workbook-pdf-export'
 import { WorkbookPdfSettingsDialog } from '@/components/workbook-pdf-settings-dialog'
@@ -191,6 +192,22 @@ export default function ProductEditorPage() {
     toast.success('Product JSON exported!')
   }, [product, outputTypeDef, editor.dissectionMap, editor.deeperMap, editor.answerMap])
 
+  const handleExportMarkdown = useCallback(() => {
+    if (!product || !outputTypeDef) return
+    const dp = buildDirectoryProduct(product, outputTypeDef, editor.dissectionMap, editor.deeperMap, editor.answerMap)
+    const md = buildMarkdown(dp)
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${product.name.toLowerCase().replace(/\s+/g, '-')}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success('Markdown exported!')
+  }, [product, outputTypeDef, editor.dissectionMap, editor.deeperMap, editor.answerMap])
+
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -251,6 +268,7 @@ export default function ProductEditorPage() {
         pdfExportLoading={pdfExportLoading}
         onExportHtml={handleExport}
         onExportJson={handleExportJson}
+        onExportMarkdown={handleExportMarkdown}
         onExportPdf={product?.outputType === 'crossword-puzzles' || product?.outputType === 'workbook' ? handleExportPdfClick : undefined}
         onAssistant={assistant.handleAssistant}
         onLogout={handleLogout}

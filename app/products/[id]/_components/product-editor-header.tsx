@@ -26,6 +26,7 @@ interface ProductEditorHeaderProps {
   onSave: () => void
   onExportHtml: () => void
   onExportJson: () => void
+  onExportMarkdown: () => void
   onExportPdf?: () => void
   onAssistant: () => void
   onLogout: () => void
@@ -41,7 +42,7 @@ export function ProductEditorHeader({
   hasUnsavedChanges, saveStatus, exportLoading, assistantLoading,
   pdfExportLoading,
   editingName, nameValue,
-  onBack, onSave, onExportHtml, onExportJson, onExportPdf, onAssistant, onLogout,
+  onBack, onSave, onExportHtml, onExportJson, onExportMarkdown, onExportPdf, onAssistant, onLogout,
   onStartEditName, onSaveEditName, onCancelEditName, onNameValueChange, onUpdateName,
 }: ProductEditorHeaderProps) {
   const TypeIcon = getOutputTypeIcon(product.outputType)
@@ -94,6 +95,10 @@ export function ProductEditorHeader({
         <Button variant="outline" size="sm" onClick={onExportHtml} disabled={exportLoading} className="gap-1.5">
           {exportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           Export HTML
+        </Button>
+        <Button variant="outline" size="sm" onClick={onExportMarkdown} className="gap-1.5">
+          <FileText className="h-3.5 w-3.5" />
+          Export MD
         </Button>
         {onExportPdf && (
           <Button variant="outline" size="sm" onClick={onExportPdf} disabled={pdfExportLoading} className="gap-1.5">

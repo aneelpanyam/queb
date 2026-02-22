@@ -22,7 +22,7 @@ function normalizeInlineLists(text: string): string {
   }
 
   if (/\([a-z]+\)\s/i.test(result)) {
-    result = result.replace(/,?\s*\(([a-z]+)\)\s+/gi, (_, letter) => `\n- (${letter}) `)
+    result = result.replace(/,?\s*\(([a-z]{0,2})\)\s+/gi, (_, letter) => `\n- (${letter}) `)
   }
 
   if (/[.!?:;]\s+[-–•]\s/.test(result)) {
