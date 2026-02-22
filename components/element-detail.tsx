@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { OutputTypeDefinition, OutputTypeField } from '@/lib/output-type-library'
 import type { ProductSection, FieldValue, TableRow } from '@/lib/product-types'
@@ -284,6 +284,75 @@ function TableFieldCard({
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null)
   const [cellValue, setCellValue] = useState('')
 
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const [resizing, setResizing] = useState(false)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const dragRef = useRef<{ colKey: string; startX: number; startWidth: number } | null>(null)
+
+  const hasExplicitWidths = Object.keys(columnWidths).length > 0
+
+  const captureWidths = useCallback(() => {
+    if (!tableRef.current) return {}
+    const ths = tableRef.current.querySelectorAll<HTMLElement>('thead th')
+    const widths: Record<string, number> = {}
+    columns.forEach((col, i) => {
+      if (ths[i]) widths[col.key] = ths[i].offsetWidth
+    })
+    return widths
+  }, [columns])
+
+  const onResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    let widths = columnWidths
+    if (!hasExplicitWidths) {
+      widths = captureWidths()
+      setColumnWidths(widths)
+    }
+    dragRef.current = { colKey, startX: e.clientX, startWidth: widths[colKey] || 100 }
+    setResizing(true)
+  }, [columnWidths, hasExplicitWidths, captureWidths])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragRef.current) return
+      const delta = e.clientX - dragRef.current.startX
+      const newWidth = Math.max(60, dragRef.current.startWidth + delta)
+      setColumnWidths((prev) => ({ ...prev, [dragRef.current!.colKey]: newWidth }))
+    }
+    const onUp = () => {
+      if (dragRef.current) {
+        dragRef.current = null
+        setResizing(false)
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (resizing) {
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      return () => {
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+  }, [resizing])
+
+  const actionColWidth = onUpdateTable ? 32 : 0
+  const tableStyle: React.CSSProperties | undefined = hasExplicitWidths
+    ? {
+        tableLayout: 'fixed',
+        minWidth: Object.values(columnWidths).reduce((s, w) => s + w, 0) + actionColWidth,
+      }
+    : undefined
+
   const startCellEdit = (rowIdx: number, colKey: string, current: string) => {
     setEditingCell({ row: rowIdx, col: colKey })
     setCellValue(current)
@@ -326,11 +395,23 @@ function TableFieldCard({
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground italic">No data</p>
         ) : (
-          <Table>
+          <Table ref={tableRef} style={tableStyle}>
             <TableHeader>
               <UITableRow>
                 {columns.map((col) => (
-                  <TableHead key={col.key} className="text-xs font-semibold">{col.label}</TableHead>
+                  <TableHead
+                    key={col.key}
+                    className="relative select-none text-xs font-semibold"
+                    style={hasExplicitWidths ? { width: columnWidths[col.key] } : undefined}
+                  >
+                    <span className="block pr-2">{col.label}</span>
+                    <div
+                      onMouseDown={(e) => onResizeStart(e, col.key)}
+                      className="absolute -right-px top-0 bottom-0 z-10 w-[5px] cursor-col-resize opacity-0 transition-opacity hover:opacity-100 active:opacity-100"
+                    >
+                      <div className="mx-auto h-full w-px bg-primary/40" />
+                    </div>
+                  </TableHead>
                 ))}
                 {onUpdateTable && <TableHead className="w-8" />}
               </UITableRow>
@@ -341,27 +422,30 @@ function TableFieldCard({
                   {columns.map((col) => {
                     const isEditing = editingCell?.row === rowIdx && editingCell?.col === col.key
                     return (
-                      <TableCell key={col.key} className="py-1.5">
+                      <TableCell key={col.key} className="py-1.5 align-top">
                         {isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <input
+                          <div className="min-w-[180px]">
+                            <MarkdownEditor
                               value={cellValue}
-                              onChange={(e) => setCellValue(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') saveCellEdit(); if (e.key === 'Escape') cancelCellEdit() }}
-                              className="h-7 min-w-[80px] flex-1 rounded border border-border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                              onChange={setCellValue}
+                              onSave={saveCellEdit}
+                              onCancel={cancelCellEdit}
+                              minRows={3}
                               autoFocus
                             />
-                            <button onClick={saveCellEdit} className="rounded p-0.5 text-primary hover:bg-primary/10"><Check className="h-3.5 w-3.5" /></button>
-                            <button onClick={cancelCellEdit} className="rounded p-0.5 text-muted-foreground hover:bg-muted"><span className="text-xs">✕</span></button>
                           </div>
                         ) : (
-                          <span
-                            className={cn('text-sm', onUpdateTable && 'cursor-text hover:text-primary')}
+                          <div
+                            className={cn('text-sm break-words', onUpdateTable && 'cursor-text group/cell')}
                             onClick={onUpdateTable ? () => startCellEdit(rowIdx, col.key, row[col.key] || '') : undefined}
                             title={onUpdateTable ? 'Click to edit' : undefined}
                           >
-                            {row[col.key] || <span className="text-muted-foreground/50">—</span>}
-                          </span>
+                            {row[col.key] ? (
+                              <MarkdownProse className="text-[13px] leading-[1.6] [&_p]:mb-1.5 [&_ul]:mb-1.5 [&_ol]:mb-1.5 [&_ul]:ml-4 [&_ol]:ml-4 [&_li]:leading-snug group-hover/cell:text-primary/80">{row[col.key]}</MarkdownProse>
+                            ) : (
+                              <span className="text-muted-foreground/50">—</span>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                     )

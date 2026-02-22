@@ -13,19 +13,22 @@ import { cn } from '@/lib/utils'
  * formatted with newlines we leave it untouched.
  */
 function normalizeInlineLists(text: string): string {
-  if (!text || text.includes('\n')) return text
-
-  const hasNumberedItems = /\s\d+\)\s/.test(text)
-  const hasBulletItems = /[.!?:;]\s+[-–•]\s/.test(text)
-  if (!hasNumberedItems && !hasBulletItems) return text
+  if (!text) return text
 
   let result = text
-  if (hasNumberedItems) {
+
+  if (/\s\d+\)\s/.test(result)) {
     result = result.replace(/\s+(\d+)\)\s+/g, '\n$1. ')
   }
-  if (hasBulletItems) {
+
+  if (/\([a-z]+\)\s/i.test(result)) {
+    result = result.replace(/,?\s*\(([a-z]+)\)\s+/gi, (_, letter) => `\n- (${letter}) `)
+  }
+
+  if (/[.!?:;]\s+[-–•]\s/.test(result)) {
     result = result.replace(/([.!?:;])\s+([-–•])\s+/g, '$1\n$2 ')
   }
+
   return result
 }
 
